@@ -2,8 +2,8 @@
 
 ## Postgres
 
-ContextForge stores typed rows and receipt metadata in PostgreSQL 16.
-The local `cfg dev` stack brings up Postgres on port 5432 with database,
+Signet stores typed rows and receipt metadata in PostgreSQL 16.
+The local `signet dev` stack brings up Postgres on port 5432 with database,
 user, and password all set to `cfg`.
 
 ## Qdrant

@@ -93,7 +93,7 @@
 </script>
 
 <svelte:head>
-  <title>Query · ContextForge</title>
+  <title>Query · Signet</title>
 </svelte:head>
 
 <div class="px-10 py-10 max-w-6xl">

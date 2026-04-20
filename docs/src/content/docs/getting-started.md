@@ -1,9 +1,9 @@
 ---
 title: Getting started
-description: Stand up a local ContextForge gateway, register a schema, ingest some data, and run your first query.
+description: Stand up a local Signet gateway, register a schema, ingest some data, and run your first query.
 ---
 
-This guide gets you from nothing to a working ContextForge gateway serving MCP
+This guide gets you from nothing to a working Signet gateway serving MCP
 tools and REST endpoints in about ten minutes. Everything runs locally with
 Docker Compose.
 
@@ -19,8 +19,8 @@ Docker Compose.
 Clone the repo and bring up Postgres, Qdrant, and the gateway:
 
 ```bash
-git clone https://github.com/bwiemz/contextforge.git
-cd contextforge
+git clone https://github.com/bwiemz/signet.git
+cd signet
 docker compose -f deploy/docker/compose.dev.yaml up -d
 ```
 
@@ -59,7 +59,7 @@ Compile and apply it. The CLI turns CSL into a JSON schema meta the gateway
 understands and POSTs it via `/v1/schemas`:
 
 ```bash
-cfg schema apply schemas/doc.csl
+signet schema apply schemas/doc.csl
 ```
 
 ## 3. Register a connector
@@ -69,26 +69,26 @@ Point the local-files connector at a directory of markdown:
 ```bash
 mkdir -p sample-docs
 echo "# Setup\nUse Postgres 16." > sample-docs/setup.md
-cfg connector add local-files --schema examples.Doc --root ./sample-docs
+signet connector add local-files --schema examples.Doc --root ./sample-docs
 ```
 
 Then trigger a sync:
 
 ```bash
-cfg connector sync local-files/examples.Doc
+signet connector sync local-files/examples.Doc
 ```
 
 ## 4. Query
 
 ```bash
-cfg query --schema examples.Doc "what does the setup doc say about postgres?"
+signet query --schema examples.Doc "what does the setup doc say about postgres?"
 ```
 
 You'll get hits plus a receipt id. Fetch the receipt to see why each source
 surfaced:
 
 ```bash
-cfg receipt show <receipt-id>
+signet receipt show <receipt-id>
 ```
 
 ## 5. Next

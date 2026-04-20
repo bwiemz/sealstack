@@ -1,11 +1,11 @@
 // TypeScript mirrors of the engine's public DTOs.
 //
 // These shapes must stay in sync with:
-//   cfg_engine::api::{SearchRequest, SearchResponse, Caller}
-//   cfg_engine::schema_registry::SchemaMeta
-//   cfg_engine::receipts::Receipt
-//   cfg_ingest::registry::ConnectorBindingInfo
-//   cfg_ingest::runtime::SyncOutcome
+//   signet_engine::api::{SearchRequest, SearchResponse, Caller}
+//   signet_engine::schema_registry::SchemaMeta
+//   signet_engine::receipts::Receipt
+//   signet_ingest::registry::ConnectorBindingInfo
+//   signet_ingest::runtime::SyncOutcome
 //
 // We keep them narrow — console never sends anything the CLI can't, and the
 // CLI is the reference implementation.

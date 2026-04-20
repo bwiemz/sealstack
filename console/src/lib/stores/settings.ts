@@ -14,7 +14,7 @@ export interface Settings {
 const DEFAULT: Settings = {
   gatewayUrl:
     (typeof window !== 'undefined' &&
-      (window as any).__CFG_GATEWAY_URL__) ??
+      (window as any).__SIGNET_GATEWAY_URL__) ??
     'http://localhost:7070',
   user: 'console'
 };

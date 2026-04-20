@@ -1,6 +1,6 @@
 # Ingestion — Design Notes
 
-**Companion to**: `crates/cfg-connector-sdk/`, `crates/cfg-ingest/`, and `connectors/local-files/` in the drop-in.
+**Companion to**: `crates/signet-connector-sdk/`, `crates/signet-ingest/`, and `connectors/local-files/` in the drop-in.
 **Status**: Unverified skeleton. 1,368 lines across 7 files. Targets `notify` 7, `walkdir` 2.5, Rust 2024. Verify locally.
 
 ---
@@ -11,19 +11,19 @@ Three crates, three concerns:
 
 | Crate | Role | Depends on |
 |---|---|---|
-| `cfg-connector-sdk` | Defines the `Connector` trait and the `Resource` / `ChangeEvent` shapes | `cfg-common` |
-| `cfg-ingest` | Runtime that drives connectors and feeds their output into the engine | `cfg-engine`, `cfg-connector-sdk` |
-| `connectors/local-files` | A concrete `Connector` implementation backed by a filesystem directory | `cfg-connector-sdk` |
+| `signet-connector-sdk` | Defines the `Connector` trait and the `Resource` / `ChangeEvent` shapes | `signet-common` |
+| `signet-ingest` | Runtime that drives connectors and feeds their output into the engine | `signet-engine`, `signet-connector-sdk` |
+| `connectors/local-files` | A concrete `Connector` implementation backed by a filesystem directory | `signet-connector-sdk` |
 
 Three crates rather than one because each has a different consumer:
 
 - Connector authors depend on just the SDK. A third party writing a SharePoint or Jira connector shouldn't have to pull in the engine or the ingest runtime.
-- The ingest runtime is an internal engine subsystem — nobody outside ContextForge calls it directly.
+- The ingest runtime is an internal engine subsystem — nobody outside Signet calls it directly.
 - Concrete connectors are binary shims that live under `connectors/` per the workspace layout in the scaffolding brief, not under `crates/`. They're treated like third-party contributions even when we write them.
 
 ---
 
-## 2. `cfg-connector-sdk` — the trait
+## 2. `signet-connector-sdk` — the trait
 
 The whole SDK is one trait:
 
@@ -32,10 +32,10 @@ The whole SDK is one trait:
 pub trait Connector: Send + Sync + 'static {
     fn name(&self) -> &str;
     fn version(&self) -> &str;
-    async fn list(&self) -> CfgResult<ResourceStream>;
-    async fn fetch(&self, id: &ResourceId) -> CfgResult<Resource>;
-    async fn subscribe(&self) -> CfgResult<Option<ChangeStream>> { Ok(None) }
-    async fn healthcheck(&self) -> CfgResult<()> { Ok(()) }
+    async fn list(&self) -> SignetResult<ResourceStream>;
+    async fn fetch(&self, id: &ResourceId) -> SignetResult<Resource>;
+    async fn subscribe(&self) -> SignetResult<Option<ChangeStream>> { Ok(None) }
+    async fn healthcheck(&self) -> SignetResult<()> { Ok(()) }
 }
 ```
 
@@ -78,7 +78,7 @@ Thin. Enough for the common push patterns (webhook arrives → decide upsert or 
 
 ---
 
-## 3. `cfg-ingest` — the runtime
+## 3. `signet-ingest` — the runtime
 
 ### Binding
 
@@ -95,7 +95,7 @@ A binding is the unit the runtime operates on: one connector plus one target sch
 
 ### Three modes
 
-1. **`sync_once(binding_id)`** — one-shot. The CLI's `cfg connector sync <id>` and the integration-test harness both call this. Returns a `SyncOutcome` with counters for resources seen / ingested / failed plus elapsed time.
+1. **`sync_once(binding_id)`** — one-shot. The CLI's `signet connector sync <id>` and the integration-test harness both call this. Returns a `SyncOutcome` with counters for resources seen / ingested / failed plus elapsed time.
 
 2. **`start_background()`** — spawns one Tokio task per binding that has an `interval` configured. The poll loop calls `sync_once` on the tick and logs the outcome. Missed ticks use `MissedTickBehavior::Delay` so a slow sync doesn't pile up.
 
@@ -113,7 +113,7 @@ The rationale: sync is a batch operation over N items. Making the whole sync fai
 
 ### What's not in v0.1
 
-- **Incremental sync.** `cfg_ingest_state` is created by the engine's migration but not read — every `sync_once` walks the full source. Idempotent upserts mean this is correct, just wasteful at scale.
+- **Incremental sync.** `signet_ingest_state` is created by the engine's migration but not read — every `sync_once` walks the full source. Idempotent upserts mean this is correct, just wasteful at scale.
 - **Dead-letter handling.** Per-resource failures go to the log. A real DLQ needs persistence and a replay mechanism.
 - **Rate limiting.** No backoff when the source returns `429`. Vendor-specific concern best handled at the connector level.
 - **Metrics.** `SyncOutcome` captures per-run numbers but doesn't expose them to Prometheus. A `tracing` → OpenTelemetry bridge covers most of this generically.
@@ -150,7 +150,7 @@ Binaries (`.bin`, `.png`, `.pdf`, etc.) are skipped at the extension filter befo
 
 ### Size cap
 
-`max_file_bytes` defaults to 2 MiB. Files larger than that are skipped with a `CfgError::Validation` that the runtime logs as a warning. Two reasons:
+`max_file_bytes` defaults to 2 MiB. Files larger than that are skipped with a `SignetError::Validation` that the runtime logs as a warning. Two reasons:
 
 1. **Embedding cost.** A 50 MiB log file produces thousands of chunks and thousands of embedder calls. That's a budgeting decision the operator should make deliberately.
 2. **Chunker quality.** The semantic chunker's heuristics assume prose-like inputs. A 20 MiB minified JSON blob will produce garbage chunks.
@@ -179,14 +179,14 @@ The scaffolding brief's Phase 12 end-to-end acceptance test becomes runnable onc
 #[tokio::test(flavor = "multi_thread")]
 async fn scaffold_end_to_end() -> anyhow::Result<()> {
     // 1. Stand up DB + vector store.
-    let env = cfg_test::Env::spin_up().await?;
+    let env = signet_test::Env::spin_up().await?;
 
     // 2. Register the compiled schema with the engine.
     env.apply_schema("examples/engineering-context/schemas/doc.csl").await?;
 
     // 3. Bind a local-files connector to the schema.
     let connector = Arc::new(
-        cfg_connector_local_files::LocalFilesConnector::new(
+        signet_connector_local_files::LocalFilesConnector::new(
             "examples/engineering-context/sample-docs",
         )?,
     );
@@ -215,15 +215,15 @@ This is the first test in the whole stack that exercises every layer — CSL →
 
 ## 6. Known gaps — priority order
 
-1. **Incremental sync.** Write connector state (`last_sync_at`, `cursor`) to `cfg_ingest_state` on every run. Skip unchanged resources on the next run. Significant efficiency win at scale.
+1. **Incremental sync.** Write connector state (`last_sync_at`, `cursor`) to `signet_ingest_state` on every run. Skip unchanged resources on the next run. Significant efficiency win at scale.
 
-2. **Delete propagation.** `ChangeEvent::Delete` is parsed but not acted on — the ingest runtime logs it and moves on. Needs a `(connector_resource_id, engine_record_id)` lookup in `cfg_lineage` so we can delete the right row.
+2. **Delete propagation.** `ChangeEvent::Delete` is parsed but not acted on — the ingest runtime logs it and moves on. Needs a `(connector_resource_id, engine_record_id)` lookup in `signet_lineage` so we can delete the right row.
 
 3. **GitHub connector.** `connectors/github/` is the next reference implementation. OAuth device flow, rate-limit handling, issue + PR + markdown-in-repo ingestion. Stage for that is the largest step toward proving the connector SDK scales beyond trivial cases.
 
 4. **Slack connector.** `connectors/slack/` after GitHub. Bot token auth, channel allow-list, chunking strategy that respects message threads.
 
-5. **Dead-letter queue.** `cfg_ingest_dlq` table with `(connector_id, resource_id, last_error, attempts, next_retry_at)`. CLI command to replay.
+5. **Dead-letter queue.** `signet_ingest_dlq` table with `(connector_id, resource_id, last_error, attempts, next_retry_at)`. CLI command to replay.
 
 6. **Rate limiting / backoff.** Vendor APIs return `429` with `Retry-After` headers. Connectors should expose an idiomatic retry strategy rather than letting every author reinvent one.
 
@@ -231,7 +231,7 @@ This is the first test in the whole stack that exercises every layer — CSL →
 
 8. **`.gitignore` support for `local-files`.** Two-line change: add `ignore` crate (the one `ripgrep` uses) and check each path.
 
-9. **Binary file handling.** PDFs and Office docs are common in enterprise. A `cfg-extract` crate with `pdf-extract` and `docx-rs` support, invoked from the connector before returning the `Resource`.
+9. **Binary file handling.** PDFs and Office docs are common in enterprise. A `signet-extract` crate with `pdf-extract` and `docx-rs` support, invoked from the connector before returning the `Resource`.
 
 10. **Connector healthcheck surface.** `POST /v1/connectors/:id/healthcheck` wires up but isn't implemented on the REST side yet. Low-hanging once the binding is accessible through `AppState`.
 
@@ -253,6 +253,6 @@ Things most likely to need adjustment:
 
 6. **`path.display().to_string()`.** On Windows, this can produce surprising byte sequences for non-UTF-8 paths. `local-files` is documented as UTF-8-only; a lossier-but-stable encoding is future work.
 
-The `cfg-connector-sdk` tests run without any external services. `cfg-ingest` unit tests are registry-only and also run clean. `local-files` tests need a writable `tempfile::tempdir` but nothing else. Smoke-test those three first.
+The `signet-connector-sdk` tests run without any external services. `signet-ingest` unit tests are registry-only and also run clean. `local-files` tests need a writable `tempfile::tempdir` but nothing else. Smoke-test those three first.
 
 *End of ingestion design notes.*

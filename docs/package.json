@@ -1,9 +1,9 @@
 {
-  "name": "contextforge-docs",
+  "name": "signet-docs",
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "ContextForge documentation site.",
+  "description": "Signet documentation site.",
   "scripts": {
     "dev": "astro dev --port 4321",
     "build": "astro build",

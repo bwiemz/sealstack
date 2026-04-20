@@ -1,4 +1,4 @@
-//! ContextForge connector for a local filesystem directory.
+//! Signet connector for a local filesystem directory.
 //!
 //! Each text file under the configured root becomes one [`Resource`]:
 //!
@@ -34,8 +34,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use cfg_common::{CfgError, CfgResult};
-use cfg_connector_sdk::{
+use signet_common::{SignetError, SignetResult};
+use signet_connector_sdk::{
     ChangeStream, Connector, PermissionPredicate, Resource, ResourceId, ResourceStream,
     change_streams,
 };
@@ -62,17 +62,17 @@ impl LocalFilesConnector {
     /// Construct a connector rooted at `root`.
     ///
     /// The path is canonicalized eagerly — if it doesn't exist, construction
-    /// fails with [`CfgError::Config`].
-    pub fn new(root: impl Into<PathBuf>) -> CfgResult<Self> {
+    /// fails with [`SignetError::Config`].
+    pub fn new(root: impl Into<PathBuf>) -> SignetResult<Self> {
         let root = root.into();
         let root = std::fs::canonicalize(&root).map_err(|e| {
-            CfgError::Config(format!(
+            SignetError::Config(format!(
                 "local-files: root `{}` is not readable: {e}",
                 root.display()
             ))
         })?;
         if !root.is_dir() {
-            return Err(CfgError::Config(format!(
+            return Err(SignetError::Config(format!(
                 "local-files: root `{}` is not a directory",
                 root.display()
             )));
@@ -123,10 +123,10 @@ impl LocalFilesConnector {
         self.extensions.contains(&ext.to_lowercase())
     }
 
-    async fn read_resource(&self, path: &Path) -> CfgResult<Resource> {
-        let metadata = tokio::fs::metadata(path).await.map_err(CfgError::backend)?;
+    async fn read_resource(&self, path: &Path) -> SignetResult<Resource> {
+        let metadata = tokio::fs::metadata(path).await.map_err(SignetError::backend)?;
         if metadata.len() > self.max_file_bytes {
-            return Err(CfgError::Validation(format!(
+            return Err(SignetError::Validation(format!(
                 "file `{}` is {} bytes, exceeds max_file_bytes {}",
                 path.display(),
                 metadata.len(),
@@ -134,7 +134,7 @@ impl LocalFilesConnector {
             )));
         }
         let body = tokio::fs::read_to_string(path).await.map_err(|e| {
-            CfgError::Backend(format!(
+            SignetError::Backend(format!(
                 "failed to read `{}` as utf-8: {e}",
                 path.display()
             ))
@@ -192,7 +192,7 @@ impl Connector for LocalFilesConnector {
         env!("CARGO_PKG_VERSION")
     }
 
-    async fn list(&self) -> CfgResult<ResourceStream> {
+    async fn list(&self) -> SignetResult<ResourceStream> {
         let root = self.root.clone();
         let connector = self.clone_lite();
 
@@ -209,7 +209,7 @@ impl Connector for LocalFilesConnector {
                 .collect()
         })
         .await
-        .map_err(|e| CfgError::Backend(format!("walkdir join: {e}")))?;
+        .map_err(|e| SignetError::Backend(format!("walkdir join: {e}")))?;
 
         // Filter and read each file. Collecting eagerly keeps error handling
         // simple; the connector is sized for typical codebases (10³–10⁴ files).
@@ -229,17 +229,17 @@ impl Connector for LocalFilesConnector {
         Ok(change_streams::resource_stream(out))
     }
 
-    async fn fetch(&self, id: &ResourceId) -> CfgResult<Resource> {
+    async fn fetch(&self, id: &ResourceId) -> SignetResult<Resource> {
         let path = PathBuf::from(id.as_str());
         if !path.starts_with(&self.root) {
-            return Err(CfgError::Unauthorized(format!(
+            return Err(SignetError::Unauthorized(format!(
                 "path `{}` is outside connector root `{}`",
                 path.display(),
                 self.root.display()
             )));
         }
         if !path.exists() {
-            return Err(CfgError::NotFound(format!(
+            return Err(SignetError::NotFound(format!(
                 "local-files resource `{}` does not exist",
                 path.display()
             )));
@@ -248,18 +248,18 @@ impl Connector for LocalFilesConnector {
     }
 
     #[cfg(feature = "watch")]
-    async fn subscribe(&self) -> CfgResult<Option<ChangeStream>> {
+    async fn subscribe(&self) -> SignetResult<Option<ChangeStream>> {
         Ok(Some(watch::watch_stream(self.clone_lite())?))
     }
 
     #[cfg(not(feature = "watch"))]
-    async fn subscribe(&self) -> CfgResult<Option<ChangeStream>> {
+    async fn subscribe(&self) -> SignetResult<Option<ChangeStream>> {
         Ok(None)
     }
 
-    async fn healthcheck(&self) -> CfgResult<()> {
+    async fn healthcheck(&self) -> SignetResult<()> {
         if !self.root.exists() {
-            return Err(CfgError::Config(format!(
+            return Err(SignetError::Config(format!(
                 "local-files root `{}` does not exist",
                 self.root.display()
             )));
@@ -292,8 +292,8 @@ mod watch {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
-    use cfg_common::{CfgError, CfgResult};
-    use cfg_connector_sdk::{ChangeEvent, ChangeStream, ResourceId};
+    use signet_common::{SignetError, SignetResult};
+    use signet_connector_sdk::{ChangeEvent, ChangeStream, ResourceId};
     use futures::{Stream, StreamExt, stream};
     use notify::{Event, EventKind, RecursiveMode, Watcher};
     use tokio::sync::mpsc::{self, UnboundedReceiver};
@@ -323,7 +323,7 @@ mod watch {
     /// * `Remove(_)`               → `Delete(path)`.
     ///
     /// Ignored events: metadata changes without content change, access events.
-    pub(super) fn watch_stream(connector: LocalFilesConnector) -> CfgResult<ChangeStream> {
+    pub(super) fn watch_stream(connector: LocalFilesConnector) -> SignetResult<ChangeStream> {
         let (tx, rx) = mpsc::unbounded_channel::<Event>();
 
         // Build the watcher on a dedicated OS thread; `notify` binds to the
@@ -331,7 +331,7 @@ mod watch {
         // tie it to the tokio executor thread.
         let root = connector.root.clone();
         std::thread::Builder::new()
-            .name("cfg-local-files-watch".into())
+            .name("signet-local-files-watch".into())
             .spawn(move || {
                 let mut watcher = match notify::recommended_watcher(move |res| {
                     if let Ok(event) = res {
@@ -353,7 +353,7 @@ mod watch {
                     std::thread::park();
                 }
             })
-            .map_err(|e| CfgError::Backend(format!("spawn watch thread: {e}")))?;
+            .map_err(|e| SignetError::Backend(format!("spawn watch thread: {e}")))?;
 
         let rx_stream = ReceiverStream { inner: rx };
         let mapped = rx_stream.then(move |event| {
@@ -433,7 +433,7 @@ mod tests {
             .fetch(&ResourceId::new("/etc/passwd"))
             .await
             .unwrap_err();
-        assert!(matches!(err, CfgError::Unauthorized(_)));
+        assert!(matches!(err, SignetError::Unauthorized(_)));
     }
 
     #[tokio::test]

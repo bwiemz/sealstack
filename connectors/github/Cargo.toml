@@ -1,5 +1,5 @@
 [package]
-name         = "cfg-connector-github"
+name         = "signet-connector-github"
 version      = { workspace = true }
 edition      = { workspace = true }
 rust-version = { workspace = true }
@@ -10,8 +10,8 @@ repository   = { workspace = true }
 workspace = true
 
 [dependencies]
-cfg-common        = { path = "../../crates/cfg-common" }
-cfg-connector-sdk = { path = "../../crates/cfg-connector-sdk" }
+signet-common        = { path = "../../crates/signet-common" }
+signet-connector-sdk = { path = "../../crates/signet-connector-sdk" }
 async-trait       = { workspace = true }
 reqwest           = { workspace = true }
 serde             = { workspace = true }

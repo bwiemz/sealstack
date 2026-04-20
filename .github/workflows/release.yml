@@ -29,20 +29,20 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            artifact: cfg-linux-x86_64.tar.gz
+            artifact: signet-linux-x86_64.tar.gz
           - os: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
-            artifact: cfg-linux-aarch64.tar.gz
+            artifact: signet-linux-aarch64.tar.gz
             cross: true
           - os: macos-14
             target: x86_64-apple-darwin
-            artifact: cfg-macos-x86_64.tar.gz
+            artifact: signet-macos-x86_64.tar.gz
           - os: macos-14
             target: aarch64-apple-darwin
-            artifact: cfg-macos-aarch64.tar.gz
+            artifact: signet-macos-aarch64.tar.gz
           - os: windows-2022
             target: x86_64-pc-windows-msvc
-            artifact: cfg-windows-x86_64.zip
+            artifact: signet-windows-x86_64.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -63,9 +63,9 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ matrix.cross }}" == "true" ]]; then
-            cross build --release -p cfg-cli --target ${{ matrix.target }}
+            cross build --release -p signet-cli --target ${{ matrix.target }}
           else
-            cargo build --release -p cfg-cli --target ${{ matrix.target }}
+            cargo build --release -p signet-cli --target ${{ matrix.target }}
           fi
 
       - name: Package (unix)
@@ -73,7 +73,7 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf "$GITHUB_WORKSPACE/${{ matrix.artifact }}" cfg
+          tar czf "$GITHUB_WORKSPACE/${{ matrix.artifact }}" signet
           cd -
 
       - name: Package (windows)
@@ -81,7 +81,7 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive `
-            -Path target/${{ matrix.target }}/release/cfg.exe `
+            -Path target/${{ matrix.target }}/release/signet.exe `
             -DestinationPath ${{ matrix.artifact }}
 
       - name: Upload to release

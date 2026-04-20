@@ -1,6 +1,6 @@
 ---
 title: Multi-tenant isolation
-description: How ContextForge scopes queries so tenants never see each other's data.
+description: How Signet scopes queries so tenants never see each other's data.
 ---
 
 ## Model
@@ -25,7 +25,7 @@ no tenant set — the default-tenant case for single-tenant deployments.
 The caller's tenant comes from their identity:
 
 - **MCP routes** — the `tenant` claim on the validated JWT, courtesy of the
-  OAuth bearer middleware at [`src/auth.rs`](https://github.com/bwiemz/contextforge/blob/main/crates/cfg-gateway/src/auth.rs).
+  OAuth bearer middleware at [`src/auth.rs`](https://github.com/bwiemz/signet/blob/main/crates/signet-gateway/src/auth.rs).
   If the gateway runs in `AuthMode::Disabled` (dev), the tenant is empty
   string.
 - **REST routes** — either the authenticated JWT (when present) or the

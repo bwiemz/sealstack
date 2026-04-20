@@ -3,11 +3,11 @@
 End-to-end walkthrough: apply a schema, ingest local markdown, query it.
 
 ```bash
-cfg dev
-cfg schema apply schemas/doc.csl
-cfg connector add local-files --root ./sample-docs
-cfg connector sync local-files
-cfg query "what does the setup guide say about postgres?"
+signet dev
+signet schema apply schemas/doc.csl
+signet connector add local-files --root ./sample-docs
+signet connector sync local-files
+signet query "what does the setup guide say about postgres?"
 ```
 
 The query should return hits with scores > 0 and a receipt ID. Fetch the

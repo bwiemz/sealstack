@@ -20,7 +20,7 @@
 </script>
 
 <svelte:head>
-  <title>Schemas · ContextForge</title>
+  <title>Schemas · Signet</title>
 </svelte:head>
 
 <div class="px-10 py-10">
@@ -29,7 +29,7 @@
     <h1 class="serif text-5xl text-[var(--color-ink-10)] mt-2 leading-none">registered.</h1>
     <p class="serif italic text-[var(--color-ink-8)] text-lg mt-3 max-w-xl leading-snug">
       Every schema is a CSL namespace + name + version. Apply new ones from the CLI —
-      <code class="code inline text-[12px] px-1.5 py-0.5">cfg schema apply</code>.
+      <code class="code inline text-[12px] px-1.5 py-0.5">signet schema apply</code>.
     </p>
   </header>
 
@@ -42,7 +42,7 @@
   {:else if schemas.length === 0}
     <EmptyState
       title="No schemas yet."
-      body="Compile a CSL file and apply it to the gateway to see it here. The CLI scaffolds a starter schema with `cfg init`."
+      body="Compile a CSL file and apply it to the gateway to see it here. The CLI scaffolds a starter schema with `signet init`."
     />
   {:else}
     <div class="panel overflow-hidden">

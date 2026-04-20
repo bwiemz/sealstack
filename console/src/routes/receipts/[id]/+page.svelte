@@ -79,7 +79,7 @@
 </script>
 
 <svelte:head>
-  <title>Receipt {($page.params.id ?? '').slice(0, 8)}… · ContextForge</title>
+  <title>Receipt {($page.params.id ?? '').slice(0, 8)}… · Signet</title>
 </svelte:head>
 
 {#if loading}
@@ -98,7 +98,7 @@
     <header class="pb-8 border-b border-[var(--color-ink-4)]">
       <div class="flex items-start justify-between">
         <div>
-          <div class="label">contextforge · receipt</div>
+          <div class="label">signet · receipt</div>
           <h1 class="serif text-5xl mt-3 text-[var(--color-ink-10)] leading-none">
             verdict &amp; provenance
           </h1>

@@ -1,0 +1,36 @@
+[package]
+name         = "signet-embedders"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "Embedder abstraction + stub and vendor-API backends for Signet."
+
+[lints]
+workspace = true
+
+[dependencies]
+signet-common  = { path = "../signet-common" }
+
+async-trait = "0.1"
+serde       = { workspace = true, features = ["derive"] }
+serde_json  = { workspace = true }
+thiserror   = { workspace = true }
+tokio       = { workspace = true, features = ["sync", "rt"] }
+tracing     = { workspace = true }
+blake3      = "1.5"
+
+# HTTP client — gated on the vendor features so pure stub users don't pay the
+# compile cost.
+reqwest     = { workspace = true, optional = true }
+
+[features]
+default = ["stub"]
+stub    = []
+voyage  = ["dep:reqwest"]
+openai  = ["dep:reqwest"]
+all     = ["stub", "voyage", "openai"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

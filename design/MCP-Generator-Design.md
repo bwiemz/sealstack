@@ -1,9 +1,9 @@
 # MCP Server Auto-Generation — Design Notes
 
-**Companion to**: `crates/cfg-csl/src/codegen/mcp.rs` and `crates/cfg-gateway/src/mcp/` in the drop-in.
+**Companion to**: `crates/signet-csl/src/codegen/mcp.rs` and `crates/signet-gateway/src/mcp/` in the drop-in.
 **Status**: Unverified skeleton. Targets MCP spec revision **2025-11-25** (streamable HTTP transport, OAuth 2.1 discovery).
 
-The thesis of ContextForge is that an enterprise context platform should expose **every schema as a typed MCP server**, automatically. You declare the schema once in CSL; you get a running MCP endpoint with properly-typed tools, inferred permissions, and auditable receipts. No hand-written tool wiring, no drift between your permission model and what the LLM sees.
+The thesis of Signet is that an enterprise context platform should expose **every schema as a typed MCP server**, automatically. You declare the schema once in CSL; you get a running MCP endpoint with properly-typed tools, inferred permissions, and auditable receipts. No hand-written tool wiring, no drift between your permission model and what the LLM sees.
 
 This document explains how that works end-to-end: the compile-time descriptor generation, the runtime dispatch, the transport layer, and the auth story.
 
@@ -37,11 +37,11 @@ This document explains how that works end-to-end: the compile-time descriptor ge
                        └─────────────────────┘
 ```
 
-1. **Compile-time.** `cfg-csl` parses the CSL source, type-checks it, and emits a JSON manifest of MCP servers. Each schema becomes one server with a fixed toolset: `search_X`, `get_X`, `list_X`, one `list_X_<rel>` per `many` relation, and one `aggregate_X_<facet>` per `@facet` field.
+1. **Compile-time.** `signet-csl` parses the CSL source, type-checks it, and emits a JSON manifest of MCP servers. Each schema becomes one server with a fixed toolset: `search_X`, `get_X`, `list_X`, one `list_X_<rel>` per `many` relation, and one `aggregate_X_<facet>` per `@facet` field.
 
 2. **Boot-time.** The gateway reads the manifest, iterates every tool descriptor, and inserts a `GeneratedHandler` into the `ToolRegistry`. The handler carries the descriptor plus a `HandlerKind` enum that tells `invoke` which engine method to call. No reflection, no macros — just pattern matching on a small enum.
 
-3. **Runtime.** A POST to `/mcp/<server_name>` with a JSON-RPC body (`tools/list`, `tools/call`, etc.) hits the transport layer, which resolves the session, authenticates the caller, and dispatches to `protocol::dispatch`. For `tools/call`, that function looks up the handler in the registry and invokes it with the caller context attached. The handler validates arguments, calls into `cfg-engine`, and packages the result into a `ToolsCallResult` with structured content.
+3. **Runtime.** A POST to `/mcp/<server_name>` with a JSON-RPC body (`tools/list`, `tools/call`, etc.) hits the transport layer, which resolves the session, authenticates the caller, and dispatches to `protocol::dispatch`. For `tools/call`, that function looks up the handler in the registry and invokes it with the caller context attached. The handler validates arguments, calls into `signet-engine`, and packages the result into a `ToolsCallResult` with structured content.
 
 ---
 
@@ -85,7 +85,7 @@ Each tool's `inputSchema` is auto-derived from the CSL types:
 
 ### Why this schema shape
 
-**Search always has a receipt_id in the response.** This is ContextForge's signature behavior: every retrieval produces a signed provenance record. The LLM gets text; the audit system gets `caller + query + sources + timestamps`. Without this, you can't answer "how did the model know that?" — which is the single most common question from compliance.
+**Search always has a receipt_id in the response.** This is Signet's signature behavior: every retrieval produces a signed provenance record. The LLM gets text; the audit system gets `caller + query + sources + timestamps`. Without this, you can't answer "how did the model know that?" — which is the single most common question from compliance.
 
 **Filters live inside a nested object, not as top-level params.** Otherwise adding a new facet to the CSL schema changes the top-level param set and breaks every client. The nested-object pattern keeps the tool contract stable.
 
@@ -97,17 +97,17 @@ Each tool's `inputSchema` is auto-derived from the CSL types:
 
 ## Runtime pieces
 
-### `cfg-gateway/src/mcp/types.rs`
+### `signet-gateway/src/mcp/types.rs`
 
 The wire vocabulary. JSON-RPC 2.0 request/response, MCP-specific `InitializeParams`, `ServerCapabilities`, `ToolDescriptor`, and the `Caller` struct that downstream code uses for permission decisions.
 
 Worth calling out: **`Caller` is built from the authenticated request context, not from anything the MCP client sent.** Clients can claim whatever they want in their arguments; the gateway ignores caller claims in the JSON body and reads identity from the OAuth token it validated. This is the main attack-surface reduction in the design.
 
-### `cfg-gateway/src/mcp/registry.rs`
+### `signet-gateway/src/mcp/registry.rs`
 
 `DashMap<(server_name, tool_name), Arc<dyn ToolHandler>>`. O(1) lookup, no locking on the hot path. The `ToolHandler` trait is async and takes both a caller and the raw arguments; each handler returns either a JSON `Value` (success) or a `ToolError` (mapped to JSON-RPC error codes by the dispatcher).
 
-### `cfg-gateway/src/mcp/protocol.rs`
+### `signet-gateway/src/mcp/protocol.rs`
 
 The JSON-RPC dispatcher. Fields roles:
 
@@ -119,7 +119,7 @@ The JSON-RPC dispatcher. Fields roles:
 
 Everything else returns `METHOD_NOT_FOUND`.
 
-### `cfg-gateway/src/mcp/transport.rs`
+### `signet-gateway/src/mcp/transport.rs`
 
 Streamable HTTP per the 2025-11 MCP spec:
 
@@ -130,7 +130,7 @@ Streamable HTTP per the 2025-11 MCP spec:
 
 The session cache is a `DashMap<String, Session>` with opportunistic reaping on every request. For a single-process gateway this is fine; for a multi-node deployment you'd replace the DashMap with Redis (the `redis_url` config field is already there).
 
-### `cfg-gateway/src/mcp/oauth.rs`
+### `signet-gateway/src/mcp/oauth.rs`
 
 OAuth 2.1 discovery. Serves two well-known endpoints:
 
@@ -139,7 +139,7 @@ OAuth 2.1 discovery. Serves two well-known endpoints:
 
 The gateway does **not** implement the OAuth flow itself — it validates bearer tokens (via JWKS URL lookup) and trusts the advertised IdP to handle the dance. This is the right division: context platforms should not be identity providers.
 
-### `cfg-gateway/src/mcp/handlers.rs`
+### `signet-gateway/src/mcp/handlers.rs`
 
 The `GeneratedHandler` struct plus the `EngineFacade` trait. The handler holds:
 - The pre-computed descriptor.
@@ -200,7 +200,7 @@ The `answer_hash` is filled in after the LLM answers; the gateway doesn't comput
 
 1. **No real auth wire-up.** The transport layer's `resolve_session` returns an anonymous caller. Real implementation reads the `Authorization: Bearer <token>` header, validates against the configured JWKS, and populates `Caller` from the JWT claims. Maybe 60 lines of code; held off because it's mostly plumbing.
 
-2. **Stub engine only.** `StubEngine` returns `Unimplemented` for every call. Real implementations live in `cfg-engine`. The gateway is ready for them.
+2. **Stub engine only.** `StubEngine` returns `Unimplemented` for every call. Real implementations live in `signet-engine`. The gateway is ready for them.
 
 3. **No SSE notifications.** `GET /mcp/<n>` opens an SSE connection but emits nothing. Per-session broadcast wiring is about 100 lines with `tokio::sync::broadcast` but not needed for the scaffold.
 
@@ -215,13 +215,13 @@ The `answer_hash` is filled in after the LLM answers; the gateway doesn't comput
 Once the crates compile:
 
 ```bash
-cd /path/to/contextforge
-cargo run --bin cfg-gateway &
+cd /path/to/signet
+cargo run --bin signet-gateway &
 GATEWAY_PID=$!
 
 # The registry is empty until you register handlers; add this as the boot step.
 # In a test:
-cargo test -p cfg-gateway --test mcp_smoke
+cargo test -p signet-gateway --test mcp_smoke
 
 # Or poke it manually:
 curl http://localhost:7070/.well-known/oauth-protected-resource | jq
@@ -233,7 +233,7 @@ curl -X POST http://localhost:7070/mcp/Note \
 kill $GATEWAY_PID
 ```
 
-The `tools/list` call will return an empty array until you wire `cfg-engine` and register generated handlers at boot. That wiring is the next piece of the scaffold — a ~50-line `register_schema` function that takes a `TypedFile` and a `ToolRegistry` and inserts handlers for every schema.
+The `tools/list` call will return an empty array until you wire `signet-engine` and register generated handlers at boot. That wiring is the next piece of the scaffold — a ~50-line `register_schema` function that takes a `TypedFile` and a `ToolRegistry` and inserts handlers for every schema.
 
 ---
 
@@ -241,6 +241,6 @@ The `tools/list` call will return an empty array until you wire `cfg-engine` and
 
 Glean doesn't expose MCP servers per datasource. Their proprietary "Agent" building is a walled-garden where you build agents inside their UI against their capability set. MCP is additive to them — they support MCP *clients* consuming Glean, not Glean-as-MCP-server.
 
-ContextForge's posture is the inverse: we are the MCP server provider. Your data sources become typed MCP endpoints your agents consume from Claude, ChatGPT, Cursor, or your own framework. That difference is why the integration story on the battle card lands on enterprise buyers who already have agent-building tools and just need a context substrate.
+Signet's posture is the inverse: we are the MCP server provider. Your data sources become typed MCP endpoints your agents consume from Claude, ChatGPT, Cursor, or your own framework. That difference is why the integration story on the battle card lands on enterprise buyers who already have agent-building tools and just need a context substrate.
 
 ---

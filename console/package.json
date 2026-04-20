@@ -1,9 +1,9 @@
 {
-  "name": "contextforge-console",
+  "name": "signet-console",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "ContextForge administrative console.",
+  "description": "Signet administrative console.",
   "scripts": {
     "dev": "vite dev --port 7071",
     "build": "vite build",

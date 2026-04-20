@@ -1,0 +1,17 @@
+[package]
+name         = "signet-receipts"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+
+[lints]
+workspace = true
+
+[dependencies]
+signet-common = { path = "../signet-common" }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+time       = { workspace = true }
+ulid       = { workspace = true }

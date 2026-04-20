@@ -1,6 +1,6 @@
-# ContextForge docs
+# Signet docs
 
-Astro + Starlight site for <https://contextforge.dev>.
+Astro + Starlight site for <https://signet.dev>.
 
 ## Dev
 

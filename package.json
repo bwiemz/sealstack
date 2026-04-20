@@ -1,5 +1,5 @@
 {
-  "name": "contextforge-js-root",
+  "name": "signet-js-root",
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "scripts": {

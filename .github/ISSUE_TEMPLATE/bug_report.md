@@ -12,5 +12,5 @@ labels: bug
 
 ### Environment
 - OS:
-- ContextForge version:
+- Signet version:
 - Deployment (local / managed / self-hosted):

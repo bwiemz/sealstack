@@ -1,29 +1,29 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/cfg-common",
-    "crates/cfg-csl",
-    "crates/cfg-engine",
-    "crates/cfg-gateway",
-    "crates/cfg-ingest",
-    "crates/cfg-connector-sdk",
-    "crates/cfg-embedders",
-    "crates/cfg-vectorstore",
-    "crates/cfg-receipts",
-    "crates/cfg-cli",
+    "crates/signet-common",
+    "crates/signet-csl",
+    "crates/signet-engine",
+    "crates/signet-gateway",
+    "crates/signet-ingest",
+    "crates/signet-connector-sdk",
+    "crates/signet-embedders",
+    "crates/signet-vectorstore",
+    "crates/signet-receipts",
+    "crates/signet-cli",
     "connectors/local-files",
     "connectors/github",
     "connectors/slack",
 ]
-default-members = ["crates/cfg-cli"]
+default-members = ["crates/signet-cli"]
 
 [workspace.package]
 version      = "0.1.0"
 edition      = "2024"
 rust-version = "1.85"
 license      = "Apache-2.0"
-repository   = "https://github.com/bwiemz/contextforge"
-authors      = ["ContextForge Contributors"]
+repository   = "https://github.com/bwiemz/signet"
+authors      = ["Signet Contributors"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

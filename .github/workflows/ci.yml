@@ -49,9 +49,9 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: cfg
-          POSTGRES_PASSWORD: cfg
-          POSTGRES_DB: cfg
+          POSTGRES_USER: signet
+          POSTGRES_PASSWORD: signet
+          POSTGRES_DB: signet
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U cfg"
@@ -64,9 +64,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
       # The e2e test target is added in Phase 12. Until then this job is a
-      # no-op placeholder; once `tests/e2e.rs` lands in cfg-gateway, swap
+      # no-op placeholder; once `tests/e2e.rs` lands in signet-gateway, swap
       # back to `cargo test --test e2e --locked`.
       - run: cargo check --workspace --locked
         env:
-          CFG_DATABASE_URL: postgres://cfg:cfg@localhost:5432/cfg
-          CFG_QDRANT_URL:   http://localhost:6334
+          SIGNET_DATABASE_URL: postgres://signet:signet@localhost:5432/signet
+          SIGNET_QDRANT_URL:   http://localhost:6334

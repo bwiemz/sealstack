@@ -30,7 +30,7 @@
       <div class="flex items-baseline gap-2">
         <span class="serif text-2xl text-[var(--color-forge)] leading-none">cf</span>
         <span class="text-[var(--color-ink-10)] text-[15px] font-medium tracking-tight">
-          ContextForge
+          Signet
         </span>
       </div>
       <div class="label mt-2">console · v0.1</div>

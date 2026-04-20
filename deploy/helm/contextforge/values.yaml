@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/contextforge/cfg-gateway
+  repository: ghcr.io/signet/signet-gateway
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 

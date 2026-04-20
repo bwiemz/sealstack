@@ -1,5 +1,5 @@
 {
-  "include": ["sdks/python/contextforge"],
+  "include": ["sdks/python/signet"],
   "exclude": ["**/node_modules", "**/target", "**/.dist", "**/dist"],
   "reportMissingImports": "none",
   "reportUnknownVariableType": "none",

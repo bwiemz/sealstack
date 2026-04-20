@@ -1,7 +1,7 @@
 {
-  "name": "@contextforge/sdk",
+  "name": "@signet/sdk",
   "version": "0.1.0",
-  "description": "ContextForge TypeScript SDK",
+  "description": "Signet TypeScript SDK",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.cjs",

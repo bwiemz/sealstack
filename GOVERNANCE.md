@@ -1,6 +1,6 @@
 # Governance
 
-ContextForge uses a Working Groups model.
+Signet uses a Working Groups model.
 
 ## Roles
 

@@ -36,7 +36,7 @@
 </script>
 
 <svelte:head>
-  <title>Settings · ContextForge</title>
+  <title>Settings · Signet</title>
 </svelte:head>
 
 <div class="px-10 py-10 max-w-3xl">
@@ -66,7 +66,7 @@
     </div>
 
     <div>
-      <div class="label mb-2">caller · x-cfg-user</div>
+      <div class="label mb-2">caller · x-signet-user</div>
       <input type="text" class="field" placeholder="console" bind:value={user} />
       <p class="serif italic text-[var(--color-ink-7)] text-[12px] mt-2 leading-relaxed">
         Identity passed to the gateway on every request via the
@@ -110,8 +110,8 @@
     </p>
     <p>
       <span class="label mr-2">source</span>
-      <a href="https://github.com/bwiemz/contextforge" class="link" target="_blank" rel="noreferrer">
-        github.com/bwiemz/contextforge
+      <a href="https://github.com/bwiemz/signet" class="link" target="_blank" rel="noreferrer">
+        github.com/bwiemz/signet
       </a>
     </p>
     <p>

@@ -1,4 +1,4 @@
-# Contributing to ContextForge
+# Contributing to Signet
 
 Thanks for your interest.
 

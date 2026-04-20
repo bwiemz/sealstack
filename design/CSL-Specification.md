@@ -2,7 +2,7 @@
 
 **Version**: 0.1.0-draft
 **Status**: Design proposal
-**Target compiler**: `cfg-csl` (Rust, winnow parser)
+**Target compiler**: `signet-csl` (Rust, winnow parser)
 
 ---
 
@@ -389,7 +389,7 @@ Decorators changes (e.g., adding `@indexed`) are non-breaking and migrate in pla
 
 One CSL file, N artifacts:
 
-| Target               | Produced by `cfg compile`        | Notes |
+| Target               | Produced by `signet compile`        | Notes |
 |----------------------|----------------------------------|-------|
 | SQL forward migration | `out/sql/NNNN_up.sql`            | Postgres dialect; other dialects later |
 | SQL down migration   | `out/sql/NNNN_down.sql`          |       |

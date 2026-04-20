@@ -37,7 +37,7 @@ Returns a `SearchResponse` with hits, a receipt id, and elapsed ms.
 | `GET`  | `/v1/schemas`                        | List every registered schema (summary).          |
 | `POST` | `/v1/schemas`                        | Register a compiled schema. Body: `{ meta }`.    |
 | `GET`  | `/v1/schemas/:qualified`             | Full schema metadata.                            |
-| `POST` | `/v1/schemas/:qualified/ddl`         | Apply a DDL bundle produced by `cfg-csl`.        |
+| `POST` | `/v1/schemas/:qualified/ddl`         | Apply a DDL bundle produced by `signet-csl`.        |
 
 Schemas registered via `POST /v1/schemas` persist to Postgres and survive a
 gateway restart. The in-memory `SchemaRegistry` is rehydrated from the DB at

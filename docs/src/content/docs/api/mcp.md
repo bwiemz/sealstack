@@ -1,9 +1,9 @@
 ---
 title: MCP tools
-description: The tools every ContextForge schema registers on the MCP endpoint.
+description: The tools every Signet schema registers on the MCP endpoint.
 ---
 
-ContextForge speaks MCP 2025-11-25 streamable HTTP at `/mcp/:server_name`. For
+Signet speaks MCP 2025-11-25 streamable HTTP at `/mcp/:server_name`. For
 every registered CSL schema, the gateway auto-registers a fixed set of tools:
 
 | Tool                             | Kind            | Purpose                                           |
@@ -31,9 +31,9 @@ is preserved in the tool's `title` and `description` for human readers.
 
 ## Authentication
 
-By default (`CFG_AUTH_MODE=disabled`), every request is accepted with an
-`anonymous` caller. In production, set `CFG_AUTH_MODE=hs256` and
-`CFG_AUTH_HS256_SECRET` — the middleware validates `Authorization: Bearer <jwt>`
+By default (`SIGNET_AUTH_MODE=disabled`), every request is accepted with an
+`anonymous` caller. In production, set `SIGNET_AUTH_MODE=hs256` and
+`SIGNET_AUTH_HS256_SECRET` — the middleware validates `Authorization: Bearer <jwt>`
 on every MCP request and rejects unauthenticated calls with a 401 plus a
 `WWW-Authenticate: Bearer ... resource_metadata="..."` header pointing at the
 OAuth 2.1 discovery document at `/.well-known/oauth-protected-resource`.
@@ -45,7 +45,7 @@ Add to Claude Desktop's MCP server config:
 ```json
 {
   "mcpServers": {
-    "contextforge": {
+    "signet": {
       "url": "https://cfg.acme.internal/mcp/default",
       "transport": "http",
       "auth": {

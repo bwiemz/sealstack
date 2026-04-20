@@ -3,14 +3,14 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://contextforge.dev',
+  site: 'https://signet.dev',
   integrations: [
     starlight({
-      title: 'ContextForge',
+      title: 'Signet',
       description:
         'Open-source, enterprise-grade context operating system. MCP-native, Rust-backed.',
       social: {
-        github: 'https://github.com/bwiemz/contextforge'
+        github: 'https://github.com/bwiemz/signet'
       },
       sidebar: [
         {

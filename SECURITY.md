@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please report security issues privately to **security@contextforge.dev**.
+Please report security issues privately to **security@signet.dev**.
 
 Do not open a public GitHub issue for suspected vulnerabilities.
 

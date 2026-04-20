@@ -2,9 +2,9 @@ FROM rust:1.85-slim AS builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 COPY . .
-RUN cargo build --release --bin cfg-gateway
+RUN cargo build --release --bin signet-gateway
 
 FROM gcr.io/distroless/cc-debian12
-COPY --from=builder /build/target/release/cfg-gateway /usr/local/bin/cfg-gateway
+COPY --from=builder /build/target/release/signet-gateway /usr/local/bin/signet-gateway
 EXPOSE 7070
-ENTRYPOINT ["/usr/local/bin/cfg-gateway"]
+ENTRYPOINT ["/usr/local/bin/signet-gateway"]

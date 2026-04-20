@@ -32,7 +32,7 @@
 </script>
 
 <svelte:head>
-  <title>Overview · ContextForge</title>
+  <title>Overview · Signet</title>
 </svelte:head>
 
 <div class="px-10 py-10">
@@ -40,7 +40,7 @@
   <header class="mb-10">
     <div class="flex items-baseline justify-between gap-6">
       <div>
-        <div class="label">contextforge · overview</div>
+        <div class="label">signet · overview</div>
         <h1 class="serif text-6xl text-[var(--color-ink-10)] mt-2 leading-none">
           <span class="text-[var(--color-forge)]">context</span>, engineered.
         </h1>
@@ -77,7 +77,7 @@
     <Metric
       value={healthy === true ? 'ready' : healthy === false ? 'down' : '—'}
       label="gateway"
-      note="Availability of the configured ContextForge gateway endpoint."
+      note="Availability of the configured Signet gateway endpoint."
       hot={healthy === false}
     />
   </div>
@@ -98,7 +98,7 @@
           <p class="serif italic text-[var(--color-ink-7)] mb-3">
             No schemas registered yet.
           </p>
-          <div class="code text-[12px]">cfg schema apply schemas/doc.csl</div>
+          <div class="code text-[12px]">signet schema apply schemas/doc.csl</div>
         </div>
       {:else}
         <div class="panel overflow-hidden">
@@ -145,7 +145,7 @@
             No connectors bound yet.
           </p>
           <div class="code text-[12px]">
-            cfg connector add local-files \
+            signet connector add local-files \
               --schema examples.Doc \
               --root ./sample-docs
           </div>

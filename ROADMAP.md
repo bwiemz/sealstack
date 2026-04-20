@@ -1,6 +1,6 @@
 # Roadmap
 
-See [`design/ContextForge-Plan.md`](./design/ContextForge-Plan.md) §10 for the detailed
+See [`design/Signet-Plan.md`](./design/Signet-Plan.md) §10 for the detailed
 phase plan. Current milestone: **v0.1.0-scaffold** (repo scaffolding and
 build-green acceptance).
 

@@ -1,4 +1,4 @@
-export interface ContextForgeClientOptions {
+export interface SignetClientOptions {
   baseUrl: string;
   token?: string;
 }
@@ -38,13 +38,13 @@ export interface Connector {
   enabled: boolean;
 }
 
-export class ContextForgeClient {
+export class SignetClient {
   readonly baseUrl: string;
   readonly token?: string;
   readonly schemas: SchemasApi;
   readonly connectors: ConnectorsApi;
 
-  constructor(opts: ContextForgeClientOptions) {
+  constructor(opts: SignetClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, "");
     this.token = opts.token;
     this.schemas = new SchemasApi(this);
@@ -63,13 +63,13 @@ export class ContextForgeClient {
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`contextforge: ${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`signet: ${res.status} ${res.statusText}`);
     return res.json();
   }
 }
 
 class SchemasApi {
-  constructor(private client: ContextForgeClient) {}
+  constructor(private client: SignetClient) {}
   list(): Promise<Schema[]> {
     return this.client.request("GET", "/v1/schemas") as Promise<Schema[]>;
   }
@@ -79,7 +79,7 @@ class SchemasApi {
 }
 
 class ConnectorsApi {
-  constructor(private client: ContextForgeClient) {}
+  constructor(private client: SignetClient) {}
   list(): Promise<Connector[]> {
     return this.client.request("GET", "/v1/connectors") as Promise<Connector[]>;
   }
