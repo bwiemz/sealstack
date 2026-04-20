@@ -7,7 +7,7 @@
 
 ## 1. What this is (and isn't)
 
-The console is the web face of Signet for operators — engineering leads, infra teams, security auditors. It's a narrow SPA with seven meaningful views, not a sprawling admin app. It covers what the CLI covers, in shapes a human can read.
+The console is the web face of SealStack for operators — engineering leads, infra teams, security auditors. It's a narrow SPA with seven meaningful views, not a sprawling admin app. It covers what the CLI covers, in shapes a human can read.
 
 What it **is**: a pure SvelteKit SPA. Every request goes browser → gateway. No SSR, no proxy layer, no BFF pattern. `+layout.ts` sets `ssr = false` explicitly.
 
@@ -98,15 +98,15 @@ Lightweight localStorage wrapper. No Svelte store machinery — just `loadSettin
 
 ## 4. The receipt viewer
 
-This is the visual differentiator — the page a buyer evaluating Signet should remember.
+This is the visual differentiator — the page a buyer evaluating SealStack should remember.
 
 ### Design intent
 
-Glean shows citations. Signet shows **receipts**: a document the customer can save, audit, and sign. The receipt viewer leans hard into that framing. Wide margins, no sidebar intrusion, a 4xl italic serif title ("verdict & provenance"), and a bibliographic header block laid out in two columns like the front page of a court filing.
+Glean shows citations. SealStack shows **receipts**: a document the customer can save, audit, and sign. The receipt viewer leans hard into that framing. Wide margins, no sidebar intrusion, a 4xl italic serif title ("verdict & provenance"), and a bibliographic header block laid out in two columns like the front page of a court filing.
 
 ### Layout (top to bottom)
 
-1. **Masthead.** `signet · receipt` label, italic serif title, full receipt ID in mono, JSON download button.
+1. **Masthead.** `sealstack · receipt` label, italic serif title, full receipt ID in mono, JSON download button.
 2. **Bibliographic block.** Two-column grid — issued / caller / schema / elapsed. Each field gets a small-caps label + a mono value. Caller tenant rendered as `user @ tenant` in a mono-with-muted dim pattern; roles render as chips.
 3. **Query block.** The original query rendered as a blockquote — italic serif, left-border amber, large size. This is what's being audited.
 4. **Latency breakdown.** Stacked horizontal bar segmented by stage (embed / vector / bm25 / fuse / rerank / policy). Each segment labeled inline where it's wide enough. Below: a six-column legend with each stage's exact millisecond count.
@@ -132,7 +132,7 @@ Hero line reads "**context, engineered.**" — the amber accent on the first wor
 
 Four metric tiles: schemas count, connectors count, scheduled syncs count, gateway status. The gateway tile goes `hot` (amber number) when the gateway is **down** — unusual but correct: red would clash with the amber accent elsewhere, and making the number amber draws the eye to the thing that needs attention.
 
-Below: two side-by-side list previews (recent schemas, recent connectors) that gracefully empty-state into quickstart CLI snippets. Empty states are operator-educational — a new user who lands on the dashboard with a running-but-empty gateway gets a literal `signet schema apply` incantation to copy.
+Below: two side-by-side list previews (recent schemas, recent connectors) that gracefully empty-state into quickstart CLI snippets. Empty states are operator-educational — a new user who lands on the dashboard with a running-but-empty gateway gets a literal `sealstack schema apply` incantation to copy.
 
 ### Schemas list
 
@@ -235,12 +235,12 @@ Because this is the last piece of v0.1, here's the full script that takes a new 
 
 ```bash
 # Backend (one terminal)
-cd signet
-signet init
-signet dev
-signet schema apply schemas/doc.csl
-signet connector add local-files --schema examples.Doc --root ./sample-docs
-signet connector sync local-files/examples.Doc
+cd sealstack
+sealstack init
+sealstack dev
+sealstack schema apply schemas/doc.csl
+sealstack connector add local-files --schema examples.Doc --root ./sample-docs
+sealstack connector sync local-files/examples.Doc
 
 # Frontend (another terminal)
 cd console

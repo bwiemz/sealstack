@@ -1,29 +1,29 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/signet-common",
-    "crates/signet-csl",
-    "crates/signet-engine",
-    "crates/signet-gateway",
-    "crates/signet-ingest",
-    "crates/signet-connector-sdk",
-    "crates/signet-embedders",
-    "crates/signet-vectorstore",
-    "crates/signet-receipts",
-    "crates/signet-cli",
+    "crates/sealstack-common",
+    "crates/sealstack-csl",
+    "crates/sealstack-engine",
+    "crates/sealstack-gateway",
+    "crates/sealstack-ingest",
+    "crates/sealstack-connector-sdk",
+    "crates/sealstack-embedders",
+    "crates/sealstack-vectorstore",
+    "crates/sealstack-receipts",
+    "crates/sealstack-cli",
     "connectors/local-files",
     "connectors/github",
     "connectors/slack",
 ]
-default-members = ["crates/signet-cli"]
+default-members = ["crates/sealstack-cli"]
 
 [workspace.package]
 version      = "0.1.0"
 edition      = "2024"
 rust-version = "1.85"
 license      = "Apache-2.0"
-repository   = "https://github.com/bwiemz/signet"
-authors      = ["Signet Contributors"]
+repository   = "https://github.com/bwiemz/sealstack"
+authors      = ["SealStack Contributors"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

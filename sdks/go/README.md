@@ -1,8 +1,8 @@
-# Signet Go SDK
+# SealStack Go SDK
 
 Scaffold only. A Go client module will live here; initialize with:
 
 ```bash
 cd sdks/go
-go mod init github.com/signet/go-sdk
+go mod init github.com/sealstack/go-sdk
 ```

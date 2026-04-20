@@ -1,7 +1,7 @@
-*               @signet/maintainers
-/crates/signet-csl/     @signet/wg-csl
-/crates/signet-engine/  @signet/wg-engine
-/crates/signet-gateway/ @signet/wg-gateway
-/connectors/         @signet/wg-connectors
-/console/            @signet/wg-console
-/docs/               @signet/wg-docs
+*               @sealstack/maintainers
+/crates/sealstack-csl/     @sealstack/wg-csl
+/crates/sealstack-engine/  @sealstack/wg-engine
+/crates/sealstack-gateway/ @sealstack/wg-gateway
+/connectors/         @sealstack/wg-connectors
+/console/            @sealstack/wg-console
+/docs/               @sealstack/wg-docs

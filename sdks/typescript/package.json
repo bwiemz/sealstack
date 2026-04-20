@@ -1,7 +1,7 @@
 {
-  "name": "@signet/sdk",
+  "name": "@sealstack/sdk",
   "version": "0.1.0",
-  "description": "Signet TypeScript SDK",
+  "description": "SealStack TypeScript SDK",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.cjs",

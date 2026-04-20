@@ -1,6 +1,6 @@
 # Engine — Design Notes
 
-**Companion to**: `crates/signet-engine/` in the drop-in.
+**Companion to**: `crates/sealstack-engine/` in the drop-in.
 **Status**: Unverified skeleton, ~3,600 LOC across 14 files + one init migration.
 Targets Rust 2024 edition, `sqlx` 0.8, `tokio` 1.42+. Verify locally; the sandbox has no Rust toolchain.
 
@@ -125,7 +125,7 @@ Denied reads return `NotFound` rather than `PolicyDenied` on purpose: leaking "t
 ## 5. Hybrid retrieval
 
 ### Backends
-- **Vector**: `signet_vectorstore::VectorStore::search`. In dev, `InMemoryStore`; in production, `QdrantStore`.
+- **Vector**: `sealstack_vectorstore::VectorStore::search`. In dev, `InMemoryStore`; in production, `QdrantStore`.
 - **BM25**: Postgres full-text (`to_tsvector` + `ts_rank_cd`). Not strictly BM25, but close enough for v0.1. Tantivy-backed replacement planned for v0.2.
 
 ### Fusion
@@ -143,7 +143,7 @@ Applied to the top `candidate_k` (default 64) candidates. `IdentityReranker` is 
 
 ## 6. Ingestion pipeline
 
-Input: `signet_connector_sdk::Resource { id, kind, title, body, metadata, permissions, source_updated_at }`.
+Input: `sealstack_connector_sdk::Resource { id, kind, title, body, metadata, permissions, source_updated_at }`.
 
 Steps:
 1. `upsert_row` → Postgres (`id`, `title`, `body`, `created_at`, `metadata` JSONB). v0.1 uses a narrow column set; the full typed projection lands with the CSL→Rust struct codegen path in v0.2.
@@ -175,7 +175,7 @@ Receipt {
 
 `list` and `list_relation` don't log receipts in v0.1 (they're high-volume and mostly uninteresting from an audit standpoint). That policy is revisitable.
 
-Receipts persist in `signet_receipts` with indexes on `caller_id`, `created_at`, and `qualified_schema`. Retention is 90 days by default; a `ReceiptStore::prune` method is provided for the nightly cleanup cron.
+Receipts persist in `sealstack_receipts` with indexes on `caller_id`, `created_at`, and `qualified_schema`. Retention is 90 days by default; a `ReceiptStore::prune` method is provided for the nightly cleanup cron.
 
 Enterprise Edition will sign receipts with Ed25519. The hook is `ReceiptConfig::sign`; v0.1 ignores it.
 
@@ -185,8 +185,8 @@ Enterprise Edition will sign receipts with Ed25519. The hook is `ReceiptConfig::
 
 Two migration paths, deliberately separate:
 
-1. **Engine control-plane tables** (`signet_schemas`, `signet_connectors`, `signet_receipts`, `signet_ingest_state`, `signet_lineage`, `signet_mcp_sessions`) — live in `migrations/` and run via `sqlx::migrate!` on startup.
-2. **Per-CSL-schema tables** (`customer`, `ticket`, `customer_chunk`, etc.) — emitted by `signet_csl::codegen::sql` into the compile output directory and applied via `Store::apply_schema_ddl` when `signet schema apply` runs.
+1. **Engine control-plane tables** (`sealstack_schemas`, `sealstack_connectors`, `sealstack_receipts`, `sealstack_ingest_state`, `sealstack_lineage`, `sealstack_mcp_sessions`) — live in `migrations/` and run via `sqlx::migrate!` on startup.
+2. **Per-CSL-schema tables** (`customer`, `ticket`, `customer_chunk`, etc.) — emitted by `sealstack_csl::codegen::sql` into the compile output directory and applied via `Store::apply_schema_ddl` when `sealstack schema apply` runs.
 
 Keeping them separate means engine upgrades don't touch user data, and user schema changes don't require an engine restart.
 
@@ -204,7 +204,7 @@ Listed in roughly decreasing priority:
 4. **Cursor encoding.** `list` and `list_relation` return the last-seen `id` as an opaque cursor. Production needs proper cursor encoding with a secret-keyed HMAC to prevent cursor forging.
 5. **Tokenizer.** The "~4 chars = 1 token" heuristic in `ingest::chunk_body` is fine for dev but off by a meaningful factor on CJK and source code. Plug in `tokenizers` (HF) or `tiktoken-rs`.
 6. **Tantivy BM25.** Postgres `ts_rank_cd` is approximate. A Tantivy-backed index per schema gives real BM25 and dramatically better multi-term recall.
-7. **Hot reload.** The registry is immutable after `Engine::new`. A file-watcher in `SchemaRegistry` plus a read-write lock lets `signet schema apply` take effect without restart.
+7. **Hot reload.** The registry is immutable after `Engine::new`. A file-watcher in `SchemaRegistry` plus a read-write lock lets `sealstack schema apply` take effect without restart.
 8. **Receipt signing.** Ed25519 over the canonical JSON of the receipt body. Key rotation, verification SDK, and customer-controllable key material all need design.
 9. **`list` receipts.** Currently skipped for volume reasons. Decide the right sampling policy (every Nth, every call over a facet filter, …).
 10. **Relation walking.** Only `many` relations are supported. `one` relations (inverse-direction lookup) need a different code path and ideally a join.
@@ -227,7 +227,7 @@ This code has not been compiled. The most likely surface for adjustments:
 
 6. **Gateway's `AppState`.** I added an `engine: Arc<dyn EngineFacade>` field. The existing `rest.rs` uses `Router<AppState>` as a type parameter without touching the field, so no changes needed there. If you add handlers that pull from state, they use the standard `State<AppState>` extractor.
 
-7. **Binary `signet-gateway`.** It now imports `signet_vectorstore::memory::InMemoryStore`, `signet_vectorstore::qdrant::QdrantStore`, `signet_embedders::stub::StubEmbedder`. If those paths differ in the actual crates, the binary won't link — fix the paths.
+7. **Binary `sealstack-gateway`.** It now imports `sealstack_vectorstore::memory::InMemoryStore`, `sealstack_vectorstore::qdrant::QdrantStore`, `sealstack_embedders::stub::StubEmbedder`. If those paths differ in the actual crates, the binary won't link — fix the paths.
 
 8. **Testcontainers / integration tests.** None included here; the acceptance test in the scaffolding brief's Phase 12 is what exercises this crate end-to-end.
 
@@ -239,9 +239,9 @@ Once the workspace builds:
 
 ```rust
 use std::sync::Arc;
-use signet_engine::{Engine, EngineConfig};
-use signet_vectorstore::memory::InMemoryStore;
-use signet_embedders::stub::StubEmbedder;
+use sealstack_engine::{Engine, EngineConfig};
+use sealstack_vectorstore::memory::InMemoryStore;
+use sealstack_embedders::stub::StubEmbedder;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -252,13 +252,13 @@ async fn main() -> anyhow::Result<()> {
     let engine = Engine::new_dev(config, vector_store, embedder).await?;
 
     // Now impls both EngineHandle (structured) and EngineFacade (JSON).
-    let caller = signet_engine::api::Caller::test("u_dev");
+    let caller = sealstack_engine::api::Caller::test("u_dev");
     // Register a schema, ingest a resource, run a search — see the
     // scaffolding brief's Phase 11 "engineering-context" example.
     Ok(())
 }
 ```
 
-The `signet-gateway` binary does exactly this composition (in `bin/server.rs`) and then wraps the `Engine` as `Arc<dyn EngineFacade>` before handing it to `build_app`.
+The `sealstack-gateway` binary does exactly this composition (in `bin/server.rs`) and then wraps the `Engine` as `Arc<dyn EngineFacade>` before handing it to `build_app`.
 
 *End of engine design notes.*

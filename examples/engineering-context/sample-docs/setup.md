@@ -2,8 +2,8 @@
 
 ## Postgres
 
-Signet stores typed rows and receipt metadata in PostgreSQL 16.
-The local `signet dev` stack brings up Postgres on port 5432 with database,
+SealStack stores typed rows and receipt metadata in PostgreSQL 16.
+The local `sealstack dev` stack brings up Postgres on port 5432 with database,
 user, and password all set to `cfg`.
 
 ## Qdrant

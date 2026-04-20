@@ -1,4 +1,4 @@
-# Signet
+# SealStack
 
 **The open, developer-first context operating system for enterprises.**
 
@@ -10,21 +10,21 @@ MCP-native · Self-hostable · Typed context schemas
 
 ```bash
 # Clone and bring up the full local stack
-git clone https://github.com/bwiemz/signet
-cd signet
-cargo install --path crates/signet-cli
-signet dev
+git clone https://github.com/bwiemz/sealstack
+cd sealstack
+cargo install --path crates/sealstack-cli
+sealstack dev
 ```
 
-`signet dev` starts Postgres, Qdrant, Redis, and the gateway on your laptop in
+`sealstack dev` starts Postgres, Qdrant, Redis, and the gateway on your laptop in
 under 60 seconds. Point it at some local markdown and you have a working
 context layer the same afternoon.
 
 ## What is this
 
-Signet unifies ingestion, retrieval, memory, policy, and tool-use under
+SealStack unifies ingestion, retrieval, memory, policy, and tool-use under
 a single typed context model, and exposes every internal system as a governed
-MCP server. See [`design/Signet-Plan.md`](./design/Signet-Plan.md) for the full
+MCP server. See [`design/SealStack-Plan.md`](./design/SealStack-Plan.md) for the full
 product plan and [`design/CSL-Specification.md`](./design/CSL-Specification.md) for the
 Context Schema Language spec.
 

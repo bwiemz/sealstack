@@ -32,7 +32,7 @@
 </script>
 
 <svelte:head>
-  <title>{$page.params.qualified} · Signet</title>
+  <title>{$page.params.qualified} · SealStack</title>
 </svelte:head>
 
 <div class="px-10 py-10 max-w-5xl">

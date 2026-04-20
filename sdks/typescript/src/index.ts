@@ -1,4 +1,4 @@
-export interface SignetClientOptions {
+export interface SealStackClientOptions {
   baseUrl: string;
   token?: string;
 }
@@ -38,13 +38,13 @@ export interface Connector {
   enabled: boolean;
 }
 
-export class SignetClient {
+export class SealStackClient {
   readonly baseUrl: string;
   readonly token?: string;
   readonly schemas: SchemasApi;
   readonly connectors: ConnectorsApi;
 
-  constructor(opts: SignetClientOptions) {
+  constructor(opts: SealStackClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, "");
     this.token = opts.token;
     this.schemas = new SchemasApi(this);
@@ -63,13 +63,13 @@ export class SignetClient {
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`signet: ${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`sealstack: ${res.status} ${res.statusText}`);
     return res.json();
   }
 }
 
 class SchemasApi {
-  constructor(private client: SignetClient) {}
+  constructor(private client: SealStackClient) {}
   list(): Promise<Schema[]> {
     return this.client.request("GET", "/v1/schemas") as Promise<Schema[]>;
   }
@@ -79,7 +79,7 @@ class SchemasApi {
 }
 
 class ConnectorsApi {
-  constructor(private client: SignetClient) {}
+  constructor(private client: SealStackClient) {}
   list(): Promise<Connector[]> {
     return this.client.request("GET", "/v1/connectors") as Promise<Connector[]>;
   }

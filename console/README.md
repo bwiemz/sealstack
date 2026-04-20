@@ -1,6 +1,6 @@
-# Signet Console
+# SealStack Console
 
-The administrative web interface for Signet.
+The administrative web interface for SealStack.
 
 ## Stack
 
@@ -22,16 +22,16 @@ cp .env.example .env
 pnpm dev               # serves on http://localhost:7071
 ```
 
-The console expects a Signet gateway on `http://localhost:7070` by
+The console expects a SealStack gateway on `http://localhost:7070` by
 default. Override via the Settings page or by setting
 `PUBLIC_GATEWAY_URL` in `.env`.
 
-With the gateway running (`signet dev` in the workspace root), the full e2e loop
+With the gateway running (`sealstack dev` in the workspace root), the full e2e loop
 works:
 
 1. Open `http://localhost:7071`
 2. Settings → verify the gateway is reachable
-3. Schemas → confirm `examples.Doc` is registered (run `signet schema apply`
+3. Schemas → confirm `examples.Doc` is registered (run `sealstack schema apply`
    first if not)
 4. Connectors → add a `local-files` binding, click **sync**
 5. Query → run a search; click the receipt id to inspect provenance

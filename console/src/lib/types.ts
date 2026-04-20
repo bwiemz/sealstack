@@ -1,11 +1,11 @@
 // TypeScript mirrors of the engine's public DTOs.
 //
 // These shapes must stay in sync with:
-//   signet_engine::api::{SearchRequest, SearchResponse, Caller}
-//   signet_engine::schema_registry::SchemaMeta
-//   signet_engine::receipts::Receipt
-//   signet_ingest::registry::ConnectorBindingInfo
-//   signet_ingest::runtime::SyncOutcome
+//   sealstack_engine::api::{SearchRequest, SearchResponse, Caller}
+//   sealstack_engine::schema_registry::SchemaMeta
+//   sealstack_engine::receipts::Receipt
+//   sealstack_ingest::registry::ConnectorBindingInfo
+//   sealstack_ingest::runtime::SyncOutcome
 //
 // We keep them narrow — console never sends anything the CLI can't, and the
 // CLI is the reference implementation.

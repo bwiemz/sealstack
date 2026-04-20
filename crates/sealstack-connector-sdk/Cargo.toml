@@ -1,0 +1,26 @@
+[package]
+name         = "sealstack-connector-sdk"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "Connector SDK: implement this trait to add a new data source to SealStack."
+
+[lints]
+workspace = true
+
+[dependencies]
+sealstack-common   = { path = "../sealstack-common" }
+
+async-trait  = "0.1"
+futures      = "0.3"
+serde        = { workspace = true, features = ["derive"] }
+serde_json   = { workspace = true }
+thiserror    = { workspace = true }
+time         = { workspace = true, features = ["serde"] }
+tokio        = { workspace = true, features = ["sync"] }
+tracing      = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

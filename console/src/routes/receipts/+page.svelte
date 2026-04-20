@@ -11,7 +11,7 @@
 </script>
 
 <svelte:head>
-  <title>Receipts · Signet</title>
+  <title>Receipts · SealStack</title>
 </svelte:head>
 
 <div class="px-10 py-10 max-w-3xl">

@@ -1,31 +1,31 @@
 # Vector Store + Embedder Backends — Design Notes
 
-**Companion to**: `crates/signet-common/`, `crates/signet-vectorstore/`, and `crates/signet-embedders/` in the drop-in.
+**Companion to**: `crates/sealstack-common/`, `crates/sealstack-vectorstore/`, and `crates/sealstack-embedders/` in the drop-in.
 **Status**: Unverified skeleton. ~1,843 lines across 11 files. Targets `qdrant-client` 1.12, `reqwest` 0.12, Rust 2024. Verify locally; the sandbox has no Rust toolchain.
 
 ---
 
 ## 1. Why these three crates together
 
-`signet-engine` has been built against traits — `VectorStore`, `Embedder`, `PolicyEngine`, `Reranker`, `EngineHandle`. The engine doesn't care whether vectors live in a `DashMap` or a remote Qdrant cluster, or whether embeddings come from a hash function or Voyage's API. It only cares about the traits.
+`sealstack-engine` has been built against traits — `VectorStore`, `Embedder`, `PolicyEngine`, `Reranker`, `EngineHandle`. The engine doesn't care whether vectors live in a `DashMap` or a remote Qdrant cluster, or whether embeddings come from a hash function or Voyage's API. It only cares about the traits.
 
 This drop-in adds the first real implementations of two of those traits:
 
 | Crate | What it provides |
 |---|---|
-| `signet-common` | `SignetError`, `SignetResult`, identifier newtypes (`ContextId`, `TenantId`, `ChunkId`, …), `Tenant` record |
-| `signet-vectorstore` | `VectorStore` trait, `Chunk` + `SearchResult` types, in-memory backend, Qdrant backend |
-| `signet-embedders` | `Embedder` trait, stub embedder, Voyage embedder, OpenAI embedder |
+| `sealstack-common` | `SealStackError`, `SealStackResult`, identifier newtypes (`ContextId`, `TenantId`, `ChunkId`, …), `Tenant` record |
+| `sealstack-vectorstore` | `VectorStore` trait, `Chunk` + `SearchResult` types, in-memory backend, Qdrant backend |
+| `sealstack-embedders` | `Embedder` trait, stub embedder, Voyage embedder, OpenAI embedder |
 
-`signet-common` is included because every other crate references its types; it's also dependency-light (no tokio, no sqlx, no network) so the workspace can build in tiers.
+`sealstack-common` is included because every other crate references its types; it's also dependency-light (no tokio, no sqlx, no network) so the workspace can build in tiers.
 
 ---
 
-## 2. `signet-common` — the error and id foundation
+## 2. `sealstack-common` — the error and id foundation
 
-### `SignetError`
+### `SealStackError`
 
-Seven variants — `NotFound`, `Unauthorized`, `Validation`, `Backend`, `Policy`, `Config`, `RateLimited`, plus a passthrough `Other`. Backends pick the right variant; the engine converts to `signet_engine::api::EngineError` at its boundary and the gateway converts to MCP `ToolError` at the wire.
+Seven variants — `NotFound`, `Unauthorized`, `Validation`, `Backend`, `Policy`, `Config`, `RateLimited`, plus a passthrough `Other`. Backends pick the right variant; the engine converts to `sealstack_engine::api::EngineError` at its boundary and the gateway converts to MCP `ToolError` at the wire.
 
 A deliberate choice: **three error types across three layers**. Backend errors are concrete failure modes; engine errors frame the action semantics; gateway errors encode the wire protocol. Collapsing them into one would make the `Display` impls leak implementation details (or worse, cause us to paper over distinctions that matter, like "rate limited by Voyage" vs "policy denied by your tenant's rule").
 
@@ -37,7 +37,7 @@ Upside: passing a `SchemaId` where a `ConnectorId` is expected is a compile erro
 
 ---
 
-## 3. `signet-vectorstore` — trait + two backends
+## 3. `sealstack-vectorstore` — trait + two backends
 
 ### Trait surface
 
@@ -45,13 +45,13 @@ Upside: passing a `SchemaId` where a `ConnectorId` is expected is a compile erro
 #[async_trait]
 pub trait VectorStore: Send + Sync + 'static {
     fn kind(&self) -> &'static str;
-    async fn ensure_collection(&self, name: &str, dims: usize) -> SignetResult<()>;
-    async fn ensure_collection_spec(&self, spec: &CollectionSpec) -> SignetResult<()> { /* default */ }
-    async fn upsert(&self, collection: &str, chunks: Vec<Chunk>) -> SignetResult<()>;
-    async fn search(&self, collection: &str, query_vec: Vec<f32>, top_k: usize, filter: Option<Value>) -> SignetResult<Vec<SearchResult>>;
-    async fn delete(&self, collection: &str, ids: Vec<ulid::Ulid>) -> SignetResult<()>;
-    async fn count(&self, collection: &str) -> SignetResult<u64>;
-    async fn drop_collection(&self, name: &str) -> SignetResult<()>;
+    async fn ensure_collection(&self, name: &str, dims: usize) -> SealStackResult<()>;
+    async fn ensure_collection_spec(&self, spec: &CollectionSpec) -> SealStackResult<()> { /* default */ }
+    async fn upsert(&self, collection: &str, chunks: Vec<Chunk>) -> SealStackResult<()>;
+    async fn search(&self, collection: &str, query_vec: Vec<f32>, top_k: usize, filter: Option<Value>) -> SealStackResult<Vec<SearchResult>>;
+    async fn delete(&self, collection: &str, ids: Vec<ulid::Ulid>) -> SealStackResult<()>;
+    async fn count(&self, collection: &str) -> SealStackResult<u64>;
+    async fn drop_collection(&self, name: &str) -> SealStackResult<()>;
 }
 ```
 
@@ -60,7 +60,7 @@ Two data types:
 - `Chunk` — id, content, embedding vector, metadata map. Input to `upsert`.
 - `SearchResult` — id, score, content, metadata. Output of `search`.
 
-Note the dedicated `content` field on `SearchResult`. The earlier engine code read text from `metadata["content"]`; I unified on the explicit field and patched `signet-engine/src/retrieval.rs` accordingly — this turn fixed a silent inconsistency with ingestion that would have yielded empty excerpts on every real query.
+Note the dedicated `content` field on `SearchResult`. The earlier engine code read text from `metadata["content"]`; I unified on the explicit field and patched `sealstack-engine/src/retrieval.rs` accordingly — this turn fixed a silent inconsistency with ingestion that would have yielded empty excerpts on every real query.
 
 ### Memory backend
 
@@ -98,7 +98,7 @@ Gating keeps pure-stub users out of the qdrant-client compile closure, which is 
 
 ---
 
-## 4. `signet-embedders` — trait + three backends
+## 4. `sealstack-embedders` — trait + three backends
 
 ### Trait surface
 
@@ -108,7 +108,7 @@ pub trait Embedder: Send + Sync + 'static {
     fn name(&self) -> &str;
     fn dims(&self) -> usize;
     fn max_batch(&self) -> usize { usize::MAX }
-    async fn embed(&self, texts: Vec<String>) -> SignetResult<Vec<Vec<f32>>>;
+    async fn embed(&self, texts: Vec<String>) -> SealStackResult<Vec<Vec<f32>>>;
 }
 ```
 
@@ -124,7 +124,7 @@ HTTP client against `https://api.voyageai.com/v1/embeddings`. Default model `voy
 
 Three configuration knobs on the builder: `with_endpoint` (proxy / mock), `with_input_type` (Voyage's `document` vs `query` hint — useful for asymmetric retrieval where query embeddings are computed differently from doc embeddings), `with_dims` (override for models not in the catalog).
 
-Rate limiting: the client surfaces `429` as `SignetError::RateLimited` — a distinct variant so the engine's retry logic can back off without confusing it with an actual failure.
+Rate limiting: the client surfaces `429` as `SealStackError::RateLimited` — a distinct variant so the engine's retry logic can back off without confusing it with an actual failure.
 
 ### OpenAI
 
@@ -148,15 +148,15 @@ Also compatible out-of-the-box with anything that speaks the OpenAI embeddings s
 
 ## 5. Engine integration
 
-The gateway binary (`signet-gateway/src/bin/server.rs`) composes the stack:
+The gateway binary (`sealstack-gateway/src/bin/server.rs`) composes the stack:
 
 ```rust
 let vector_store: Arc<dyn VectorStore> = if config.qdrant_url.is_empty() {
-    Arc::new(signet_vectorstore::memory::InMemoryStore::default())
+    Arc::new(sealstack_vectorstore::memory::InMemoryStore::default())
 } else {
-    Arc::new(signet_vectorstore::qdrant::QdrantStore::connect(&config.qdrant_url).await?)
+    Arc::new(sealstack_vectorstore::qdrant::QdrantStore::connect(&config.qdrant_url).await?)
 };
-let embedder: Arc<dyn Embedder> = Arc::new(signet_embedders::stub::StubEmbedder::new(64));
+let embedder: Arc<dyn Embedder> = Arc::new(sealstack_embedders::stub::StubEmbedder::new(64));
 let engine = Engine::new_dev(engine_config, vector_store, embedder).await?;
 ```
 
@@ -164,31 +164,31 @@ For production, swap the stub embedder:
 
 ```rust
 let embedder: Arc<dyn Embedder> = if let Ok(key) = std::env::var("VOYAGE_API_KEY") {
-    Arc::new(signet_embedders::voyage::VoyageEmbedder::new(key)?)
+    Arc::new(sealstack_embedders::voyage::VoyageEmbedder::new(key)?)
 } else if let Ok(key) = std::env::var("OPENAI_API_KEY") {
-    Arc::new(signet_embedders::openai::OpenAIEmbedder::new(key)?)
+    Arc::new(sealstack_embedders::openai::OpenAIEmbedder::new(key)?)
 } else {
-    Arc::new(signet_embedders::stub::StubEmbedder::new(1024))
+    Arc::new(sealstack_embedders::stub::StubEmbedder::new(1024))
 };
 ```
 
-This env-based fallback is deliberately not in the binary yet — adding it requires enabling the `voyage` / `openai` features on the gateway's `signet-embedders` dep, which is a production-deployment decision (pulls in `reqwest`). Flip it on when you actually plan to embed.
+This env-based fallback is deliberately not in the binary yet — adding it requires enabling the `voyage` / `openai` features on the gateway's `sealstack-embedders` dep, which is a production-deployment decision (pulls in `reqwest`). Flip it on when you actually plan to embed.
 
 ### Dims must line up
 
-The single most common misconfiguration: an embedder producing `N`-dim vectors against a schema with `vector_dims = M`. The vector store catches it on the first `upsert` with `SignetError::Validation`; the ingestion pipeline surfaces the error with enough context to debug. Still, the right place to catch this earlier is at schema-apply time — `signet schema apply` should load the embedder and check `embedder.dims() == schema.context.vector_dims` before accepting the schema. That's a TODO for the CLI.
+The single most common misconfiguration: an embedder producing `N`-dim vectors against a schema with `vector_dims = M`. The vector store catches it on the first `upsert` with `SealStackError::Validation`; the ingestion pipeline surfaces the error with enough context to debug. Still, the right place to catch this earlier is at schema-apply time — `sealstack schema apply` should load the embedder and check `embedder.dims() == schema.context.vector_dims` before accepting the schema. That's a TODO for the CLI.
 
 ---
 
 ## 6. Known gaps — in priority order
 
-1. **Voyage rerank client.** `signet-engine/src/rerank.rs` has an `HttpReranker` scaffold; a concrete `VoyageReranker` at `https://api.voyageai.com/v1/rerank` is a direct port of the embedder pattern. Maybe 80 lines.
+1. **Voyage rerank client.** `sealstack-engine/src/rerank.rs` has an `HttpReranker` scaffold; a concrete `VoyageReranker` at `https://api.voyageai.com/v1/rerank` is a direct port of the embedder pattern. Maybe 80 lines.
 
 2. **Qdrant filter richness.** Our `value_to_filter` handles equality and "any of"; range, nested boolean, geo, and payload-text match are all Qdrant features we don't expose. The blocker isn't implementation — it's the lack of a filter DSL upstream. Resolve at the CSL level with an explicit `filter { ... }` block, then translate.
 
 3. **Qdrant HNSW tuning.** `ensure_collection_spec` uses Qdrant defaults. Real production deployments want to set `hnsw_config { m, ef_construct }` and `quantization_config` per collection. Thread through `CollectionSpec` additions.
 
-4. **Dims-mismatch checks at schema-apply time.** Caught late right now — should fail at `signet schema apply` when the chosen embedder's `dims()` disagrees with the schema's `vector_dims`.
+4. **Dims-mismatch checks at schema-apply time.** Caught late right now — should fail at `sealstack schema apply` when the chosen embedder's `dims()` disagrees with the schema's `vector_dims`.
 
 5. **OpenAI base64 encoding.** The vendor recommends it for bandwidth savings. We request `float`. Worth revisiting for high-throughput ingestion.
 
@@ -222,8 +222,8 @@ Things most likely to need adjustment against the real compiler, in rough priori
 
 7. **`blake3::Hasher::finalize_xof()`.** Returns `OutputReader`. The `fill` method on it writes into a slice. If the trait is called something different (e.g., `read_exact`), one mechanical fix.
 
-8. **`insta`/`proptest` dev-dep features.** The `signet-common` and `signet-embedders` crates don't use them. Pure cosmetic if cargo complains.
+8. **`insta`/`proptest` dev-dep features.** The `sealstack-common` and `sealstack-embedders` crates don't use them. Pure cosmetic if cargo complains.
 
-The memory vector store, the stub embedder, and `signet-common` should all build on a clean Rust 1.83 toolchain without any external services. That's the smoke test I'd run first.
+The memory vector store, the stub embedder, and `sealstack-common` should all build on a clean Rust 1.83 toolchain without any external services. That's the smoke test I'd run first.
 
 *End of backends design notes.*

@@ -1,6 +1,6 @@
 # CSL Parser — Design Notes
 
-**Companion to**: `crates/signet-csl/` in the `signet-crates.tar.gz` drop-in.
+**Companion to**: `crates/sealstack-csl/` in the `sealstack-crates.tar.gz` drop-in.
 **Status**: Unverified skeleton. Follows documented `winnow` 0.6 APIs; expect a round of compiler-driven fixes before first green build.
 
 ---
@@ -78,7 +78,7 @@ Every pass preserves byte spans. Errors are `miette::Diagnostic`-derived so `car
 
 ```bash
 # In the repo root:
-cd crates/signet-csl
+cd crates/sealstack-csl
 cargo test
 
 # First, if the `unreachable!` in `ident_raw` trips a warning,

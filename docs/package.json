@@ -1,9 +1,9 @@
 {
-  "name": "signet-docs",
+  "name": "sealstack-docs",
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "Signet documentation site.",
+  "description": "SealStack documentation site.",
   "scripts": {
     "dev": "astro dev --port 4321",
     "build": "astro build",

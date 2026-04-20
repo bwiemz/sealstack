@@ -68,7 +68,7 @@ The `context { ... }` block configures retrieval for this schema:
 ## Compile
 
 ```bash
-signet compile schemas/
+sealstack compile schemas/
 ```
 
 Produces:
@@ -81,7 +81,7 @@ Produces:
 ## Apply
 
 ```bash
-signet schema apply schemas/
+sealstack schema apply schemas/
 ```
 
 Runs the DDL against Postgres and POSTs each schema meta to

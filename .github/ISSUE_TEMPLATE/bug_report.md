@@ -12,5 +12,5 @@ labels: bug
 
 ### Environment
 - OS:
-- Signet version:
+- SealStack version:
 - Deployment (local / managed / self-hosted):

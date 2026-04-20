@@ -39,7 +39,7 @@ export class Client {
   constructor(opts: ClientOptions = {}) {
     const raw =
       opts.gatewayUrl ??
-      (typeof window !== 'undefined' && (window as any).__SIGNET_GATEWAY_URL__) ??
+      (typeof window !== 'undefined' && (window as any).__SEALSTACK_GATEWAY_URL__) ??
       'http://localhost:7070';
     this.base = raw.replace(/\/+$/, '');
     this.user = opts.user ?? 'console';

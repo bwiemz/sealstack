@@ -1,6 +1,6 @@
-# Signet docs
+# SealStack docs
 
-Astro + Starlight site for <https://signet.dev>.
+Astro + Starlight site for <https://sealstack.ai>.
 
 ## Dev
 

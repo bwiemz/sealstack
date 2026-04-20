@@ -1,6 +1,6 @@
 # Governance
 
-Signet uses a Working Groups model.
+SealStack uses a Working Groups model.
 
 ## Roles
 

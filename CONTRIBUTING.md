@@ -1,4 +1,4 @@
-# Contributing to Signet
+# Contributing to SealStack
 
 Thanks for your interest.
 

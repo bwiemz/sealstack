@@ -19,15 +19,15 @@
 #![warn(missing_docs, unreachable_pub)]
 
 use async_trait::async_trait;
-use signet_common::{SignetError, SignetResult};
-use signet_connector_sdk::{
+use sealstack_common::{SealStackError, SealStackResult};
+use sealstack_connector_sdk::{
     Connector, PermissionPredicate, Resource, ResourceId, ResourceStream, change_streams,
 };
 use serde::Deserialize;
 use time::OffsetDateTime;
 
 const SLACK_API: &str = "https://slack.com/api";
-const UA: &str = concat!("signet-slack/", env!("CARGO_PKG_VERSION"));
+const UA: &str = concat!("sealstack-slack/", env!("CARGO_PKG_VERSION"));
 
 /// Slack connector configuration.
 #[derive(Clone, Debug)]
@@ -47,14 +47,14 @@ impl SlackConfig {
     /// ```json
     /// { "token": "xoxb-...", "channels": ["C01234"], "max_messages_per_channel": 500 }
     /// ```
-    pub fn from_json(v: &serde_json::Value) -> SignetResult<Self> {
+    pub fn from_json(v: &serde_json::Value) -> SealStackResult<Self> {
         let token = v
             .get("token")
             .and_then(|x| x.as_str())
             .map(str::to_owned)
             .or_else(|| std::env::var("SLACK_BOT_TOKEN").ok())
             .ok_or_else(|| {
-                SignetError::Config("slack connector requires `token` or SLACK_BOT_TOKEN env".into())
+                SealStackError::Config("slack connector requires `token` or SLACK_BOT_TOKEN env".into())
             })?;
         let channels: Vec<String> = v
             .get("channels")
@@ -90,7 +90,7 @@ impl SlackConnector {
         Self { client, config }
     }
 
-    async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> SignetResult<T> {
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> SealStackResult<T> {
         let resp = self
             .client
             .get(url)
@@ -98,22 +98,22 @@ impl SlackConnector {
             .header("accept", "application/json")
             .send()
             .await
-            .map_err(|e| SignetError::Backend(format!("slack request: {e}")))?;
+            .map_err(|e| SealStackError::Backend(format!("slack request: {e}")))?;
 
         if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(SignetError::Unauthorized("slack token rejected".into()));
+            return Err(SealStackError::Unauthorized("slack token rejected".into()));
         }
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(SignetError::Backend(format!("slack {status}: {body}")));
+            return Err(SealStackError::Backend(format!("slack {status}: {body}")));
         }
         resp.json::<T>()
             .await
-            .map_err(|e| SignetError::Backend(format!("slack decode: {e}")))
+            .map_err(|e| SealStackError::Backend(format!("slack decode: {e}")))
     }
 
-    async fn list_channels(&self) -> SignetResult<Vec<Channel>> {
+    async fn list_channels(&self) -> SealStackResult<Vec<Channel>> {
         let mut cursor = String::new();
         let mut out = Vec::new();
         loop {
@@ -141,7 +141,7 @@ impl SlackConnector {
         Ok(out)
     }
 
-    async fn list_messages(&self, channel_id: &str) -> SignetResult<Vec<Message>> {
+    async fn list_messages(&self, channel_id: &str) -> SealStackResult<Vec<Message>> {
         let cap = self.config.max_messages_per_channel as usize;
         let mut cursor = String::new();
         let mut out: Vec<Message> = Vec::new();
@@ -179,7 +179,7 @@ impl Connector for SlackConnector {
         env!("CARGO_PKG_VERSION")
     }
 
-    async fn list(&self) -> SignetResult<ResourceStream> {
+    async fn list(&self) -> SealStackResult<ResourceStream> {
         let channels = self.list_channels().await?;
         let mut out: Vec<Resource> = Vec::new();
         for channel in channels {
@@ -221,13 +221,13 @@ impl Connector for SlackConnector {
         Ok(change_streams::resource_stream(out))
     }
 
-    async fn fetch(&self, id: &ResourceId) -> SignetResult<Resource> {
-        Err(SignetError::NotFound(format!(
+    async fn fetch(&self, id: &ResourceId) -> SealStackResult<Resource> {
+        Err(SealStackError::NotFound(format!(
             "slack fetch not yet implemented for `{id}`",
         )))
     }
 
-    async fn healthcheck(&self) -> SignetResult<()> {
+    async fn healthcheck(&self) -> SealStackResult<()> {
         let url = format!("{SLACK_API}/auth.test");
         let resp: AuthTestResp = self.get_json(&url).await?;
         resp.ok_or_err()
@@ -270,11 +270,11 @@ struct AuthTestResp {
 trait SlackOk {
     fn is_ok(&self) -> bool;
     fn err(&self) -> Option<&str>;
-    fn ok_or_err(&self) -> SignetResult<()> {
+    fn ok_or_err(&self) -> SealStackResult<()> {
         if self.is_ok() {
             Ok(())
         } else {
-            Err(SignetError::Backend(format!(
+            Err(SealStackError::Backend(format!(
                 "slack api: {}",
                 self.err().unwrap_or("unknown")
             )))
@@ -369,7 +369,7 @@ mod tests {
             error: Some("invalid_auth".into()),
         };
         match resp.ok_or_err() {
-            Err(SignetError::Backend(m)) => assert!(m.contains("invalid_auth")),
+            Err(SealStackError::Backend(m)) => assert!(m.contains("invalid_auth")),
             other => panic!("expected Backend error, got {other:?}"),
         }
     }

@@ -1,9 +1,9 @@
 {
-  "name": "signet-console",
+  "name": "sealstack-console",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Signet administrative console.",
+  "description": "SealStack administrative console.",
   "scripts": {
     "dev": "vite dev --port 7071",
     "build": "vite build",

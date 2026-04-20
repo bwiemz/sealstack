@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please report security issues privately to **security@signet.dev**.
+Please report security issues privately to **security@sealstack.ai**.
 
 Do not open a public GitHub issue for suspected vulnerabilities.
 

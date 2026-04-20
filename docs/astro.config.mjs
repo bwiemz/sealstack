@@ -3,14 +3,14 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://signet.dev',
+  site: 'https://sealstack.ai',
   integrations: [
     starlight({
-      title: 'Signet',
+      title: 'SealStack',
       description:
         'Open-source, enterprise-grade context operating system. MCP-native, Rust-backed.',
       social: {
-        github: 'https://github.com/bwiemz/signet'
+        github: 'https://github.com/bwiemz/sealstack'
       },
       sidebar: [
         {

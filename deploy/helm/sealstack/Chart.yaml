@@ -1,0 +1,6 @@
+apiVersion: v2
+name: sealstack
+description: SealStack — the open context OS for AI-native companies.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

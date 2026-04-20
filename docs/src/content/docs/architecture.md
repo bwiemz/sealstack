@@ -1,9 +1,9 @@
 ---
 title: Architecture overview
-description: The major components of a running Signet deployment and how they interact.
+description: The major components of a running SealStack deployment and how they interact.
 ---
 
-Signet is intentionally small. The entire runtime is five moving parts:
+SealStack is intentionally small. The entire runtime is five moving parts:
 
 ```text
 ┌──────────────────┐      ┌──────────────────────┐
@@ -30,16 +30,16 @@ Signet is intentionally small. The entire runtime is five moving parts:
 
 ## Crates
 
-- **signet-csl** — parses and type-checks CSL, emits DDL, MCP tool descriptors, and typed SDK clients.
-- **signet-engine** — retrieval, ingest, receipts, policy. Every business behavior lives here.
-- **signet-gateway** — HTTP surface. REST for humans and CLIs, MCP JSON-RPC streamable-HTTP for agents, OAuth 2.1 discovery + bearer validation.
-- **signet-ingest** — runtime that drives connectors on a schedule and feeds resources into the engine's ingest path.
-- **signet-connector-sdk + connectors/\*** — trait definition and bundled connector implementations (local-files, GitHub, Slack).
+- **sealstack-csl** — parses and type-checks CSL, emits DDL, MCP tool descriptors, and typed SDK clients.
+- **sealstack-engine** — retrieval, ingest, receipts, policy. Every business behavior lives here.
+- **sealstack-gateway** — HTTP surface. REST for humans and CLIs, MCP JSON-RPC streamable-HTTP for agents, OAuth 2.1 discovery + bearer validation.
+- **sealstack-ingest** — runtime that drives connectors on a schedule and feeds resources into the engine's ingest path.
+- **sealstack-connector-sdk + connectors/\*** — trait definition and bundled connector implementations (local-files, GitHub, Slack).
 
 ## Data plane
 
 Schemas and connector bindings are durable: they live in Postgres
-(`signet_schemas`, `signet_connectors`) and are rehydrated on every gateway boot. A
+(`sealstack_schemas`, `sealstack_connectors`) and are rehydrated on every gateway boot. A
 restart loses nothing.
 
 Every per-schema table gets a `tenant` column automatically. Retrieval queries

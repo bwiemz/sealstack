@@ -1,0 +1,16 @@
+image:
+  repository: ghcr.io/sealstack/sealstack-gateway
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 7070
+
+postgres:
+  url: ""
+
+qdrant:
+  url: ""
+
+resources: {}

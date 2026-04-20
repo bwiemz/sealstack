@@ -1,5 +1,5 @@
 [package]
-name         = "signet-connector-github"
+name         = "sealstack-connector-github"
 version      = { workspace = true }
 edition      = { workspace = true }
 rust-version = { workspace = true }
@@ -10,8 +10,8 @@ repository   = { workspace = true }
 workspace = true
 
 [dependencies]
-signet-common        = { path = "../../crates/signet-common" }
-signet-connector-sdk = { path = "../../crates/signet-connector-sdk" }
+sealstack-common        = { path = "../../crates/sealstack-common" }
+sealstack-connector-sdk = { path = "../../crates/sealstack-connector-sdk" }
 async-trait       = { workspace = true }
 reqwest           = { workspace = true }
 serde             = { workspace = true }

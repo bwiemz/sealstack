@@ -1,0 +1,61 @@
+[package]
+name         = "sealstack-gateway"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "MCP, REST, and OAuth gateway for SealStack."
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "sealstack-gateway"
+path = "src/bin/server.rs"
+
+[dependencies]
+tokio           = { workspace = true }
+axum            = { workspace = true }
+tower           = { workspace = true }
+tower-http      = { workspace = true }
+hyper           = { workspace = true }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+thiserror       = { workspace = true }
+anyhow          = { workspace = true }
+tracing         = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid            = { workspace = true }
+ulid            = { workspace = true }
+time            = { workspace = true }
+async-trait     = "0.1"
+dashmap         = "6"
+futures         = "0.3"
+jsonwebtoken    = "9.2"
+reqwest         = { workspace = true }
+# Internal crates
+sealstack-common                  = { path = "../sealstack-common" }
+sealstack-csl                     = { path = "../sealstack-csl" }
+sealstack-engine                  = { path = "../sealstack-engine", features = ["reranker", "wasm-policy"] }
+sealstack-vectorstore             = { path = "../sealstack-vectorstore", features = ["qdrant"] }
+sealstack-embedders               = { path = "../sealstack-embedders", features = ["stub", "openai", "voyage"] }
+sealstack-connector-sdk           = { path = "../sealstack-connector-sdk" }
+sealstack-ingest                  = { path = "../sealstack-ingest" }
+sealstack-connector-local-files   = { path = "../../connectors/local-files" }
+sealstack-connector-github        = { path = "../../connectors/github" }
+sealstack-connector-slack         = { path = "../../connectors/slack" }
+
+[dev-dependencies]
+tokio           = { workspace = true, features = ["macros", "rt-multi-thread"] }
+reqwest         = { workspace = true }
+tempfile        = { workspace = true }
+serde_json      = { workspace = true }
+tower           = { workspace = true, features = ["util"] }
+axum            = { workspace = true }
+http-body-util  = "0.1"
+
+[features]
+default      = []
+# Compile in the StubEngineFacade for integration tests of the gateway alone.
+stub-engine  = []

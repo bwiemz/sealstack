@@ -1,18 +1,18 @@
 [package]
-name         = "signet-connector-local-files"
+name         = "sealstack-connector-local-files"
 version      = { workspace = true }
 edition      = { workspace = true }
 rust-version = { workspace = true }
 license      = { workspace = true }
 repository   = { workspace = true }
-description  = "Signet connector for a local filesystem directory."
+description  = "SealStack connector for a local filesystem directory."
 
 [lints]
 workspace = true
 
 [dependencies]
-signet-common        = { path = "../../crates/signet-common" }
-signet-connector-sdk = { path = "../../crates/signet-connector-sdk" }
+sealstack-common        = { path = "../../crates/sealstack-common" }
+sealstack-connector-sdk = { path = "../../crates/sealstack-connector-sdk" }
 
 async-trait = "0.1"
 futures     = "0.3"

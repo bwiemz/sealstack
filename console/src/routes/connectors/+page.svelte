@@ -94,7 +94,7 @@
 </script>
 
 <svelte:head>
-  <title>Connectors · Signet</title>
+  <title>Connectors · SealStack</title>
 </svelte:head>
 
 <div class="px-10 py-10">

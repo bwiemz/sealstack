@@ -49,9 +49,9 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: signet
-          POSTGRES_PASSWORD: signet
-          POSTGRES_DB: signet
+          POSTGRES_USER: sealstack
+          POSTGRES_PASSWORD: sealstack
+          POSTGRES_DB: sealstack
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U cfg"
@@ -64,9 +64,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
       # The e2e test target is added in Phase 12. Until then this job is a
-      # no-op placeholder; once `tests/e2e.rs` lands in signet-gateway, swap
+      # no-op placeholder; once `tests/e2e.rs` lands in sealstack-gateway, swap
       # back to `cargo test --test e2e --locked`.
       - run: cargo check --workspace --locked
         env:
-          SIGNET_DATABASE_URL: postgres://signet:signet@localhost:5432/signet
-          SIGNET_QDRANT_URL:   http://localhost:6334
+          SEALSTACK_DATABASE_URL: postgres://sealstack:sealstack@localhost:5432/sealstack
+          SEALSTACK_QDRANT_URL:   http://localhost:6334

@@ -24,8 +24,8 @@
 #![warn(missing_docs, unreachable_pub)]
 
 use async_trait::async_trait;
-use signet_common::{SignetError, SignetResult};
-use signet_connector_sdk::{
+use sealstack_common::{SealStackError, SealStackResult};
+use sealstack_connector_sdk::{
     Connector, PermissionPredicate, Resource, ResourceId, ResourceStream, change_streams,
 };
 use serde::Deserialize;
@@ -33,7 +33,7 @@ use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
 const GITHUB_API: &str = "https://api.github.com";
-const UA: &str = concat!("signet-github/", env!("CARGO_PKG_VERSION"));
+const UA: &str = concat!("sealstack-github/", env!("CARGO_PKG_VERSION"));
 
 /// Configuration for the GitHub connector.
 #[derive(Clone, Debug)]
@@ -41,7 +41,7 @@ pub struct GithubConfig {
     /// PAT with `repo` + `read:org` scopes for private repo access; `public_repo`
     /// is enough for open-source use.
     pub token: String,
-    /// The user or org login to pull from (e.g. `"signet"`). When
+    /// The user or org login to pull from (e.g. `"sealstack"`). When
     /// `None`, pulls every repo the token can see.
     pub owner: Option<String>,
     /// Optional comma-separated allow-list of repo names. Empty = all.
@@ -57,14 +57,14 @@ impl GithubConfig {
     /// ```json
     /// { "token": "ghp_...", "owner": "acme", "repos": ["docs", "core"], "include_issues": true }
     /// ```
-    pub fn from_json(v: &serde_json::Value) -> SignetResult<Self> {
+    pub fn from_json(v: &serde_json::Value) -> SealStackResult<Self> {
         let token = v
             .get("token")
             .and_then(|x| x.as_str())
             .map(str::to_owned)
             .or_else(|| std::env::var("GITHUB_TOKEN").ok())
             .ok_or_else(|| {
-                SignetError::Config("github connector requires `token` or GITHUB_TOKEN env".into())
+                SealStackError::Config("github connector requires `token` or GITHUB_TOKEN env".into())
             })?;
         let owner = v
             .get("owner")
@@ -105,7 +105,7 @@ impl GithubConnector {
         Self { client, config }
     }
 
-    async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> SignetResult<(T, Option<String>)> {
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> SealStackResult<(T, Option<String>)> {
         let resp = self
             .client
             .get(url)
@@ -114,15 +114,15 @@ impl GithubConnector {
             .header("x-github-api-version", "2022-11-28")
             .send()
             .await
-            .map_err(|e| SignetError::Backend(format!("github request: {e}")))?;
+            .map_err(|e| SealStackError::Backend(format!("github request: {e}")))?;
 
         if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(SignetError::Unauthorized("github token rejected".into()));
+            return Err(SealStackError::Unauthorized("github token rejected".into()));
         }
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(SignetError::Backend(format!(
+            return Err(SealStackError::Backend(format!(
                 "github {status}: {}",
                 truncate_for_log(&body),
             )));
@@ -132,11 +132,11 @@ impl GithubConnector {
         let value = resp
             .json::<T>()
             .await
-            .map_err(|e| SignetError::Backend(format!("github decode: {e}")))?;
+            .map_err(|e| SealStackError::Backend(format!("github decode: {e}")))?;
         Ok((value, next))
     }
 
-    async fn list_repos(&self) -> SignetResult<Vec<Repo>> {
+    async fn list_repos(&self) -> SealStackResult<Vec<Repo>> {
         let first = match &self.config.owner {
             Some(o) => format!("{GITHUB_API}/users/{o}/repos?per_page=100&type=owner"),
             None => format!("{GITHUB_API}/user/repos?per_page=100&affiliation=owner"),
@@ -160,16 +160,16 @@ impl GithubConnector {
         Ok(out)
     }
 
-    async fn fetch_readme(&self, owner: &str, repo: &str) -> SignetResult<Option<String>> {
+    async fn fetch_readme(&self, owner: &str, repo: &str) -> SealStackResult<Option<String>> {
         let url = format!("{GITHUB_API}/repos/{owner}/{repo}/readme");
         match self.get_json::<ReadmeBody>(&url).await {
             Ok((body, _)) => Ok(Some(decode_base64_content(&body.content))),
-            Err(SignetError::Backend(m)) if m.contains("404") => Ok(None),
+            Err(SealStackError::Backend(m)) if m.contains("404") => Ok(None),
             Err(e) => Err(e),
         }
     }
 
-    async fn list_issues(&self, owner: &str, repo: &str) -> SignetResult<Vec<Issue>> {
+    async fn list_issues(&self, owner: &str, repo: &str) -> SealStackResult<Vec<Issue>> {
         let mut url =
             format!("{GITHUB_API}/repos/{owner}/{repo}/issues?state=all&per_page=100");
         let mut out = Vec::new();
@@ -196,7 +196,7 @@ impl Connector for GithubConnector {
         env!("CARGO_PKG_VERSION")
     }
 
-    async fn list(&self) -> SignetResult<ResourceStream> {
+    async fn list(&self) -> SealStackResult<ResourceStream> {
         let repos = self.list_repos().await?;
         let mut out: Vec<Resource> = Vec::new();
 
@@ -259,16 +259,16 @@ impl Connector for GithubConnector {
         Ok(change_streams::resource_stream(out))
     }
 
-    async fn fetch(&self, id: &ResourceId) -> SignetResult<Resource> {
+    async fn fetch(&self, id: &ResourceId) -> SealStackResult<Resource> {
         // v0.1 does not resolve single-resource fetches by id; the full list
         // path is sufficient for initial sync. On-demand fetch lands when
         // webhook-driven push is wired.
-        Err(SignetError::NotFound(format!(
+        Err(SealStackError::NotFound(format!(
             "github fetch not yet implemented for `{id}`"
         )))
     }
 
-    async fn healthcheck(&self) -> SignetResult<()> {
+    async fn healthcheck(&self) -> SealStackResult<()> {
         let url = format!("{GITHUB_API}/user");
         let _: (serde_json::Value, _) = self.get_json(&url).await?;
         Ok(())
