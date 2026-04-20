@@ -23,7 +23,7 @@ time        = { workspace = true }
 tokio       = { workspace = true, features = ["fs", "macros", "rt", "sync", "time"] }
 tracing     = { workspace = true }
 walkdir     = "2.5"
-notify      = { version = "7", optional = true }
+notify      = { version = "8", optional = true }
 
 [features]
 default = ["watch"]
