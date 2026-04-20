@@ -13,16 +13,16 @@ docker compose -f deploy/docker/compose.dev.yaml up -d
 
 ## Kubernetes (Helm — coming in v0.2)
 
-Helm chart scaffolding lives in [`deploy/helm/`](https://github.com/contextforge/contextforge/tree/main/deploy/helm).
-Not production-ready yet; track the [v0.2 milestone](https://github.com/contextforge/contextforge/milestones).
+Helm chart scaffolding lives in [`deploy/helm/`](https://github.com/bwiemz/contextforge/tree/main/deploy/helm).
+Not production-ready yet; track the [v0.2 milestone](https://github.com/bwiemz/contextforge/milestones).
 
 ## Gateway image
 
 The gateway image is published on every tagged release:
 
 ```
-ghcr.io/contextforge/contextforge/gateway:<version>
-ghcr.io/contextforge/contextforge/gateway:latest
+ghcr.io/bwiemz/contextforge/gateway:<version>
+ghcr.io/bwiemz/contextforge/gateway:latest
 ```
 
 Multi-arch (linux/amd64, linux/arm64).

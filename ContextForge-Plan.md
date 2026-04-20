@@ -327,14 +327,14 @@ Transparent pricing is one of the top three buyer complaints about Glean — eve
 
 Identical two-repo pattern to QuantForge.
 
-### Public repo — `contextforge/contextforge`
+### Public repo — `bwiemz/contextforge`
 
 - **License**: Apache-2.0 with a narrow `CLA.md` (standard Individual + Corporate CLA)
 - **Contents**: engine core, connector SDK, CLI, console, standard connectors, CSL compiler, reference Docker/Helm/Terraform
 - **Why Apache-2.0 (not MIT)**: patent grant clause. ContextForge sits adjacent to prior art in search, retrieval, and policy evaluation — explicit patent grants protect contributors and users. MIT doesn't. Dust/Onyx picked MIT; we can differentiate on this.
 - **Why not AGPL/SSPL/BUSL**: the category is still being defined. Permissive licensing is the fastest way to become the default, and you capture value through the commercial repo, managed service, and premium modules — not by forcing upstream contribution.
 
-### Private repo — `contextforge/contextforge-enterprise`
+### Private repo — `bwiemz/contextforge-enterprise`
 
 - **License**: ContextForge Commercial License (EULA) — template derived from your QuantForge EULA
 - **Contents**:
@@ -366,7 +366,7 @@ Identical two-repo pattern to QuantForge.
 
 ## 9. GitHub File Structure
 
-### Public repo: `contextforge/contextforge`
+### Public repo: `bwiemz/contextforge`
 
 ```
 contextforge/
@@ -514,7 +514,7 @@ contextforge/
 └── ROADMAP.md
 ```
 
-### Private repo: `contextforge/contextforge-enterprise`
+### Private repo: `bwiemz/contextforge-enterprise`
 
 ```
 contextforge-enterprise/

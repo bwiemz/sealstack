@@ -10,7 +10,7 @@ MCP-native · Self-hostable · Typed context schemas
 
 ```bash
 # Clone and bring up the full local stack
-git clone https://github.com/contextforge/contextforge
+git clone https://github.com/bwiemz/contextforge
 cd contextforge
 cargo install --path crates/cfg-cli
 cfg dev

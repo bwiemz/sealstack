@@ -1,6 +1,6 @@
 # ContextForge — Agent-Executable Scaffolding Brief
 
-**Target repo**: `contextforge/contextforge` (public, Apache-2.0)
+**Target repo**: `bwiemz/contextforge` (public, Apache-2.0)
 **Target stack**: Rust 1.83+ (Axum 0.8, Tokio, sqlx, wasmtime) · SvelteKit 2 + Svelte 5 · PostgreSQL 16 · Qdrant
 **Executor**: AI coding agent (Claude Code, Cursor, Codex CLI) with Bash + filesystem access
 **Completion criterion**: `cfg dev` stands up the full stack in under 60 seconds on a clean machine, serves an MCP endpoint, and passes the end-to-end acceptance test in §12.
@@ -112,7 +112,7 @@ ContextForge
 Copyright 2026 ContextForge Contributors
 
 This product includes software developed by the ContextForge project
-(https://github.com/contextforge/contextforge).
+(https://github.com/bwiemz/contextforge).
 ```
 
 **`TRADEMARKS.md`**
@@ -162,7 +162,7 @@ version     = "0.1.0"
 edition     = "2024"
 rust-version = "1.83"
 license     = "Apache-2.0"
-repository  = "https://github.com/contextforge/contextforge"
+repository  = "https://github.com/bwiemz/contextforge"
 authors     = ["ContextForge Contributors"]
 
 [workspace.lints.rust]

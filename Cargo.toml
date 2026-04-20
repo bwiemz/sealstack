@@ -22,7 +22,7 @@ version      = "0.1.0"
 edition      = "2024"
 rust-version = "1.85"
 license      = "Apache-2.0"
-repository   = "https://github.com/contextforge/contextforge"
+repository   = "https://github.com/bwiemz/contextforge"
 authors      = ["ContextForge Contributors"]
 
 [workspace.lints.rust]

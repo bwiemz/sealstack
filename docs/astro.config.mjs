@@ -10,7 +10,7 @@ export default defineConfig({
       description:
         'Open-source, enterprise-grade context operating system. MCP-native, Rust-backed.',
       social: {
-        github: 'https://github.com/contextforge/contextforge'
+        github: 'https://github.com/bwiemz/contextforge'
       },
       sidebar: [
         {

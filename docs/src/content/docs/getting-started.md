@@ -19,7 +19,7 @@ Docker Compose.
 Clone the repo and bring up Postgres, Qdrant, and the gateway:
 
 ```bash
-git clone https://github.com/contextforge/contextforge.git
+git clone https://github.com/bwiemz/contextforge.git
 cd contextforge
 docker compose -f deploy/docker/compose.dev.yaml up -d
 ```
