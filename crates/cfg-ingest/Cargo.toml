@@ -1,0 +1,29 @@
+[package]
+name         = "cfg-ingest"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "Runtime that drives connectors and feeds their resources into the engine."
+
+[lints]
+workspace = true
+
+[dependencies]
+cfg-common        = { path = "../cfg-common" }
+cfg-connector-sdk = { path = "../cfg-connector-sdk" }
+cfg-engine        = { path = "../cfg-engine" }
+
+async-trait  = "0.1"
+dashmap      = "6.1"
+futures      = "0.3"
+serde        = { workspace = true, features = ["derive"] }
+serde_json   = { workspace = true }
+thiserror    = { workspace = true }
+time         = { workspace = true }
+tokio        = { workspace = true, features = ["full"] }
+tracing      = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

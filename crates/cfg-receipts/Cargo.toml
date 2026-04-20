@@ -1,0 +1,17 @@
+[package]
+name         = "cfg-receipts"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+
+[lints]
+workspace = true
+
+[dependencies]
+cfg-common = { path = "../cfg-common" }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+time       = { workspace = true }
+ulid       = { workspace = true }

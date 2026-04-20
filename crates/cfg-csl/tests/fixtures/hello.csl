@@ -1,0 +1,12 @@
+schema Note {
+    id:         Ulid    @primary
+    title:      String  @searchable
+    body:       Text    @chunked
+    created_at: Instant
+
+    context {
+        chunking    = semantic(max_tokens = 512)
+        embedder    = "stub"
+        vector_dims = 64
+    }
+}

@@ -1,0 +1,10 @@
+{
+  "include": ["sdks/python/contextforge"],
+  "exclude": ["**/node_modules", "**/target", "**/.dist", "**/dist"],
+  "reportMissingImports": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownMemberType": "none",
+  "reportUntypedBaseClass": "none",
+  "reportUnannotatedClassAttribute": "none",
+  "reportExplicitAny": "none"
+}

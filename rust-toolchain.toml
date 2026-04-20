@@ -1,0 +1,7 @@
+[toolchain]
+# Brief specified 1.83. Bumped because:
+#  * edition 2024 + resolver "3" require 1.85
+#  * qdrant-client 1.12 uses `unsigned_is_multiple_of`, stabilized in 1.87
+channel = "1.87"
+components = ["rustfmt", "clippy", "rust-src"]
+targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]

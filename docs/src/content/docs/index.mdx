@@ -1,0 +1,46 @@
+---
+title: ContextForge
+description: Open-source context operating system. MCP-native, Rust-backed.
+template: splash
+hero:
+  tagline: The platform knows what your tools know.
+  actions:
+    - text: Getting started
+      link: /getting-started
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/contextforge/contextforge
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What it is
+
+ContextForge is an open-source, enterprise-grade context platform. It ingests
+data from your tools, indexes it with hybrid BM25+vector retrieval, and exposes
+MCP tools plus a REST API that every AI agent in your organization can call.
+
+Every search returns a **receipt** — the sources it read, the policies it
+enforced, and the time each stage cost. Those receipts are first-class
+primitives, not an afterthought.
+
+<CardGrid>
+  <Card title="CSL — declarative schemas" icon="document">
+    Describe what data you have in a terse domain-specific language. CSL
+    compiles to Postgres DDL, an MCP tool surface, and typed SDK clients.
+  </Card>
+  <Card title="Connectors" icon="puzzle">
+    Pull from GitHub, Slack, local files out of the box. The connector SDK is
+    a single trait — add a new source in an afternoon.
+  </Card>
+  <Card title="MCP-native" icon="setting">
+    Every schema auto-registers `search_*`, `get_*`, `list_*`, and aggregate
+    tools compatible with MCP 2025-11-25 streamable HTTP.
+  </Card>
+  <Card title="Receipts" icon="approve-check">
+    Every answer carries a cryptographic receipt. Debug "why did I see this?"
+    in the console or replay the query from the receipt id.
+  </Card>
+</CardGrid>

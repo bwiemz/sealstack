@@ -1,0 +1,15 @@
+schema Doc {
+    id:         Ulid    @primary
+    path:       String  @searchable @indexed
+    title:      String  @searchable
+    body:       Text    @chunked
+    updated_at: Instant
+
+    context {
+        chunking        = semantic(max_tokens = 512, overlap = 64)
+        embedder        = "stub"
+        vector_dims     = 64
+        default_top_k   = 8
+        freshness_decay = exponential(half_life = 30d)
+    }
+}

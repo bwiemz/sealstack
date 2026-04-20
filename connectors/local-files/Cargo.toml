@@ -1,0 +1,35 @@
+[package]
+name         = "cfg-connector-local-files"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "ContextForge connector for a local filesystem directory."
+
+[lints]
+workspace = true
+
+[dependencies]
+cfg-common        = { path = "../../crates/cfg-common" }
+cfg-connector-sdk = { path = "../../crates/cfg-connector-sdk" }
+
+async-trait = "0.1"
+futures     = "0.3"
+serde       = { workspace = true, features = ["derive"] }
+serde_json  = { workspace = true }
+thiserror   = { workspace = true }
+time        = { workspace = true }
+tokio       = { workspace = true, features = ["fs", "macros", "rt", "sync", "time"] }
+tracing     = { workspace = true }
+walkdir     = "2.5"
+notify      = { version = "7", optional = true }
+
+[features]
+default = ["watch"]
+# Enables `subscribe()` via the `notify` crate for push-based updates on change.
+watch   = ["dep:notify"]
+
+[dev-dependencies]
+tempfile = "3.13"
+tokio    = { workspace = true, features = ["macros", "rt-multi-thread"] }

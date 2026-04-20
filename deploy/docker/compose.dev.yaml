@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: cfg
+      POSTGRES_USER: cfg
+      POSTGRES_DB: cfg
+    ports: ["5432:5432"]
+    volumes: [cfg_pg:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cfg"]
+      interval: 2s
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports: ["6333:6333", "6334:6334"]
+    volumes: [cfg_qdrant:/qdrant/storage]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/readyz || exit 1"]
+      interval: 2s
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.gateway
+    ports: ["7070:7070"]
+    environment:
+      CFG_DATABASE_URL: postgres://cfg:cfg@postgres:5432/cfg
+      CFG_QDRANT_URL: http://qdrant:6334
+      CFG_REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      qdrant:   { condition: service_healthy }
+      redis:    { condition: service_started }
+
+volumes:
+  cfg_pg:
+  cfg_qdrant:

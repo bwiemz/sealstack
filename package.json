@@ -1,0 +1,11 @@
+{
+  "name": "contextforge-js-root",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "lint": "pnpm -r lint",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
+  "engines": { "node": ">=20" }
+}

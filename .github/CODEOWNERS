@@ -1,0 +1,7 @@
+*               @contextforge/maintainers
+/crates/cfg-csl/     @contextforge/wg-csl
+/crates/cfg-engine/  @contextforge/wg-engine
+/crates/cfg-gateway/ @contextforge/wg-gateway
+/connectors/         @contextforge/wg-connectors
+/console/            @contextforge/wg-console
+/docs/               @contextforge/wg-docs
