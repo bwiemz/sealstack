@@ -58,7 +58,7 @@ sparingly for active / pending / CTA states. The receipt viewer is the
 visual differentiator — laid out like a legal document rather than a
 typical SaaS card.
 
-See `../Console-Design.md` in the workspace root for the full design notes.
+See [`../design/Console-Design.md`](../design/Console-Design.md) for the full design notes.
 
 ## Build
 

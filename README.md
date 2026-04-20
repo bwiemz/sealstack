@@ -24,8 +24,8 @@ context layer the same afternoon.
 
 ContextForge unifies ingestion, retrieval, memory, policy, and tool-use under
 a single typed context model, and exposes every internal system as a governed
-MCP server. See [`ContextForge-Plan.md`](./ContextForge-Plan.md) for the full
-product plan and [`CSL-Specification.md`](./CSL-Specification.md) for the
+MCP server. See [`design/ContextForge-Plan.md`](./design/ContextForge-Plan.md) for the full
+product plan and [`design/CSL-Specification.md`](./design/CSL-Specification.md) for the
 Context Schema Language spec.
 
 ## Repository layout
