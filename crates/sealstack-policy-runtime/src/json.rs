@@ -213,13 +213,22 @@ fn skip_container(bytes: &[u8], at: usize, open: u8, close: u8) -> JsonResult<us
 
 fn skip_number(bytes: &[u8], at: usize) -> JsonResult<usize> {
     let mut i = at;
-    if bytes.get(i) == Some(&b'-') {
+    let sign_consumed = if bytes.get(i) == Some(&b'-') {
         i += 1;
-    }
+        true
+    } else {
+        false
+    };
+    let digits_start = i;
     while i < bytes.len() && matches!(bytes[i], b'0'..=b'9' | b'.' | b'e' | b'E' | b'-' | b'+') {
         i += 1;
     }
-    if i == at {
+    // Require at least one digit char after the optional `-`. Otherwise a
+    // bare `-` would otherwise be treated as a valid number span and let
+    // downstream consumers skip past it rather than reporting malformed JSON.
+    if i == digits_start {
+        Err(())
+    } else if !sign_consumed && i == at {
         Err(())
     } else {
         Ok(i)
