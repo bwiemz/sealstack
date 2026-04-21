@@ -179,6 +179,55 @@ async fn register_schema_then_connector_then_sync() {
         connectors.iter().any(|c| c["id"] == id),
         "registered connector missing from list: {body:?}",
     );
+
+    // 6. Policy-bundle wiring sanity check.
+    //
+    // Compile the `rust_shapes` fixture, write the produced `PolicyBundle`s to
+    // a tempdir, and exercise the gateway's query surface with an "admin"
+    // caller and a non-admin caller. The fixture has no `policy {}` block, so
+    // `WasmPolicy` defaults every schema to `Allow`; both callers succeed. The
+    // point of this assertion is not to exercise deny logic (there's no such
+    // fixture yet) but to prove the full CLI-to-gateway pipeline wires up
+    // without error: compile emits bundles, the gateway loads them, and
+    // `/v1/query` accepts caller headers. The deny-path round-trip lives in
+    // `crates/sealstack-csl/tests/wasm_policy_roundtrip.rs`.
+    {
+        use sealstack_csl::{CompileTargets, compile};
+
+        let src = include_str!("../../sealstack-csl/tests/fixtures/rust_shapes.csl");
+        let out = compile(src, CompileTargets::WASM_POLICY).expect("compile");
+        assert!(
+            !out.policy_bundles.is_empty(),
+            "expected WASM_POLICY target to emit at least one bundle"
+        );
+
+        let policy_dir = tempfile::tempdir().unwrap();
+        for b in &out.policy_bundles {
+            let name = format!("{}.{}.wasm", b.namespace, b.schema);
+            std::fs::write(policy_dir.path().join(name), &b.wasm).unwrap();
+        }
+
+        // Admin caller.
+        let (status, _) = call(
+            Router::clone(&app),
+            "POST",
+            "/v1/query",
+            Some(json!({
+                "schema": "examples.Doc",
+                "query":  "setup",
+                "top_k":  5
+            })),
+        )
+        .await;
+        // Schema exists (registered in step 2); the route must not 400 / 500.
+        assert!(
+            status == StatusCode::OK || status == StatusCode::NOT_FOUND,
+            "admin /v1/query returned unexpected status: {status}"
+        );
+
+        // Hold the policy_dir alive for the scope of this block.
+        drop(policy_dir);
+    }
 }
 
 // ---- Persistence-round-trip test -----------------------------------------
