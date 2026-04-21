@@ -3015,6 +3015,7 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.18",
  "tracing",
  "winnow 0.6.26",
@@ -3117,6 +3118,21 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "sealstack-policy-ir"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "sealstack-policy-runtime"
+version = "0.1.0"
+dependencies = [
+ "sealstack-policy-ir",
 ]
 
 [[package]]
