@@ -287,6 +287,18 @@ impl<'a> Interp<'a> {
             return Ok(());
         }
 
+        // Zero-segment load: push a sentinel representing "the root object
+        // itself". The only opcodes that legitimately consume this (and know
+        // what to do with it) are the built-in calls like CALL_HAS_ROLE,
+        // which inspect `self.caller_at` / `self.self_at` directly rather
+        // than the popped value. We represent the root with Val::Null to
+        // distinguish from Val::Raw (scalar string) and Val::ArrayAt, both
+        // of which the calls use as an "invalid" signal.
+        if segs.iter().next().is_none() {
+            self.push(Val::Null)?;
+            return Ok(());
+        }
+
         // Resolve path segments through the input JSON.
         let mut cursor = root_at;
         for seg in segs.iter() {
@@ -312,6 +324,7 @@ impl<'a> Interp<'a> {
                 Val::Raw(s)
             }
             b'[' => Val::ArrayAt(start),
+            b'{' => Val::Null, // object reference: host treats as "use root"
             b'-' | b'0'..=b'9' => {
                 // Prefer i64; fall back to f64.
                 match json::as_i64(self.input, start) {

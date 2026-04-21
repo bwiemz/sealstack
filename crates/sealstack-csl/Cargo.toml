@@ -28,6 +28,7 @@ wasmparser      = "0.220"
 insta           = { workspace = true }
 pretty_assertions = "1"
 tempfile       = { workspace = true }
+wasmtime       = { workspace = true }
 
 [features]
 slow-tests = []

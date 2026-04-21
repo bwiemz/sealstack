@@ -90,6 +90,18 @@ struct ScanResult {
 fn locate_predicate_section(wasm: &[u8]) -> CslResult<ScanResult> {
     use wasmparser::{Parser, Payload};
 
+    // The runtime defines `.sealstack_predicate_ir` as a `static mut` of
+    // `IR_SECTION_BYTES` whose first 4 bytes are the MAGIC `"SLIR"` and
+    // the remaining `IR_MAX_BYTES` bytes are zero. Pre-seeding the MAGIC
+    // forces `wasm-ld` to emit a real data segment (a pure-zero static
+    // gets promoted to BSS and stripped from the binary, leaving nothing
+    // to patch).
+    //
+    // The linker may merge `PREDICATE_IR` with adjacent statics into a
+    // single data segment larger than `IR_SECTION_BYTES`. We therefore
+    // identify the slot as the region starting with MAGIC and followed
+    // by at least `IR_MAX_BYTES` zero bytes, without constraining the
+    // containing segment's total length.
     for payload in Parser::new(0).parse_all(wasm) {
         let p = payload.map_err(|e| CslError::Codegen {
             message: format!("parse runtime wasm: {e}"),
@@ -99,10 +111,20 @@ fn locate_predicate_section(wasm: &[u8]) -> CslResult<ScanResult> {
                 let data = item.map_err(|e| CslError::Codegen {
                     message: format!("parse data segment: {e}"),
                 })?;
-                if data.data.len() == IR_SECTION_BYTES && data.data.iter().all(|b| *b == 0) {
-                    // `data.data` is a sub-slice of `wasm`; recover the offset.
-                    let start = data.data.as_ptr() as usize - wasm.as_ptr() as usize;
-                    return Ok(ScanResult { start });
+                if data.data.len() < IR_SECTION_BYTES {
+                    continue;
+                }
+                // Scan every 4-byte-aligned position within this segment
+                // for the MAGIC-prefixed, zero-padded reservation slot.
+                let hay = data.data;
+                for i in (0..=hay.len() - IR_SECTION_BYTES).step_by(4) {
+                    if hay[i..i + 4] == MAGIC
+                        && hay[i + 4..i + IR_SECTION_BYTES].iter().all(|b| *b == 0)
+                    {
+                        let start =
+                            hay.as_ptr() as usize - wasm.as_ptr() as usize + i;
+                        return Ok(ScanResult { start });
+                    }
                 }
             }
         }

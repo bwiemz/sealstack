@@ -1,28 +1,40 @@
 //! First gate before any patching logic gets written.
 //!
-//! The plan proposes parsing `policy_runtime.wasm` with `wasmparser` and
-//! re-encoding with `wasm-encoder::RoundtripReencoder`. On our toolchain +
-//! runtime build, the re-encode is NOT byte-identical (length differs by 4
-//! bytes — the reencoder re-serializes some size-prefixed sections in a
-//! canonical form that differs from what `rustc`/`lld` emitted).
+//! The plan originally proposed parsing `policy_runtime.wasm` with
+//! `wasmparser` and re-encoding with `wasm-encoder::RoundtripReencoder`. On
+//! our toolchain + runtime build, the re-encode is NOT byte-identical
+//! (length differs by 4 bytes — canonical resize of some size-prefixed
+//! sections). Per the plan's §6 fallback option 2, we pivot to byte-level
+//! section surgery: never re-encode, only use `wasmparser` to locate the
+//! `.sealstack_predicate_ir` data segment window inside the original
+//! bytes, then overwrite in place.
 //!
-//! Per the plan's §6 risk fallback list (option 2): switch to byte-level
-//! section surgery — never run the re-encoder, never reserialize sections.
-//! Use `wasmparser` only to locate the `.sealstack_predicate_ir` data
-//! segment inside the original bytes, then overwrite that window in place.
+//! Additionally, the runtime had to pre-seed the section with the MAGIC
+//! `"SLIR"` + trailing zeros, because a pure-zero `static` is promoted to
+//! BSS by `wasm-ld` and stripped from the binary entirely (nothing to
+//! patch). We identify the reservation slot by (length, MAGIC prefix,
+//! zero-rest) to keep the scan unambiguous.
 //!
 //! This test validates both properties the patching code relies on:
 //!   1. wasmparser can walk the Data section of the committed asset.
-//!   2. There exists exactly one data segment of length `IR_SECTION_BYTES`
-//!      whose initial contents are all-zero — the runtime's reservation
-//!      slot.
-//! If either property breaks in the future (e.g. the runtime adds another
-//! all-zero blob of the same size), this test surfaces it up-front.
+//!   2. There exists exactly one data segment of length
+//!      `IR_SECTION_BYTES` whose first four bytes are the MAGIC and whose
+//!      remaining bytes are zero — the runtime's reservation slot.
 
-use sealstack_policy_ir::IR_SECTION_BYTES;
+use sealstack_policy_ir::{IR_SECTION_BYTES, MAGIC};
 use wasmparser::{Parser, Payload};
 
 const ASSET: &[u8] = include_bytes!("../assets/policy_runtime.wasm");
+
+/// Locate the MAGIC + `IR_MAX_BYTES` zeros window inside a data segment.
+fn find_slot_in_segment(data: &[u8]) -> Option<usize> {
+    if data.len() < IR_SECTION_BYTES {
+        return None;
+    }
+    (0..=data.len() - IR_SECTION_BYTES).step_by(4).find(|&i| {
+        data[i..i + 4] == MAGIC && data[i + 4..i + IR_SECTION_BYTES].iter().all(|b| *b == 0)
+    })
+}
 
 #[test]
 fn runtime_asset_has_exactly_one_predicate_ir_slot() {
@@ -32,7 +44,7 @@ fn runtime_asset_has_exactly_one_predicate_ir_slot() {
         if let Payload::DataSection(reader) = p {
             for item in reader {
                 let data = item.expect("parse data segment");
-                if data.data.len() == IR_SECTION_BYTES && data.data.iter().all(|b| *b == 0) {
+                if find_slot_in_segment(data.data).is_some() {
                     matches += 1;
                 }
             }
@@ -40,8 +52,9 @@ fn runtime_asset_has_exactly_one_predicate_ir_slot() {
     }
     assert_eq!(
         matches, 1,
-        "expected exactly one all-zero data segment of length {IR_SECTION_BYTES} (the \
-         .sealstack_predicate_ir reservation); found {matches}"
+        "expected exactly one data segment containing a MAGIC-prefixed, \
+         zero-padded predicate-IR reservation of {IR_SECTION_BYTES} bytes; \
+         found {matches}"
     );
 }
 
@@ -54,9 +67,9 @@ fn byte_level_surgery_preserves_all_other_bytes() {
         if let Payload::DataSection(reader) = p {
             for item in reader {
                 let data = item.expect("parse data segment");
-                if data.data.len() == IR_SECTION_BYTES && data.data.iter().all(|b| *b == 0) {
+                if let Some(idx) = find_slot_in_segment(data.data) {
                     start =
-                        Some(data.data.as_ptr() as usize - ASSET.as_ptr() as usize);
+                        Some(data.data.as_ptr() as usize - ASSET.as_ptr() as usize + idx);
                 }
             }
         }
