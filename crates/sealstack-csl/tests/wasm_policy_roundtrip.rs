@@ -137,15 +137,12 @@ fn truncated_length_header_returns_negative() {
     let file = parser::parse_file(src).unwrap();
     let typed = types::check(&file).unwrap();
     let mut bundle = policy::emit_policy_bundles(&typed).unwrap().remove(0);
-    // Find SLIR and overwrite the 4-byte length header with a value that
-    // exceeds the data section payload (IR_SECTION_BYTES = 4104 on the
-    // wasm side). 0x10000 is large enough to fail the runtime's
-    // `declared_len + 8 > ir_full.len()` length check while staying far
-    // below u32::MAX (u32::MAX + 8 would wrap on wasm32's 32-bit usize
-    // and bypass the check, triggering a slice-index panic — a latent
-    // runtime bug out of scope for this test).
+    // Find SLIR and overwrite the 4-byte length header with u32::MAX.
+    // The runtime uses checked_add to detect `declared_len + 8` overflow
+    // on wasm32's 32-bit usize; a hostile u32::MAX would otherwise wrap
+    // and bypass the length guard. Expect -1.
     let pos = bundle.wasm.windows(4).position(|w| w == b"SLIR").unwrap();
-    bundle.wasm[pos + 4..pos + 8].copy_from_slice(&0x0001_0000u32.to_le_bytes());
+    bundle.wasm[pos + 4..pos + 8].copy_from_slice(&u32::MAX.to_le_bytes());
 
     let engine = Engine::default();
     let module = Module::new(&engine, &bundle.wasm).unwrap();

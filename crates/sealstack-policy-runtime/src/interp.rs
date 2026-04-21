@@ -76,7 +76,14 @@ pub(crate) fn evaluate(input: &[u8], ir_full: &[u8]) -> Verdict {
     }
     let declared_len =
         u32::from_le_bytes([ir_full[4], ir_full[5], ir_full[6], ir_full[7]]) as usize;
-    if declared_len + 8 > ir_full.len() {
+    // `declared_len` comes from untrusted bundle bytes. On wasm32 `usize` is
+    // 32 bits, so `declared_len + 8` can wrap for a hostile length close to
+    // u32::MAX and bypass the guard, causing the slice below to trap. Use
+    // checked_add to catch the overflow.
+    let Some(total) = declared_len.checked_add(8) else {
+        return Verdict::Error;
+    };
+    if total > ir_full.len() {
         return Verdict::Error;
     }
     let ir = &ir_full[8..8 + declared_len];

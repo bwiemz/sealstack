@@ -66,7 +66,13 @@ pub fn interpret(
     }
     let declared_len =
         u32::from_le_bytes([ir_full[4], ir_full[5], ir_full[6], ir_full[7]]) as usize;
-    if declared_len + 8 > ir_full.len() {
+    // declared_len is untrusted; on 32-bit platforms `declared_len + 8` can
+    // wrap and bypass the bounds guard. Use checked_add to match the wasm
+    // runtime's interp.rs fix.
+    let Some(total) = declared_len.checked_add(8) else {
+        return Err(IrError::BadLength);
+    };
+    if total > ir_full.len() {
         return Err(IrError::BadLength);
     }
     let ir = &ir_full[8..8 + declared_len];
