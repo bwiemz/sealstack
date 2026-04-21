@@ -54,7 +54,7 @@ fn emit_namespace_module(out: &mut String, typed: &TypedFile) {
 
     for name in &typed.decl_order {
         if let Some(schema) = typed.schemas.get(name) {
-            emit_schema_struct(out, &schema.decl);
+            emit_schema_struct(out, &schema.decl, &typed.namespace);
             out.push('\n');
         }
     }
@@ -78,7 +78,7 @@ fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
     out.push_str("    }\n");
 }
 
-fn emit_schema_struct(out: &mut String, decl: &crate::ast::SchemaDecl) {
+fn emit_schema_struct(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: &str) {
     out.push_str("    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]\n");
     out.push_str(&format!("    pub struct {} {{\n", decl.name));
 
@@ -107,7 +107,66 @@ fn emit_schema_struct(out: &mut String, decl: &crate::ast::SchemaDecl) {
         out.push_str("        pub tenant: String,\n");
     }
 
+    out.push_str("    }\n\n");
+
+    emit_schema_impl(out, decl, namespace);
+}
+
+fn emit_schema_impl(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: &str) {
+    let primary_key = decl
+        .fields
+        .iter()
+        .find(|f| f.decorators.iter().any(|d| d.is("primary")))
+        .map(|f| f.name.clone())
+        .unwrap_or_else(|| "id".to_string());
+
+    let version = decl.version.unwrap_or(1);
+    let table = to_snake(&decl.name);
+    let namespace_literal = if namespace.is_empty() { "default" } else { namespace };
+
+    out.push_str(&format!("    impl {} {{\n", decl.name));
+    out.push_str(&format!(
+        "        pub const NAMESPACE:   &'static str = \"{namespace_literal}\";\n"
+    ));
+    out.push_str(&format!(
+        "        pub const SCHEMA:      &'static str = \"{}\";\n",
+        decl.name
+    ));
+    out.push_str(&format!(
+        "        pub const TABLE:       &'static str = \"{table}\";\n"
+    ));
+    out.push_str(&format!(
+        "        pub const VERSION:     u32          = {version};\n"
+    ));
+    out.push_str(&format!(
+        "        pub const PRIMARY_KEY: &'static str = \"{primary_key}\";\n"
+    ));
+
+    for rel in &decl.relations {
+        let const_name = format!("RELATION_{}", rel.name.to_ascii_uppercase());
+        let fk = rel.via.segments.last().cloned().unwrap_or_default();
+        let target = &rel.target;
+        out.push_str(&format!(
+            "        pub const {const_name}: (&'static str, &'static str) = (\"{target}\", \"{fk}\");\n"
+        ));
+    }
+
     out.push_str("    }\n");
+}
+
+fn to_snake(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                out.push('_');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 fn namespace_module_name(namespace: &str) -> String {
