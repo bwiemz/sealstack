@@ -39,9 +39,39 @@ fn emit_namespace_module(out: &mut String, typed: &TypedFile) {
     let module_name = namespace_module_name(&typed.namespace);
     out.push_str(&format!("pub mod {module_name} {{\n"));
     out.push_str("    use serde::{Deserialize, Serialize};\n\n");
-    // Enum and schema emit will be added in subsequent tasks.
+
+    // Enums are not currently tracked in `decl_order` (the type checker only
+    // inserts schemas there), so iterate the enums map directly. Sort by name
+    // for deterministic output.
+    let mut enum_names: Vec<&String> = typed.enums.keys().collect();
+    enum_names.sort();
+    for name in enum_names {
+        if let Some(en) = typed.enums.get(name) {
+            emit_enum(out, en);
+            out.push('\n');
+        }
+    }
+
+    // Schema struct emission comes in Task A5.
     let _ = typed;
+
     out.push_str("}\n");
+}
+
+fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
+    out.push_str("    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]\n");
+    out.push_str(&format!("    pub enum {} {{\n", en.name));
+    for v in &en.variants {
+        let wire = v
+            .wire
+            .clone()
+            .unwrap_or_else(|| v.name.to_ascii_lowercase());
+        out.push_str(&format!(
+            "        #[serde(rename = \"{wire}\")] {ident},\n",
+            ident = v.name,
+        ));
+    }
+    out.push_str("    }\n");
 }
 
 fn namespace_module_name(namespace: &str) -> String {
