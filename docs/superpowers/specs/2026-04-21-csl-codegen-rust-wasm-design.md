@@ -131,27 +131,27 @@ pub mod acme_crm {
 
 ### 2.3 Primitive type mapping
 
-| CSL           | Default Rust     | Rich-types feature (`rich-types`) |
-|---------------|------------------|-----------------------------------|
-| `String`      | `String`         | `String`                          |
-| `Text`        | `String`         | `String`                          |
-| `Ulid`        | `String`         | `ulid::Ulid`                      |
-| `Uuid`        | `String`         | `uuid::Uuid`                      |
-| `I32`         | `i32`            | `i32`                             |
-| `I64`         | `i64`            | `i64`                             |
-| `F32`         | `f32`            | `f32`                             |
-| `F64`         | `f64`            | `f64`                             |
-| `Bool`        | `bool`           | `bool`                            |
-| `Instant`     | `String`         | `time::OffsetDateTime`            |
-| `Duration`    | `String`         | `std::time::Duration`             |
-| `Json`        | `serde_json::Value` | `serde_json::Value`            |
-| `Vector<N>`   | *skipped*        | *skipped*                         |
-| `Ref<T>`      | `String`         | `String` (same — FK semantics don't gain from typing here) |
-| `List<T>`     | `Vec<T>`         | `Vec<T>`                          |
-| `Map<K,V>`    | Not emitted in v0.1 | (type checker already rejects; this is belt-and-braces) |
-| `Named(Enum)` | Rust `enum`      | Rust `enum`                       |
-| `Named(Schema)` | `String`       | `String` (reference to another schema's PK) |
-| `T?`          | `Option<T>`      | `Option<T>`                       |
+| CSL             | Default Rust          | Rich-types feature (`rich-types`)                          |
+| --------------- | --------------------- | ---------------------------------------------------------- |
+| `String`        | `String`              | `String`                                                   |
+| `Text`          | `String`              | `String`                                                   |
+| `Ulid`          | `String`              | `ulid::Ulid`                                               |
+| `Uuid`          | `String`              | `uuid::Uuid`                                               |
+| `I32`           | `i32`                 | `i32`                                                      |
+| `I64`           | `i64`                 | `i64`                                                      |
+| `F32`           | `f32`                 | `f32`                                                      |
+| `F64`           | `f64`                 | `f64`                                                      |
+| `Bool`          | `bool`                | `bool`                                                     |
+| `Instant`       | `String`              | `time::OffsetDateTime`                                     |
+| `Duration`      | `String`              | `std::time::Duration`                                      |
+| `Json`          | `serde_json::Value`   | `serde_json::Value`                                        |
+| `Vector<N>`     | *skipped*             | *skipped*                                                  |
+| `Ref<T>`        | `String`              | `String` (same — FK semantics don't gain from typing here) |
+| `List<T>`       | `Vec<T>`              | `Vec<T>`                                                   |
+| `Map<K,V>`      | Not emitted in v0.1   | (type checker already rejects; belt-and-braces)            |
+| `Named(Enum)`   | Rust `enum`           | Rust `enum`                                                |
+| `Named(Schema)` | `String`              | `String` (reference to another schema's PK)                |
+| `T?`            | `Option<T>`           | `Option<T>`                                                |
 
 The rich-types path is gated by `#[cfg(feature = "rich-types")]` **emitted in the consumer crate**, not in `sealstack-csl` itself. What the emitter does:
 
@@ -262,9 +262,21 @@ Location: `crates/sealstack-policy-runtime/`. A small Rust crate targeting `wasm
 
 1. Provide the three required exports (`memory`, `sealstack_alloc`, `sealstack_evaluate`) with the exact ABI signatures the runtime expects.
 2. Bump-allocate a single input buffer inside linear memory (no `alloc` crate — the bump allocator is ~30 lines and avoids pulling in `wee_alloc` or similar).
-3. At `sealstack_evaluate` entry, deserialize the input bytes as `PolicyInputWire` using `serde_json::from_slice` in no-std mode.
+3. At `sealstack_evaluate` entry, scan the input bytes with a **purpose-built streaming JSON reader** — not `serde_json` (rationale below).
 4. Walk the predicate IR (embedded in a linker-marked data section) against the `caller` and `record` JSON values.
-5. Return `1` for allow, `0` for deny, `-1` for any internal error (malformed IR, bad JSON, depth exceeded).
+5. Return `1` for allow, `0` for deny, `-1` for any internal error (malformed IR, bad JSON, bad magic number, depth exceeded).
+
+**Why not `serde_json`.** Even with `default-features = false, features = ["alloc"]`, `serde_json::from_slice` against a fixed `PolicyInputWire` shape lands around 140–180 KiB uncompressed in a release wasm build and drags `std::fmt`-adjacent panic machinery that conflicts with the no-std / no-alloc runtime posture. We control both ends of the wire (the gateway serializes, the runtime deserializes) and the runtime only ever reads `action` at the top level and `caller` / `record` via a known set of JSON-pointer paths statically enumerable from the IR. A purpose-built ~200-line reader is strictly less work than fighting `serde_json`-in-wasm.
+
+**JSON reader contract.** The reader is pull-based and non-allocating:
+
+- `find_key(bytes, path)` — walks a `&[&str]` path into a JSON object tree, returning a `(start, end)` slice into the original bytes at the target value. No copying; the IR interpreter references values as `&[u8]` slices into the input buffer.
+- `as_bool` / `as_i64` / `as_f64` / `as_str` — typed accessors that parse the slice on demand. Numbers tolerate integer/float ambiguity (a JSON literal `42` answers both `as_i64` and `as_f64`).
+- `each_in_array(bytes, path, f)` — for the `in` / `not in` opcodes, iterates array members without materializing a Vec.
+
+Tokens recognized: object open/close, array open/close, string (with `\\"` and `\\\\` escapes), true, false, null, numbers (int/float). Unicode escapes (`\\uXXXX`) in strings return `-1` from `sealstack_evaluate` — policies comparing against non-ASCII strings are vanishingly rare and the decoder cost is not worth it for v0.1.
+
+Bundle size target with this reader: **8–15 KiB uncompressed per bundle**, well inside any reasonable policy directory footprint.
 
 **Data section contract.** The runtime references the IR via a `#[link_section = ".sealstack_predicate_ir"]` static:
 
@@ -278,7 +290,7 @@ pub static PREDICATE_IR: [u8; IR_MAX_BYTES] = [0; IR_MAX_BYTES];
 
 **Build pipeline:**
 
-```
+```text
 scripts/rebuild-policy-runtime.sh
   → cargo build -p sealstack-policy-runtime
       --target wasm32-unknown-unknown --release
@@ -295,43 +307,57 @@ A tree of opcodes, post-order serialization, compact enough to stay well under t
 
 **Opcodes (u8 tag, followed by payload):**
 
-| Opcode | Name               | Payload                                        | Stack effect                        |
-|--------|--------------------|------------------------------------------------|-------------------------------------|
-| 0x01   | `LIT_NULL`         | —                                              | push Null                           |
-| 0x02   | `LIT_BOOL`         | u8 (0/1)                                       | push Bool                           |
-| 0x03   | `LIT_I64`          | i64 LE                                         | push I64                            |
-| 0x04   | `LIT_F64`          | f64 LE                                         | push F64                            |
-| 0x05   | `LIT_STR`          | u16 len LE + UTF-8 bytes                       | push Str                            |
-| 0x06   | `LIT_DURATION_SECS`| i64 LE (seconds)                               | push I64                            |
-| 0x10   | `LOAD_CALLER`      | u16 len + JSON-pointer segments as UTF-8       | push value or Null                  |
-| 0x11   | `LOAD_SELF`        | u16 len + JSON-pointer segments as UTF-8       | push value or Null                  |
-| 0x20   | `EQ`               | —                                              | pop2, push Bool                     |
-| 0x21   | `NE`               | —                                              | pop2, push Bool                     |
-| 0x22   | `LT`               | —                                              | pop2, push Bool                     |
-| 0x23   | `LE`               | —                                              | pop2, push Bool                     |
-| 0x24   | `GT`               | —                                              | pop2, push Bool                     |
-| 0x25   | `GE`               | —                                              | pop2, push Bool                     |
-| 0x30   | `AND`              | —                                              | pop2, short-circuit                 |
-| 0x31   | `OR`               | —                                              | pop2, short-circuit                 |
-| 0x32   | `NOT`              | —                                              | pop1, push Bool                     |
-| 0x40   | `IN`               | —                                              | pop2 (value, list), push Bool       |
-| 0x41   | `NOT_IN`           | —                                              | pop2, push Bool                     |
-| 0x50   | `CALL_HAS_ROLE`    | —                                              | pop2 (caller, role_string)          |
-| 0x51   | `CALL_TENANT_MATCH`| —                                              | pop2 (caller, self), push Bool      |
-| 0x52   | `CALL_NOW`         | —                                              | push I64 (unix seconds)             |
-| 0xF0   | `BRANCH_ACTION`    | u8 action_mask + u16 offset-if-mismatch        | conditional skip for per-action rules |
-| 0xFE   | `DENY`             | —                                              | terminal; yields 0                  |
-| 0xFF   | `ALLOW`            | —                                              | terminal; yields 1                  |
+| Opcode | Name                | Payload                                   | Stack effect                   |
+| ------ | ------------------- | ----------------------------------------- | ------------------------------ |
+| 0x01   | `LIT_NULL`          | —                                         | push Null                      |
+| 0x02   | `LIT_BOOL`          | u8 (0/1)                                  | push Bool                      |
+| 0x03   | `LIT_I64`           | i64 LE                                    | push I64                       |
+| 0x04   | `LIT_F64`           | f64 LE                                    | push F64                       |
+| 0x05   | `LIT_STR`           | u16 len LE + UTF-8 bytes                  | push Str                       |
+| 0x06   | `LIT_DURATION_SECS` | i64 LE (seconds)                          | push I64                       |
+| 0x10   | `LOAD_CALLER`       | u16 len + JSON-pointer segments as UTF-8  | push value or Null             |
+| 0x11   | `LOAD_SELF`         | u16 len + JSON-pointer segments as UTF-8  | push value or Null             |
+| 0x20   | `EQ`                | —                                         | pop2, push Bool                |
+| 0x21   | `NE`                | —                                         | pop2, push Bool                |
+| 0x22   | `LT`                | —                                         | pop2, push Bool                |
+| 0x23   | `LE`                | —                                         | pop2, push Bool                |
+| 0x24   | `GT`                | —                                         | pop2, push Bool                |
+| 0x25   | `GE`                | —                                         | pop2, push Bool                |
+| 0x30   | `AND`               | —                                         | pop2, short-circuit            |
+| 0x31   | `OR`                | —                                         | pop2, short-circuit            |
+| 0x32   | `NOT`               | —                                         | pop1, push Bool                |
+| 0x40   | `IN`                | —                                         | pop2 (value, list), push Bool  |
+| 0x41   | `NOT_IN`            | —                                         | pop2, push Bool                |
+| 0x50   | `CALL_HAS_ROLE`     | —                                         | pop2 (caller, role_string)     |
+| 0x51   | `CALL_TENANT_MATCH` | —                                         | pop2 (caller, self), push Bool |
+| 0xFE   | `DENY`              | —                                         | terminal; yields 0             |
+| 0xFF   | `ALLOW`             | —                                         | terminal; yields 1             |
 
-The IR is a single flat byte stream, not per-action. The top-level structure is:
+**Deliberately absent.** No `CALL_NOW` opcode in v0.1 — time-dependent policies are a flakiness vector, and nothing in the target CSL programs actually needs it. If a real policy needs wall-clock semantics later, the gateway will populate a `now_unix: i64` field on the wire and we'll add `LOAD_NOW` (0x52, pops nothing, pushes i64) — trivially additive. No `BRANCH_ACTION` opcode either: the action-dispatch table below already selects the correct rule, so each rule is a straight-line program and the interpreter never needs to jump forward or backward mid-rule.
 
-```
+**Control flow is straight-line with no branches.** The interpreter's IP advances strictly monotonically from a rule's entry offset to its terminal `ALLOW` or `DENY`. Short-circuit `AND` / `OR` are stack-only (they evaluate both operands and combine) — we pay the cost of evaluating both sides rather than introduce jumps. Realistic predicates are under a dozen operators deep, so the cost is negligible, and the absence of a jump opcode removes any possibility of a malformed IR producing a wasm-side infinite loop the host can't time-bound.
+
+The IR is a single flat byte stream. The top-level structure is:
+
+```text
+"SLIR"                                       (4 bytes, magic number; fail-fast on corruption)
+<ir_len: u32 LE>                             (bytes in this IR payload, not counting magic/length)
 <action_table_count: u8>
-{ <action_mask: u8> <offset_to_rule_start: u16> }* action_table_count
+{ <action_mask: u8> <offset_to_rule_start: u16 LE> }* action_table_count
 <rule bytecode, concatenated>
 ```
 
-The runtime at evaluation time reads the requested action from the input, scans the action table to find the matching rule, and begins interpreting at that offset. If no rule matches, the verdict is deny (default deny for unhandled actions — matches spec §6 totality expectation).
+Offsets in the action table are **absolute** (measured from the start of `<rule bytecode>`, i.e., immediately after the action table). Since there are no backward branches, "absolute from start of bytecode" is a simple, non-relative convention with no edge cases.
+
+The runtime at evaluation time:
+
+1. Asserts the first 4 bytes equal `"SLIR"` — on mismatch, returns `-1`.
+2. Reads `ir_len` and validates the data section carries at least that many payload bytes.
+3. Reads `action_table_count`. **If zero, returns 0 (deny).** This covers the case where a schema's `policy { }` block is empty or absent — the bundle still emits, the verdict is always deny.
+4. Scans the action table for a row whose `action_mask` bit is set for the requested action. If none match, returns 0 (deny).
+5. Jumps to the matched rule's offset and executes straight-line to its terminal `ALLOW` / `DENY`.
+
+Default deny for unhandled or no-matching-rule actions matches spec §6 totality expectations.
 
 **Values at runtime** are a tagged Rust enum:
 
@@ -366,12 +392,14 @@ pub struct PolicyBundle {
 pub fn emit_policy_bundles(typed: &TypedFile) -> CslResult<Vec<PolicyBundle>>;
 ```
 
-Per schema with a `policy { ... }` block:
+For every schema (whether or not it has a `policy { ... }` block — empty-policy schemas still emit a bundle so the gateway's fail-closed mode works uniformly):
 
-1. **Lower AST → IR.** Walk the `PolicyBlock::rules`, emit an action-dispatch table, then post-order-emit each rule's `Expr` into the bytecode stream.
-2. **Validate.** Assert every path in `LOAD_CALLER` / `LOAD_SELF` matches the type-checked symbol table. Assert every `CALL_*` is a registered built-in. Cap total IR length at 4 KiB (assert before patching).
-3. **Patch.** Load `policy_runtime.wasm` (via `include_bytes!`) into a `wasm-encoder::Module` representation, locate the `.sealstack_predicate_ir` data segment by name, replace its initializer with `<len: u32 LE> <ir bytes> <zero padding to IR_MAX_BYTES>`.
+1. **Lower AST → IR.** Walk the `PolicyBlock::rules` (empty vec if no block), emit the magic + length header, the action-dispatch table, then straight-line post-order-emit each rule's `Expr` into the bytecode stream ending in `ALLOW` / `DENY`. Schemas with no policy block produce a bundle whose `action_table_count == 0`, which the runtime reads as "always deny."
+2. **Validate.** Assert every path in `LOAD_CALLER` / `LOAD_SELF` matches the type-checked symbol table. Assert every `CALL_*` is a registered built-in. Cap total IR length (after magic + length header) at 4 KiB. Validate the emitted stream with a self-pass of the interpreter (in native, not wasm) against an empty `caller` / `record` fixture — the verdict is irrelevant; we're asserting the stream is well-formed and terminates.
+3. **Patch.** Load `policy_runtime.wasm` (via `include_bytes!`) into a `wasm-encoder::Module` representation, locate the `.sealstack_predicate_ir` data segment by name, replace its initializer with `"SLIR" <ir_len: u32 LE> <ir bytes> <zero padding to IR_MAX_BYTES>`.
 4. **Serialize** the patched module, push onto the return `Vec<PolicyBundle>`.
+
+**First gate before writing any patching logic:** a byte-identity round-trip test must pass. Parse `policy_runtime.wasm` via `wasmparser`, re-encode with `wasm-encoder` without touching any section, assert the output bytes equal the input exactly. `wasm-encoder` 0.220 can reorder sections or change encoding details when it re-encodes; if this test fails, the mental model of "parse, patch one segment, re-encode" is wrong and needs adjusting before the patching work starts. See §6 risks.
 
 **Dependencies added** to `sealstack-csl/Cargo.toml`:
 
@@ -456,9 +484,11 @@ For each fixture:
 
 ### 4.2 Generated-code `cargo check`
 
-`tests/rust_emit_compiles.rs` — write the generated Rust to a tempdir, populate a minimal `Cargo.toml` with `serde = { version = "1", features = ["derive"] }` + `serde_json = "1"`, run `cargo check --quiet`, assert exit 0 and zero stderr under the crate's configured clippy lints.
+`tests/rust_emit_compiles.rs` — write the generated Rust to a tempdir, populate a minimal `Cargo.toml` with `serde = { version = "1", features = ["derive"] }` + `serde_json = "1"`, shell out to **real `cargo check --quiet`** (via `std::process::Command`), assert exit 0 and empty stderr.
 
-This catches issues no snapshot can: unresolved identifiers, missing derives, trait-bound inconsistencies.
+This must run the actual compiler, not a `syn::parse_file` static check. `syn` catches 90% of codegen bugs but misses the ones that bite in production: trait-bound conflicts between derives, `#[cfg]` cycles between feature gates, generic parameter mismatches across type aliases. A tempdir + real `cargo check` adds 5–10 seconds to the test run and pays for itself the first time it catches something `syn` would have missed. Keep the slow version.
+
+The test is gated behind a `slow-tests` cargo feature so the default `cargo test -p sealstack-csl` stays fast, and `cargo test -p sealstack-csl --features slow-tests` is what CI runs.
 
 ### 4.3 WASM round-trip
 
@@ -476,7 +506,9 @@ Cases to cover:
 - `list` vs `read` divergence on the same record.
 - `caller.id in self.notes[*].shared_with` — exercises list-traversal.
 - Missing caller attribute (`caller.attrs["region"]` absent) — evaluates to Null-compared-to-Str → false, not a trap.
-- Tampered IR (truncated length header) — evaluate returns `-1`, host surfaces `EngineError::Backend`.
+- **Empty policy block** — a schema with `policy { }` (or no block at all) emits a bundle with `action_table_count == 0`. All four actions must return `Deny`.
+- **No matching action row** — a schema with `policy { read: ... }` only. A `write` request matches no action-table row and must return `Deny`.
+- Tampered bundle — flip one byte of the magic number (`"SLIR"` → `"SLXR"`). Evaluate returns `-1`, host surfaces `EngineError::Backend`. Also test: truncated length header (declared `ir_len` exceeds data section size) yields `-1`.
 
 ### 4.4 Integration with existing `end_to_end.rs`
 
@@ -503,14 +535,19 @@ This asserts the full happy path end-to-end, but remains `#[ignore]`-gated per t
 
 ## 6. Risks and mitigations
 
-| Risk | Likelihood | Mitigation |
-|------|-----------|------------|
-| `policy_runtime.wasm` bundle size grows unacceptably with `serde_json` | Medium | Measure after first build; if over 100 KB, swap to `miniserde` or a hand-rolled JSON parser for just the input shape. |
-| Data-section patching surprises us (wasm-encoder re-serialization reorders sections) | Low | Test-driven: the first roundtrip test validates the patched binary is identical to the source except for the one data segment. |
-| CI drift where `policy_runtime.wasm` asset doesn't match source | Medium | CI job runs `scripts/rebuild-policy-runtime.sh` and fails if the asset differs from what's checked in. |
-| 4 KiB IR cap too small for realistic policies | Low | Spec §6.3 caps `Ref` traversal at depth 4, and real CSL policies are short. If a real policy hits the cap, bump to 16 KiB — same data-section template, one constant change. |
-| Generated Rust fails to compile under some combination of derives + user's workspace lints | Medium | §4.2 cargo-check test catches this before merge. The file opts out of `clippy::pedantic`/`nursery` which covers the common cases; workspace-specific lints remain the consumer's problem to allow. |
-| Non-admin callers with the wrong caller shape cause policy evaluation errors at runtime instead of denials | Medium | Runtime `-1` return for internal errors is already surfaced as `EngineError::Backend` — the gateway does not silently allow on error. Audit check-in. |
+Risks listed as bullets rather than a table — the wordier rows overflow any reasonable column width.
+
+**Hand-rolled JSON reader mishandles an edge case** (deep nesting, numeric edge, escape sequence). *Likelihood: Medium.* Fuzz the reader with `cargo-fuzz` against a corpus of real `PolicyInputWire` JSON captured from the gateway. Failing inputs produce `-1`, which surfaces host-side as `EngineError::Backend`. Unicode escapes (`\\uXXXX`) explicitly return `-1`; no silent mis-decoding.
+
+**Data-section patching surprises us: `wasm-encoder` re-serialization reorders sections.** *Likelihood: Medium.* First gate is a byte-identity round-trip test (§3.4): parse the unmodified runtime asset via `wasmparser`, re-encode via `wasm-encoder`, assert bytes identical. Until that passes, no patching logic gets written. If it fails, switch to `walrus` (higher-level but slower) or direct byte-level section surgery (cheapest, no re-encoding) before proceeding.
+
+**CI drift where `policy_runtime.wasm` asset doesn't match source.** *Likelihood: Medium.* CI job runs `scripts/rebuild-policy-runtime.sh` and fails if the asset differs from what's checked in.
+
+**4 KiB IR cap too small for realistic policies.** *Likelihood: Low.* CSL spec §6.3 caps `Ref` traversal at depth 4, and real policies are short (typically 3–6 operators). If a real policy hits the cap, bump to 16 KiB — same data-section template, one constant change.
+
+**Generated Rust fails to compile under some combination of derives + user's workspace lints.** *Likelihood: Medium.* §4.2 cargo-check test catches this before merge. The file opts out of `clippy::pedantic` / `clippy::nursery` which covers the common cases; workspace-specific lints remain the consumer's problem to allow.
+
+**Non-admin callers with the wrong caller shape cause policy evaluation errors at runtime rather than denials.** *Likelihood: Medium.* Runtime `-1` return for internal errors is already surfaced as `EngineError::Backend` — the gateway does not silently allow on error. Audit check-in to confirm nothing downstream maps the error back into Allow.
 
 ---
 
