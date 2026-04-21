@@ -4,6 +4,7 @@
 //! CSL namespace with struct + enum declarations for each schema. See the
 //! design doc §2 for decisions made and rationale.
 
+use crate::ast::{PrimitiveType, TypeExpr};
 use crate::error::CslResult;
 use crate::types::TypedFile;
 
@@ -48,5 +49,73 @@ fn namespace_module_name(namespace: &str) -> String {
         "default".to_string()
     } else {
         namespace.replace('.', "_")
+    }
+}
+
+fn render_field_type(ty: &TypeExpr) -> String {
+    match ty {
+        TypeExpr::Primitive(p, _) => render_primitive(*p).to_string(),
+        TypeExpr::Ref(_, _) => "String".to_string(),
+        TypeExpr::Named(name, _) => name.clone(),
+        TypeExpr::Optional(inner, _) => format!("Option<{}>", render_field_type(inner)),
+        TypeExpr::List(inner, _) => format!("Vec<{}>", render_field_type(inner)),
+        TypeExpr::Map(k, v, _) => format!(
+            "std::collections::HashMap<{}, {}>",
+            render_field_type(k),
+            render_field_type(v),
+        ),
+        TypeExpr::Vector(_, _) => "/* vector - skipped */".to_string(),
+    }
+}
+
+fn render_primitive(p: PrimitiveType) -> &'static str {
+    match p {
+        PrimitiveType::String | PrimitiveType::Text => "String",
+        PrimitiveType::Ulid | PrimitiveType::Uuid => "String",
+        PrimitiveType::I32 => "i32",
+        PrimitiveType::I64 => "i64",
+        PrimitiveType::F32 => "f32",
+        PrimitiveType::F64 => "f64",
+        PrimitiveType::Bool => "bool",
+        PrimitiveType::Instant | PrimitiveType::Duration => "String",
+        PrimitiveType::Json => "serde_json::Value",
+    }
+}
+
+#[cfg(test)]
+mod type_mapper_tests {
+    use super::*;
+    use crate::ast::{PrimitiveType, TypeExpr};
+    use crate::span::Span;
+
+    fn s() -> Span {
+        Span::point(0)
+    }
+
+    #[test]
+    fn primitives_map_to_default_types() {
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::String, s())), "String");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I32, s())), "i32");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Bool, s())), "bool");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Ulid, s())), "String");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Instant, s())), "String");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Json, s())), "serde_json::Value");
+    }
+
+    #[test]
+    fn optional_wraps_in_option() {
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::F32, s()));
+        assert_eq!(render_field_type(&TypeExpr::Optional(inner, s())), "Option<f32>");
+    }
+
+    #[test]
+    fn ref_and_named_schema_are_strings() {
+        assert_eq!(render_field_type(&TypeExpr::Ref("User".into(), s())), "String");
+    }
+
+    #[test]
+    fn list_renders_vec() {
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::String, s()));
+        assert_eq!(render_field_type(&TypeExpr::List(inner, s())), "Vec<String>");
     }
 }
