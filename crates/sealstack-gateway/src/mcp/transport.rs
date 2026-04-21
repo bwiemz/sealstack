@@ -82,13 +82,16 @@ impl TransportState {
     }
 }
 
-/// Build the router fragment that mounts `/mcp/:server_name` endpoints.
+/// Build the router fragment that mounts `/mcp/{server_name}` endpoints.
 ///
 /// The caller should nest this onto the main app router, typically under `/mcp`.
 #[must_use]
 pub fn router(state: TransportState) -> Router {
     Router::new()
-        .route("/:server_name", post(handle_post).get(handle_get).delete(handle_delete))
+        .route(
+            "/{server_name}",
+            post(handle_post).get(handle_get).delete(handle_delete),
+        )
         .with_state(state)
 }
 

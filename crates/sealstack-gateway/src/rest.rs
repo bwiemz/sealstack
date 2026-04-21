@@ -45,14 +45,14 @@ pub fn router() -> Router<AppState> {
         .route("/readyz", get(readyz))
         .route("/v1/query", post(post_query))
         .route("/v1/schemas", get(list_schemas).post(register_schema))
-        .route("/v1/schemas/:qualified", get(get_schema))
-        .route("/v1/schemas/:qualified/ddl", post(apply_schema_ddl))
+        .route("/v1/schemas/{qualified}", get(get_schema))
+        .route("/v1/schemas/{qualified}/ddl", post(apply_schema_ddl))
         .route(
             "/v1/connectors",
             get(list_connectors).post(register_connector),
         )
-        .route("/v1/connectors/:id/sync", post(sync_connector))
-        .route("/v1/receipts/:id", get(get_receipt))
+        .route("/v1/connectors/{id}/sync", post(sync_connector))
+        .route("/v1/receipts/{id}", get(get_receipt))
 }
 
 // ---------------------------------------------------------------------------
