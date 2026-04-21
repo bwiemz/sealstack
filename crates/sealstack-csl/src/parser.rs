@@ -457,11 +457,15 @@ fn expr_unary<'s>(i: &mut Input<'s>) -> PR<Expr> {
 }
 
 fn expr_atom<'s>(i: &mut Input<'s>) -> PR<Expr> {
+    // `expr_literal` must come before `call_or_path` so that reserved words
+    // like `true`, `false`, and `null` bind as boolean / null literals rather
+    // than being eagerly consumed by `path_parser` (which uses the
+    // permissive `ident_recognized` that doesn't reject reserved words).
     alt((
         parenthesized_expr,
         list_literal,
-        call_or_path,
         expr_literal,
+        call_or_path,
     ))
     .parse_next(i)
 }

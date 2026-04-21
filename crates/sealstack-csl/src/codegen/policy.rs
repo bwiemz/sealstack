@@ -1,11 +1,13 @@
 //! WASM policy bundle codegen. One bundle per schema; empty policies still
 //! emit a bundle that denies all actions.
 
-use sealstack_policy_ir::{MAGIC, action_bit, op};
+use sealstack_policy_ir::{IR_SECTION_BYTES, MAGIC, action_bit, op};
 
 use crate::ast::{Action, BinaryOp, Expr, Literal, PolicyBlock, SchemaDecl, UnaryOp};
 use crate::error::{CslError, CslResult};
 use crate::types::TypedFile;
+
+const RUNTIME_WASM: &[u8] = include_bytes!("../../assets/policy_runtime.wasm");
 
 /// A compiled WASM policy bundle, ready to write as `<namespace>.<schema>.wasm`.
 #[derive(Clone, Debug)]
@@ -18,10 +20,96 @@ pub struct PolicyBundle {
     pub wasm: Vec<u8>,
 }
 
-/// Emit one bundle per schema. Populated over later plan tasks; C3 only
-/// adds the lowerer.
-pub fn emit_policy_bundles(_typed: &TypedFile) -> CslResult<Vec<PolicyBundle>> {
-    Ok(Vec::new())
+/// Emit one bundle per schema.
+///
+/// # Errors
+///
+/// Returns [`CslError::Codegen`] if lowering produces IR that exceeds the
+/// reserved data-section size or if the runtime asset cannot be patched.
+pub fn emit_policy_bundles(typed: &TypedFile) -> CslResult<Vec<PolicyBundle>> {
+    let mut out = Vec::with_capacity(typed.schemas.len());
+    for name in &typed.decl_order {
+        if !typed.schemas.contains_key(name) {
+            continue;
+        }
+        let ir = lower_schema_to_ir(typed, name)?;
+        let wasm = patch_runtime(&ir)?;
+        out.push(PolicyBundle {
+            namespace: if typed.namespace.is_empty() {
+                "default".to_string()
+            } else {
+                typed.namespace.clone()
+            },
+            schema: name.clone(),
+            wasm,
+        });
+    }
+    Ok(out)
+}
+
+/// Patch the `.sealstack_predicate_ir` data segment of the runtime asset with
+/// the given IR bytes (which already include the 8-byte "SLIR" + length header)
+/// plus zero padding.
+///
+/// This function implements byte-level section surgery via `wasmparser`
+/// scanning — no `wasm-encoder` re-encode — so the output differs from the
+/// input only in the patched segment bytes.
+pub(crate) fn patch_runtime(ir_with_header: &[u8]) -> CslResult<Vec<u8>> {
+    if ir_with_header.len() > IR_SECTION_BYTES {
+        return Err(CslError::Codegen {
+            message: format!(
+                "policy IR exceeds {} bytes (got {})",
+                IR_SECTION_BYTES,
+                ir_with_header.len()
+            ),
+        });
+    }
+
+    let mut padded = Vec::with_capacity(IR_SECTION_BYTES);
+    padded.extend_from_slice(ir_with_header);
+    padded.resize(IR_SECTION_BYTES, 0u8);
+
+    // Scan for a contiguous zero-filled region of the exact target size in
+    // the Data section. The runtime reserves `IR_SECTION_BYTES` of zeros via
+    // `static PREDICATE_IR: [u8; IR_SECTION_BYTES] = [0; ...]` in a custom
+    // link section, which the linker lays down as a single data segment
+    // whose initial contents are all-zeros. We find that segment by scanning
+    // every data segment for one whose length matches and whose bytes are
+    // all zero (the compiler has not yet patched), and rewrite in place.
+    let scan = locate_predicate_section(RUNTIME_WASM)?;
+
+    let mut out = RUNTIME_WASM.to_vec();
+    out[scan.start..scan.start + IR_SECTION_BYTES].copy_from_slice(&padded);
+    Ok(out)
+}
+
+struct ScanResult {
+    start: usize,
+}
+
+fn locate_predicate_section(wasm: &[u8]) -> CslResult<ScanResult> {
+    use wasmparser::{Parser, Payload};
+
+    for payload in Parser::new(0).parse_all(wasm) {
+        let p = payload.map_err(|e| CslError::Codegen {
+            message: format!("parse runtime wasm: {e}"),
+        })?;
+        if let Payload::DataSection(reader) = p {
+            for item in reader {
+                let data = item.map_err(|e| CslError::Codegen {
+                    message: format!("parse data segment: {e}"),
+                })?;
+                if data.data.len() == IR_SECTION_BYTES && data.data.iter().all(|b| *b == 0) {
+                    // `data.data` is a sub-slice of `wasm`; recover the offset.
+                    let start = data.data.as_ptr() as usize - wasm.as_ptr() as usize;
+                    return Ok(ScanResult { start });
+                }
+            }
+        }
+    }
+    Err(CslError::Codegen {
+        message: "could not find .sealstack_predicate_ir data segment in runtime wasm".into(),
+    })
 }
 
 /// Lower a schema's `policy { ... }` block to the flat IR byte stream
