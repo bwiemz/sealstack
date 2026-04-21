@@ -1,0 +1,48 @@
+namespace acme.crm
+
+enum Tier {
+    Free("free"),
+    Pro("pro"),
+    Enterprise("enterprise")
+}
+
+schema Customer version 2 {
+    id:            Ulid     @primary
+    external_id:   String   @unique @indexed
+    name:          String   @searchable
+    domain:        String   @searchable @indexed
+    tier:          Tier     @facet
+    owner:         Ref<User>
+    health_score:  F32?
+    summary:       Text     @chunked
+    created_at:    Instant
+
+    relations {
+        tickets:   many Ticket   via Ticket.customer   on_delete cascade
+        contracts: many Contract via Contract.customer on_delete restrict
+    }
+
+    context {
+        chunking    = semantic(max_tokens = 512)
+        embedder    = "stub"
+        vector_dims = 64
+    }
+}
+
+schema User {
+    id:    Ulid   @primary
+    email: String @unique @indexed
+    team:  String
+}
+
+schema Ticket {
+    id:       Ulid   @primary
+    title:    String @searchable
+    customer: Ref<Customer>
+}
+
+schema Contract {
+    id:       Ulid   @primary
+    customer: Ref<Customer>
+    value:    F64
+}

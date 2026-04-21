@@ -10,6 +10,8 @@ members = [
     "crates/sealstack-embedders",
     "crates/sealstack-vectorstore",
     "crates/sealstack-receipts",
+    "crates/sealstack-policy-ir",
+    "crates/sealstack-policy-runtime",
     "crates/sealstack-cli",
     "connectors/local-files",
     "connectors/github",

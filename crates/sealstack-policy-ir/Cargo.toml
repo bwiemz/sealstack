@@ -1,0 +1,23 @@
+[package]
+name         = "sealstack-policy-ir"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "Shared invariants (opcodes, action masks, layout) for the CSL policy IR. Depended on by both the wasm runtime and the sealstack-csl emitter."
+
+[lib]
+
+[features]
+default = []
+# Pulls in serde_json for the host-side native interpreter. The wasm runtime
+# builds without this feature and stays no_std.
+host = ["dep:serde_json", "dep:thiserror"]
+
+[dependencies]
+serde_json = { workspace = true, optional = true }
+thiserror  = { workspace = true, optional = true }
+
+[lints]
+workspace = true

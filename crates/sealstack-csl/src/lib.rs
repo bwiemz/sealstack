@@ -60,6 +60,8 @@ bitflags! {
         const TYPESCRIPT  = 0b0001_0000;
         /// Python (Pydantic v2) models.
         const PYTHON      = 0b0010_0000;
+        /// Policy WASM bundles (one per schema, always emitted when set).
+        const WASM_POLICY = 0b0100_0000;
     }
 }
 
@@ -94,6 +96,10 @@ pub struct CompileOutput {
     /// CLI forwards each entry verbatim to `POST /v1/schemas` so the gateway
     /// can hydrate its in-memory registry.
     pub schemas_meta: Vec<serde_json::Value>,
+    /// Compiled policy bundles, one per schema. Emitted when
+    /// [`CompileTargets::WASM_POLICY`] is set. Each tuple is
+    /// `(namespace, schema_name, wasm_bytes)`.
+    pub policy_bundles: Vec<crate::codegen::policy::PolicyBundle>,
 }
 
 /// Compile a single CSL source string into the requested artifact bundle.

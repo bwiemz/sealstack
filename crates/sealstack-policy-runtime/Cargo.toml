@@ -1,0 +1,31 @@
+[package]
+name         = "sealstack-policy-runtime"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "WASM runtime that interprets CSL policy-predicate IR. Built with `cargo build --target wasm32-unknown-unknown --release` and committed as an asset in sealstack-csl."
+publish      = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+sealstack-policy-ir = { path = "../sealstack-policy-ir", default-features = false }
+
+[profile.release]
+opt-level     = "z"
+lto           = "fat"
+codegen-units = 1
+panic         = "abort"
+strip         = "debuginfo"
+
+[lints.rust]
+unreachable_pub = "warn"
+
+[lints.clippy]
+pedantic                 = { level = "warn", priority = -1 }
+nursery                  = { level = "warn", priority = -1 }
+module_name_repetitions  = "allow"
+missing_errors_doc       = "allow"

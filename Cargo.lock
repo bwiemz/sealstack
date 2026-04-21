@@ -27,6 +27,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "ahash"
+version = "0.8.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
+dependencies = [
+ "cfg-if",
+ "once_cell",
+ "version_check",
+ "zerocopy",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1329,6 +1341,10 @@ name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
+dependencies = [
+ "ahash",
+ "serde",
+]
 
 [[package]]
 name = "hashbrown"
@@ -3013,10 +3029,15 @@ dependencies = [
  "insta",
  "miette",
  "pretty_assertions",
+ "sealstack-policy-ir",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.18",
  "tracing",
+ "wasmparser 0.220.1",
+ "wasmtime",
+ "wat",
  "winnow 0.6.26",
 ]
 
@@ -3117,6 +3138,21 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "sealstack-policy-ir"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "sealstack-policy-runtime"
+version = "0.1.0"
+dependencies = [
+ "sealstack-policy-ir",
 ]
 
 [[package]]
@@ -4509,6 +4545,20 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.220.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d07b6a3b550fefa1a914b6d54fc175dd11c3392da11eee604e6ffc759805d25"
+dependencies = [
+ "ahash",
+ "bitflags 2.11.1",
+ "hashbrown 0.14.5",
+ "indexmap 2.14.0",
+ "semver",
+ "serde",
 ]
 
 [[package]]

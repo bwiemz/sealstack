@@ -26,6 +26,24 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.85
       - uses: EmbarkStudios/cargo-deny-action@v2
 
+  policy-runtime-drift:
+    name: Policy runtime asset matches source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
+      - uses: Swatinem/rust-cache@v2
+      - name: Install wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Rebuild policy runtime
+        run: ./scripts/rebuild-policy-runtime.sh
+      - name: Check for drift
+        run: |
+          if ! git diff --exit-code crates/sealstack-csl/assets/policy_runtime.wasm; then
+            echo "policy_runtime.wasm is out of date; run ./scripts/rebuild-policy-runtime.sh and commit" >&2
+            exit 1
+          fi
+
   node:
     runs-on: ubuntu-latest
     steps:

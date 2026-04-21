@@ -86,10 +86,25 @@ fn write_outputs(output_dir: &Path, source: &Path, out: &CompileOutput) -> anyho
     let sql_dir = output_dir.join("sql");
     let mcp_dir = output_dir.join("mcp");
     let vector_dir = output_dir.join("vector");
+    let rust_dir = output_dir.join("rust");
+    let policy_dir = output_dir.join("policy");
     std::fs::create_dir_all(&schemas_dir)?;
     std::fs::create_dir_all(&sql_dir)?;
     std::fs::create_dir_all(&mcp_dir)?;
     std::fs::create_dir_all(&vector_dir)?;
+    std::fs::create_dir_all(&rust_dir)?;
+    std::fs::create_dir_all(&policy_dir)?;
+
+    if !out.rust.is_empty()
+        && !out.rust.starts_with("// Rust codegen not yet implemented")
+    {
+        std::fs::write(rust_dir.join("generated.rs"), &out.rust)?;
+    }
+
+    for bundle in &out.policy_bundles {
+        let name = format!("{}.{}.wasm", bundle.namespace, bundle.schema);
+        std::fs::write(policy_dir.join(name), &bundle.wasm)?;
+    }
 
     if !out.sql.is_empty() {
         std::fs::write(sql_dir.join(format!("{stem}_up.sql")), &out.sql)?;
