@@ -1,88 +1,89 @@
 # Deploying the docs site to Cloudflare Pages
 
-The site at `docs/` publishes to Cloudflare Pages from GitHub Actions. One
-project, two environments:
+The site at `docs/` publishes to Cloudflare Pages via **Cloudflare's Git
+integration** — connect the repo once, and every push to `main` that
+touches `docs/**` triggers a build. Pull requests get preview deploys at a
+per-commit URL.
 
-- **Production** — `main` branch, served at `sealstack.ai`
-- **Preview** — every pull request touching `docs/**` gets a unique URL
+No GitHub Actions workflow is involved. The build runs on Cloudflare's
+builder.
 
-The workflow lives at [`.github/workflows/docs-deploy.yml`](../.github/workflows/docs-deploy.yml).
+## Why this page exists
 
-## One-time setup
+The first build will fail if the Pages project is pointed at the repo root,
+because the workspace's root `package.json` runs `pnpm -r build` across
+every Node project — including `console` and the SDKs that aren't what we
+want deployed. The fix below scopes the build to `docs/`.
 
-You need these pieces wired up in your Cloudflare and GitHub accounts.
-Everything past that is automatic.
+## Dashboard setup
 
-### 1. Create the Cloudflare Pages project
+### Create the project (once)
 
-From the Cloudflare dashboard:
+1. **Workers & Pages → Create → Pages → Connect to Git.**
+2. Authorize Cloudflare's GitHub app against `bwiemz/sealstack`.
+3. **Project name**: `sealstack-docs`.
+4. **Production branch**: `main`.
 
-1. **Workers & Pages** → **Create application** → **Pages** → **Connect to Git**.
-2. Authorize Cloudflare's GitHub app against `bwiemz/sealstack` (repo-scoped is fine).
-3. Project name: `sealstack-docs` (must match `--project-name` in the workflow).
-4. Production branch: `main`.
-5. **Build settings** — these are also re-specified by the workflow, so pick
-   anything reasonable; the workflow's `wrangler pages deploy dist` overrides
-   them on every run.
-6. Click **Save and Deploy** — the first build runs via Cloudflare's own
-   builder. Subsequent builds come from the workflow.
+### Build settings (this is the bit that matters)
 
-### 2. Mint a Cloudflare API token
+Use these values when the dashboard prompts for build settings — or go to
+**project settings → Builds & deployments → Build configuration → Edit**
+if you already created the project with defaults:
 
-1. Cloudflare dashboard → top-right avatar → **My Profile** → **API Tokens** → **Create Token**.
-2. Use the "Edit Cloudflare Workers" template and narrow it:
-   - **Permissions**: `Account · Cloudflare Pages · Edit`
-   - **Account resources**: your account
-3. Copy the token — Cloudflare only shows it once.
+| Field                                  | Value                       |
+|----------------------------------------|-----------------------------|
+| Framework preset                       | **Astro**                   |
+| Build command                          | `npm ci && npm run build`   |
+| Build output directory                 | `dist`                      |
+| **Root directory (advanced)**          | `docs`                      |
+| Environment variables                  | (none required)             |
 
-### 3. Find your account id
+The **root directory = `docs`** is the non-obvious one — it scopes Node /
+build detection to that subfolder, bypassing the pnpm workspace at the
+repo root entirely. Without it, Cloudflare walks into the root
+`package.json`, runs `pnpm -r build`, and fails because dependencies
+weren't installed for the workspaces it tries to build.
 
-Dashboard URL: `https://dash.cloudflare.com/<ACCOUNT_ID>/...`. That UUID-looking
-segment is the account id.
+### Redeploy
 
-### 4. Set GitHub repo secrets
+After saving the build settings, click **Deployments → Retry deployment**
+on the failed build. It should complete in under a minute; the Starlight
+output ends up at `docs/dist/` which Cloudflare picks up as the publish
+directory.
 
-GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**:
+### Custom domain
 
-- `CLOUDFLARE_API_TOKEN` — the token from step 2
-- `CLOUDFLARE_ACCOUNT_ID` — the id from step 3
+Project → **Custom domains → Set up a custom domain** → enter `sealstack.ai`.
+Because DNS is Cloudflare-managed, the CNAME / ALIAS record and TLS
+certificate are provisioned automatically — no manual DNS step.
 
-### 5. Wire the custom domain
+### (Optional) Block the `pages.dev` subdomain
 
-In the Cloudflare Pages project → **Custom domains** → **Set up a custom domain**:
-
-- Enter `sealstack.ai` (or `docs.sealstack.ai` if you want to reserve the apex
-  for a marketing site later).
-- Because `sealstack.ai` is already on Cloudflare DNS, the CNAME/ALIAS record
-  is auto-created and TLS issues within ~1 minute.
-
-### 6. (Optional) Strip the `pages.dev` subdomain
-
-By default every Pages project is also reachable at
-`sealstack-docs.pages.dev`. Turn it off via the project's **Settings →
-General → Block access to pages.dev subdomain** toggle once the custom domain
-is live — it prevents duplicate-content SEO noise.
-
-## Verify
-
-Push a change to anything under `docs/` on `main`. The workflow should:
-
-1. Build the Starlight site (`npm run build` → `docs/dist/`).
-2. Call `wrangler pages deploy dist --project-name=sealstack-docs`.
-3. Publish, with the production URL updating within ~30 seconds.
-
-Pull requests get a per-commit preview URL posted back as a bot comment.
+Every Pages project is also reachable at `sealstack-docs.pages.dev`. Once
+`sealstack.ai` is live, turn it off under **project settings → General →
+Access policy → Block access to pages.dev subdomain** to avoid duplicate
+content for SEO.
 
 ## Troubleshooting
 
-**`Error: Invalid API token`** — token likely lacks `Cloudflare Pages: Edit`
-permission, or is scoped to the wrong account.
+**`sh: 1: vite: not found` or similar** — build is running at the repo
+root instead of `docs/`. Re-check the Root directory setting.
 
-**404 on the custom domain for more than 2 minutes** — check the Cloudflare
-DNS tab: the Pages integration should have added a `CNAME` for `@` (or
-`docs`) pointing at `<project>.pages.dev`. If it's missing, add it manually.
+**Build passes but `sealstack.ai` serves a 404** — the custom domain isn't
+yet bound to the project. The DNS record was probably created but pointed
+at the wrong Pages project. Project → Custom domains → verify.
 
-**Build works locally but fails in CI** — the workflow runs `npm ci`, which
-respects `package-lock.json` exactly. If you committed a `package.json`
-change without refreshing the lockfile, CI will fail. Run `npm install` and
-commit the lockfile.
+**Build succeeds but only the first page renders** — Astro's `site` field
+in [`astro.config.mjs`](astro.config.mjs) must match the production URL.
+It's currently set to `https://sealstack.ai`; if you host on a subdomain,
+update it.
+
+## Local preview
+
+```bash
+cd docs
+npm install
+npm run dev       # http://localhost:4321
+npm run build     # writes dist/
+npm run preview   # serves dist/ on http://localhost:4321
+```
