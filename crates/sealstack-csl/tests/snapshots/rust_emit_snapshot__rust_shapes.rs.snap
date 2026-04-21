@@ -21,4 +21,43 @@ pub mod acme_crm {
         #[serde(rename = "enterprise")] Enterprise,
     }
 
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    pub struct Customer {
+        pub id: String,
+        pub external_id: String,
+        pub name: String,
+        pub domain: String,
+        pub tier: Tier,
+        pub owner: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub health_score: Option<f32>,
+        pub summary: String,
+        pub created_at: String,
+        pub tenant: String,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    pub struct User {
+        pub id: String,
+        pub email: String,
+        pub team: String,
+        pub tenant: String,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    pub struct Ticket {
+        pub id: String,
+        pub title: String,
+        pub customer: String,
+        pub tenant: String,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    pub struct Contract {
+        pub id: String,
+        pub customer: String,
+        pub value: f64,
+        pub tenant: String,
+    }
+
 }

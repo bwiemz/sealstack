@@ -52,8 +52,12 @@ fn emit_namespace_module(out: &mut String, typed: &TypedFile) {
         }
     }
 
-    // Schema struct emission comes in Task A5.
-    let _ = typed;
+    for name in &typed.decl_order {
+        if let Some(schema) = typed.schemas.get(name) {
+            emit_schema_struct(out, &schema.decl);
+            out.push('\n');
+        }
+    }
 
     out.push_str("}\n");
 }
@@ -71,6 +75,38 @@ fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
             ident = v.name,
         ));
     }
+    out.push_str("    }\n");
+}
+
+fn emit_schema_struct(out: &mut String, decl: &crate::ast::SchemaDecl) {
+    out.push_str("    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]\n");
+    out.push_str(&format!("    pub struct {} {{\n", decl.name));
+
+    let mut emitted_tenant = false;
+    for field in &decl.fields {
+        // Vector<N> lives in the vector store, not on the struct. Spec §2.3.
+        if matches!(field.ty, crate::ast::TypeExpr::Vector(_, _)) {
+            continue;
+        }
+        if field.name == "tenant" {
+            emitted_tenant = true;
+        }
+
+        let ty_str = render_field_type(&field.ty);
+        let serde_attr = if matches!(field.ty, crate::ast::TypeExpr::Optional(_, _)) {
+            "        #[serde(default, skip_serializing_if = \"Option::is_none\")]\n"
+        } else {
+            ""
+        };
+        out.push_str(serde_attr);
+        out.push_str(&format!("        pub {}: {},\n", field.name, ty_str));
+    }
+
+    if !emitted_tenant {
+        // Every CSL-generated table carries a tenant column (spec §2.5).
+        out.push_str("        pub tenant: String,\n");
+    }
+
     out.push_str("    }\n");
 }
 
