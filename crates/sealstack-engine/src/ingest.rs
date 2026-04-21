@@ -40,6 +40,11 @@ pub struct Ingestor {
     vector_store: Arc<dyn VectorStore>,
     embedder: Arc<dyn Embedder>,
     store: Store,
+    /// Collections we've already called `ensure_collection` on. Memoized so
+    /// the happy-path ingest doesn't round-trip to the vector store before
+    /// every upsert — the per-backend check is idempotent and cheap, but
+    /// a local set is effectively free.
+    ensured_collections: dashmap::DashSet<String>,
 }
 
 impl Ingestor {
@@ -54,7 +59,28 @@ impl Ingestor {
             vector_store,
             embedder,
             store,
+            ensured_collections: dashmap::DashSet::new(),
         }
+    }
+
+    /// Ensure the schema's vector-store collection exists before the first
+    /// upsert. Idempotent on every call; memoized on our side so the cold
+    /// path runs at most once per collection per process.
+    async fn ensure_collection(&self, meta: &SchemaMeta) -> Result<(), EngineError> {
+        if self.ensured_collections.contains(&meta.collection) {
+            return Ok(());
+        }
+        self.vector_store
+            .ensure_collection(&meta.collection, meta.context.vector_dims)
+            .await
+            .map_err(|e| {
+                EngineError::Backend(format!(
+                    "ensure collection `{}` ({}d): {e}",
+                    meta.collection, meta.context.vector_dims
+                ))
+            })?;
+        self.ensured_collections.insert(meta.collection.clone());
+        Ok(())
     }
 
     /// Ingest one resource into the given schema under the given tenant.
@@ -82,6 +108,9 @@ impl Ingestor {
                 inserted: true,
             });
         }
+
+        // Make sure the vector-store collection exists. Cheap when memoized.
+        self.ensure_collection(meta).await?;
 
         let embeddings = self
             .embedder
