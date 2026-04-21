@@ -9,6 +9,8 @@ use crate::types::TypedFile;
 use crate::{CompileOutput, CompileTargets};
 
 pub mod mcp;
+pub mod policy;
+pub mod rust;
 pub mod sql;
 
 /// Emit all requested targets. The MCP and SQL codegen are in this crate;
@@ -32,7 +34,7 @@ pub fn emit(typed: &TypedFile, targets: CompileTargets) -> CslResult<CompileOutp
     // above. Gating behind a target flag would break the CLI's schema-apply path.
     out.schemas_meta = emit_schemas_meta(typed);
     if targets.contains(CompileTargets::RUST) {
-        out.rust = format!("// Rust codegen not yet implemented. {} schemas.\n", typed.schemas.len());
+        out.rust = rust::emit_rust(typed)?;
     }
     if targets.contains(CompileTargets::TYPESCRIPT) {
         out.typescript = String::from("// TypeScript codegen not yet implemented.\n");
