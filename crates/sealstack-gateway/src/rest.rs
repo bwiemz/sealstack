@@ -252,7 +252,7 @@ async fn get_receipt(
 // ---------------------------------------------------------------------------
 
 /// Injects an authenticated [`Caller`] into each handler. In production,
-/// sourced from the verified JWT; in v0.1 we accept an `X-Cfg-User` header
+/// sourced from the verified JWT; in v0.1 we accept an `X-Sealstack-User` header
 /// for local / CLI use and fall back to an anonymous caller.
 struct CallerExt(Caller);
 
@@ -261,7 +261,7 @@ impl<S: Sync> axum::extract::FromRequestParts<S> for CallerExt {
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         // Prefer the JWT-validated identity if the auth middleware ran.
-        // Fall back to `X-Cfg-*` headers only when it didn't — i.e. on `/v1/*`
+        // Fall back to `X-Sealstack-*` headers only when it didn't — i.e. on `/v1/*`
         // routes in dev. The MCP router always has the middleware attached,
         // so those requests arrive here (if at all) with the extension set.
         if let Some(a) = parts

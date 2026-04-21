@@ -55,7 +55,7 @@ export class Client {
   ): Promise<T> {
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      'X-Cfg-User': this.user
+      'X-Sealstack-User': this.user
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
 
