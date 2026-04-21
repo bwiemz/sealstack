@@ -1,0 +1,484 @@
+/*
+ * SealStack docs — custom Starlight theme.
+ *
+ * Ports the console's industrial-editorial aesthetic onto Starlight's CSS
+ * variables. Palette rule: forge-amber is earned, never decorative.
+ * If a state is not actively happening (pending, active link, CTA), it
+ * does not get amber. Everything else lives on a grayscale gradient from
+ * near-black to near-white.
+ *
+ * Starlight's theming contract is "override our CSS variables and we'll
+ * take care of the rest" — so we do exactly that, and add a handful of
+ * component tweaks for the hero and card grid on the landing page.
+ */
+
+/* ------------------------------------------------------------------------ */
+/* Fonts                                                                    */
+/* ------------------------------------------------------------------------ */
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/instrumentserif/v4/jizBRFtNs2ka5fXjeivQ4LroWlx-2zIZj1bIkNoy9w.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/instrumentserif/v4/jizDRFtNs2ka5fXjeiv-3IpAitEDw6ew.woff2')
+    format('woff2');
+}
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+/* ------------------------------------------------------------------------ */
+/* Tokens                                                                   */
+/* ------------------------------------------------------------------------ */
+
+:root {
+  /* Grayscale — deliberately narrow range for dense UI. */
+  --ss-ink-0: #0a0a0b;
+  --ss-ink-1: #111114;
+  --ss-ink-2: #17171a;
+  --ss-ink-3: #1a1a1d;
+  --ss-ink-4: #2a2a2e;
+  --ss-ink-5: #3d3d42;
+  --ss-ink-6: #5a5a60;
+  --ss-ink-7: #7a7a80;
+  --ss-ink-8: #9d9da3;
+  --ss-ink-9: #c8c8cc;
+  --ss-ink-10: #e8e8e8;
+
+  --ss-forge: #ff7a1a;
+  --ss-forge-dim: #c45d12;
+  --ss-forge-bg: #2a1708;
+
+  --ss-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ss-font-serif: 'Instrument Serif', Georgia, serif;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Starlight variable overrides — dark theme (default for this site).       */
+/* ------------------------------------------------------------------------ */
+
+:root[data-theme='dark'],
+:root {
+  color-scheme: dark;
+
+  /* Accents — Starlight's link / active / focus color. */
+  --sl-color-accent-low: var(--ss-forge-bg);
+  --sl-color-accent: var(--ss-forge-dim);
+  --sl-color-accent-high: var(--ss-forge);
+
+  /* Greys — most of the UI lives here. */
+  --sl-color-white: var(--ss-ink-10);
+  --sl-color-gray-1: var(--ss-ink-9);
+  --sl-color-gray-2: var(--ss-ink-8);
+  --sl-color-gray-3: var(--ss-ink-7);
+  --sl-color-gray-4: var(--ss-ink-5);
+  --sl-color-gray-5: var(--ss-ink-4);
+  --sl-color-gray-6: var(--ss-ink-3);
+  --sl-color-black: var(--ss-ink-0);
+
+  /* Surfaces. */
+  --sl-color-bg: var(--ss-ink-0);
+  --sl-color-bg-nav: var(--ss-ink-1);
+  --sl-color-bg-sidebar: var(--ss-ink-1);
+  --sl-color-bg-inline-code: var(--ss-ink-2);
+
+  /* Text. */
+  --sl-color-text: var(--ss-ink-10);
+  --sl-color-text-accent: var(--ss-forge);
+  --sl-color-text-invert: var(--ss-ink-0);
+
+  /* Borders — subtle, never shadowed. */
+  --sl-color-hairline: var(--ss-ink-3);
+  --sl-color-hairline-shade: var(--ss-ink-4);
+  --sl-color-hairline-light: var(--ss-ink-2);
+
+  /* Typography. */
+  --sl-font: var(--ss-font-mono);
+  --sl-font-system-mono: var(--ss-font-mono);
+
+  /* Layout — a hair narrower than default to keep lines legible. */
+  --sl-content-width: 48rem;
+  --sl-sidebar-width: 16rem;
+  --sl-text-code: 0.875rem;
+  --sl-text-code-sm: 0.8125rem;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Base                                                                     */
+/* ------------------------------------------------------------------------ */
+
+html {
+  font-feature-settings: 'tnum' 1, 'ss01' 1;
+}
+
+body {
+  /* Same subtle two-gradient grain the console uses. Forge-amber + healthy-green,
+     both at <1% opacity, anchored off-axis so the page feels dimensional
+     without drawing attention. */
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 122, 26, 0.012), transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.008), transparent 50%);
+  background-attachment: fixed;
+}
+
+/* Selection — amber, emphatic. Matches the console. */
+::selection {
+  background: var(--ss-forge);
+  color: var(--ss-ink-0);
+}
+
+/* Scrollbar — thin, dark, out of the way. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--ss-ink-3);
+  border: 2px solid var(--ss-ink-0);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ss-ink-4); }
+
+/* ------------------------------------------------------------------------ */
+/* Editorial typography                                                     */
+/* ------------------------------------------------------------------------ */
+
+/* Page titles and h1s: editorial italic serif. This is the one place where
+   the brand voice is loudest. */
+.sl-markdown-content h1:not(:where(.not-content *)),
+h1.page-title,
+.content-panel h1 {
+  font-family: var(--ss-font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  line-height: 1.05;
+  color: var(--ss-ink-10);
+}
+
+/* h2 / h3: mono, a touch tighter than default, bolder weight. */
+.sl-markdown-content h2:not(:where(.not-content *)) {
+  font-family: var(--ss-font-mono);
+  font-weight: 600;
+  font-size: 1.375rem;
+  letter-spacing: -0.01em;
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--ss-ink-3);
+  color: var(--ss-ink-10);
+}
+
+.sl-markdown-content h3:not(:where(.not-content *)) {
+  font-family: var(--ss-font-mono);
+  font-weight: 600;
+  font-size: 1.0625rem;
+  color: var(--ss-ink-10);
+}
+
+/* Body copy — slightly larger than the console's UI because docs want
+   comfortable long-form reading. */
+.sl-markdown-content {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--ss-ink-9);
+}
+
+.sl-markdown-content strong:not(:where(.not-content *)) {
+  color: var(--ss-ink-10);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Links — border-bottom rule, amber on hover                               */
+/* ------------------------------------------------------------------------ */
+
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--ss-ink-10);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ss-ink-4);
+  transition: border-color 120ms, color 120ms;
+}
+
+.sl-markdown-content a:not(:where(.not-content *)):hover {
+  border-bottom-color: var(--ss-forge);
+  color: var(--ss-forge);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Inline + block code                                                      */
+/* ------------------------------------------------------------------------ */
+
+.sl-markdown-content code:not(:where(.not-content *)) {
+  font-family: var(--ss-font-mono);
+  font-size: 0.85em;
+  padding: 0.1rem 0.35rem;
+  background: var(--ss-ink-2);
+  border: 1px solid var(--ss-ink-3);
+  border-radius: 2px;
+  color: var(--ss-ink-10);
+}
+
+/* Shiki code blocks — lean borders, no rounded corners, tabular numerals. */
+.expressive-code {
+  --ec-frm-edBg: var(--ss-ink-0);
+  --ec-frm-edTabBarBg: var(--ss-ink-1);
+  --ec-brdCol: var(--ss-ink-3);
+  border-radius: 2px !important;
+}
+
+.expressive-code .frame {
+  border-radius: 2px !important;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Tables — Swiss rail timetable, dense, no zebra                           */
+/* ------------------------------------------------------------------------ */
+
+.sl-markdown-content table:not(:where(.not-content *)) {
+  font-family: var(--ss-font-mono);
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+  border: 1px solid var(--ss-ink-3);
+}
+
+.sl-markdown-content th:not(:where(.not-content *)) {
+  font-family: var(--ss-font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ss-ink-7);
+  padding: 0.5rem 0.875rem;
+  background: var(--ss-ink-1);
+  border-bottom: 1px solid var(--ss-ink-4);
+  text-align: left;
+}
+
+.sl-markdown-content td:not(:where(.not-content *)) {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--ss-ink-3);
+  color: var(--ss-ink-9);
+  vertical-align: top;
+}
+
+.sl-markdown-content tr:last-child td:not(:where(.not-content *)) {
+  border-bottom: none;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Blockquotes — amber left-rule, editorial italic                          */
+/* ------------------------------------------------------------------------ */
+
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  border-left: 2px solid var(--ss-forge);
+  padding-left: 1rem;
+  margin-left: 0;
+  font-family: var(--ss-font-serif);
+  font-style: italic;
+  font-size: 1.125rem;
+  color: var(--ss-ink-9);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Brand: title in the top nav                                              */
+/* ------------------------------------------------------------------------ */
+
+.site-title {
+  font-family: var(--ss-font-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  font-size: 1.375rem !important;
+  letter-spacing: -0.01em;
+  color: var(--ss-ink-10);
+}
+
+/* Put a forge-amber seed before the wordmark. */
+.site-title::before {
+  content: '●';
+  color: var(--ss-forge);
+  margin-right: 0.5rem;
+  font-size: 0.6rem;
+  vertical-align: middle;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Sidebar — small-caps italic labels for section groups                   */
+/* ------------------------------------------------------------------------ */
+
+.sidebar-content summary span.large,
+.sidebar-content > ul > li > details > summary span,
+.sidebar-content > ul > li > span {
+  font-family: var(--ss-font-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  color: var(--ss-ink-7) !important;
+}
+
+/* Sidebar leaf links — dense, terminal-coded. */
+.sidebar-content a {
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.75rem !important;
+  border-left: 2px solid transparent !important;
+}
+
+.sidebar-content a[aria-current='page'] {
+  background: var(--ss-ink-2) !important;
+  color: var(--ss-ink-10) !important;
+  border-left-color: var(--ss-forge) !important;
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Splash (landing) page — masthead + card grid                             */
+/* ------------------------------------------------------------------------ */
+
+/* The hero block on the index uses Starlight's built-in `.hero`. Rewrite
+   it to look like the console's mastheads: tight leading, deep inset
+   under an italic serif headline. */
+.hero h1.page-title {
+  font-family: var(--ss-font-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  font-size: clamp(3rem, 7vw, 5rem) !important;
+  line-height: 1 !important;
+  letter-spacing: -0.015em;
+  color: var(--ss-ink-10);
+}
+
+.hero .tagline {
+  font-family: var(--ss-font-serif);
+  font-style: italic;
+  color: var(--ss-ink-8);
+  font-size: 1.125rem;
+  line-height: 1.4;
+  max-width: 34rem;
+}
+
+.hero .actions a {
+  font-family: var(--ss-font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  border-radius: 2px !important;
+  padding: 0.625rem 1rem !important;
+  border: 1px solid var(--ss-ink-4) !important;
+  background: var(--ss-ink-2) !important;
+  color: var(--ss-ink-10) !important;
+  text-decoration: none;
+}
+
+.hero .actions a.primary {
+  background: var(--ss-forge-bg) !important;
+  border-color: var(--ss-forge-dim) !important;
+  color: var(--ss-forge) !important;
+}
+
+.hero .actions a:hover {
+  background: var(--ss-ink-3) !important;
+  border-color: var(--ss-ink-5) !important;
+}
+
+.hero .actions a.primary:hover {
+  background: color-mix(in oklab, var(--ss-forge-bg), var(--ss-forge) 18%) !important;
+  border-color: var(--ss-forge) !important;
+}
+
+/* Starlight's Card component — flatten to match console panels. */
+.card {
+  border-radius: 2px !important;
+  border: 1px solid var(--ss-ink-3) !important;
+  background: var(--ss-ink-1) !important;
+  transition: border-color 140ms;
+}
+
+.card:hover {
+  border-color: var(--ss-ink-5) !important;
+}
+
+.card .title {
+  font-family: var(--ss-font-mono);
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: var(--ss-ink-10) !important;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Top-nav refinements                                                      */
+/* ------------------------------------------------------------------------ */
+
+header.header {
+  border-bottom: 1px solid var(--ss-ink-3);
+}
+
+/* Search field — flat, outlined, matches the console's .field treatment. */
+.search-input,
+site-search button {
+  border-radius: 2px !important;
+  border: 1px solid var(--ss-ink-3) !important;
+  background: var(--ss-ink-0) !important;
+  font-family: var(--ss-font-mono);
+  font-size: 0.8125rem;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Right-hand "on this page" nav                                            */
+/* ------------------------------------------------------------------------ */
+
+starlight-toc nav {
+  font-size: 0.75rem;
+}
+
+starlight-toc h2 {
+  font-family: var(--ss-font-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  color: var(--ss-ink-7) !important;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Footer — pagination prev/next tiles                                      */
+/* ------------------------------------------------------------------------ */
+
+.pagination-links a {
+  border: 1px solid var(--ss-ink-3) !important;
+  border-radius: 2px !important;
+  background: var(--ss-ink-1);
+  transition: border-color 140ms;
+}
+
+.pagination-links a:hover {
+  border-color: var(--ss-ink-5) !important;
+}
+
+.pagination-links a span {
+  color: var(--ss-ink-7);
+  font-family: var(--ss-font-serif);
+  font-style: italic;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.pagination-links a .link-title {
+  font-family: var(--ss-font-mono) !important;
+  font-size: 0.9375rem !important;
+  color: var(--ss-ink-10);
+  letter-spacing: 0;
+  text-transform: none;
+  font-style: normal;
+}

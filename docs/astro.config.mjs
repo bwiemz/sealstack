@@ -9,6 +9,7 @@ export default defineConfig({
       title: 'SealStack',
       description:
         'Open-source, enterprise-grade context operating system. MCP-native, Rust-backed.',
+      customCss: ['./src/styles/sealstack.css'],
       social: {
         github: 'https://github.com/bwiemz/sealstack'
       },
