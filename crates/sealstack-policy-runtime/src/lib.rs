@@ -10,6 +10,8 @@
 #![no_std]
 #![no_main]
 
+mod json;
+
 #[panic_handler]
 fn on_panic(_info: &core::panic::PanicInfo) -> ! {
     // In a no-std wasm build, panics abort the module. No formatting, no alloc.
