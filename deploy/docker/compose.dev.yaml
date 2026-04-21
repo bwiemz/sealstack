@@ -8,7 +8,7 @@ services:
     ports: ["5432:5432"]
     volumes: [sealstack_pg:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cfg"]
+      test: ["CMD-SHELL", "pg_isready -U sealstack"]
       interval: 2s
 
   qdrant:
