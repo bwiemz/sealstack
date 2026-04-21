@@ -33,7 +33,8 @@ You may, without asking:
 
 ## 3. Uses that require permission
 
-These require a written OK from the Project Owner (email or GitHub issue):
+These require written permission. Email **`trademark@sealstack.ai`** with
+the details of your intended use:
 
 - **Naming a product, service, company, domain, package, or app** that
   incorporates "SealStack" (e.g. "SealStack Cloud", "SealStackPro",
@@ -60,11 +61,11 @@ is the friendly-neighbor convention.
 ## 5. Reporting misuse
 
 If you encounter a product or project using the SealStack name or logo
-in a way this policy forbids, open an issue at
-`github.com/bwiemz/sealstack/issues` or email the Project Owner
-directly. Misuse that the Project Owner does not act on quickly is not
-evidence of permission — the Project Owner expressly reserves all rights
-and enforcement discretion.
+in a way this policy forbids, email **`trademark@sealstack.ai`** with
+the specifics (URL, screenshots, package name, etc.). Misuse that the
+Project Owner does not act on quickly is not evidence of permission —
+the Project Owner expressly reserves all rights and enforcement
+discretion.
 
 ## 6. Changes to this policy
 
@@ -75,4 +76,9 @@ faith under those versions.
 
 ## 7. Contact
 
-Brandon Wiemers — via GitHub (`@bwiemz`) or the repository's issues.
+For questions about trademark use or permission requests:
+**`trademark@sealstack.ai`**.
+
+For everything else — bug reports, feature ideas, general inquiries —
+use [github.com/bwiemz/sealstack/issues](https://github.com/bwiemz/sealstack/issues)
+or `hello@sealstack.ai`.

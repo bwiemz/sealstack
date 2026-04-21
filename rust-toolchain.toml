@@ -1,7 +1,10 @@
 [toolchain]
-# Brief specified 1.83. Bumped because:
-#  * edition 2024 + resolver "3" require 1.85
+# Pinned to the latest stable at time of writing:
+#  * edition 2024 + resolver "3" need ≥ 1.85
 #  * qdrant-client 1.12 uses `unsigned_is_multiple_of`, stabilized in 1.87
-channel = "1.87"
+#  * cargo-deny 0.19+ (which parses CVSS 4.0 advisories) needs ≥ 1.88
+# 1.95 satisfies all three with headroom for any dep that lands a new MSRV
+# between dependabot refreshes.
+channel = "1.95"
 components = ["rustfmt", "clippy", "rust-src"]
 targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]

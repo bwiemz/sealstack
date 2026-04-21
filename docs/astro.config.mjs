@@ -42,6 +42,12 @@ export default defineConfig({
             { label: 'REST reference', slug: 'api/rest' },
             { label: 'MCP tools', slug: 'api/mcp' }
           ]
+        },
+        {
+          label: 'Project',
+          items: [
+            { label: 'Contact', slug: 'contact' }
+          ]
         }
       ]
     })

@@ -20,7 +20,7 @@ default-members = ["crates/sealstack-cli"]
 [workspace.package]
 version      = "0.1.0"
 edition      = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 license      = "Apache-2.0"
 repository   = "https://github.com/bwiemz/sealstack"
 authors      = ["SealStack Contributors"]
@@ -65,7 +65,7 @@ quote      = "1"
 proc-macro2 = "1"
 minijinja  = "2"
 # Policy engine
-wasmtime = "28"
+wasmtime = "43"
 # CLI
 clap      = { version = "4.5", features = ["derive", "env"] }
 indicatif = "0.17"
