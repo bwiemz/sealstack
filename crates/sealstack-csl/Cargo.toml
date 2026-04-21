@@ -24,3 +24,7 @@ bitflags        = "2"
 [dev-dependencies]
 insta           = { workspace = true }
 pretty_assertions = "1"
+tempfile       = { workspace = true }
+
+[features]
+slow-tests = []
