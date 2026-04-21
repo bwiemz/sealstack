@@ -4,6 +4,7 @@
 //! CSL namespace with struct + enum declarations for each schema. See the
 //! design doc §2 for decisions made and rationale.
 
+use super::to_snake;
 use crate::ast::{PrimitiveType, TypeExpr};
 use crate::error::CslResult;
 use crate::types::TypedFile;
@@ -17,7 +18,7 @@ use crate::types::TypedFile;
 pub fn emit_rust(typed: &TypedFile) -> CslResult<String> {
     let mut out = String::new();
     emit_file_header(&mut out);
-    emit_namespace_module(&mut out, typed);
+    emit_namespace_module(&mut out, typed)?;
     Ok(out)
 }
 
@@ -35,7 +36,7 @@ fn emit_file_header(out: &mut String) {
     );
 }
 
-fn emit_namespace_module(out: &mut String, typed: &TypedFile) {
+fn emit_namespace_module(out: &mut String, typed: &TypedFile) -> CslResult<()> {
     let module_name = namespace_module_name(&typed.namespace);
     out.push_str(&format!("pub mod {module_name} {{\n"));
     out.push_str("    use serde::{Deserialize, Serialize};\n\n");
@@ -54,12 +55,13 @@ fn emit_namespace_module(out: &mut String, typed: &TypedFile) {
 
     for name in &typed.decl_order {
         if let Some(schema) = typed.schemas.get(name) {
-            emit_schema_struct(out, &schema.decl, &typed.namespace);
+            emit_schema_struct(out, &schema.decl, &typed.namespace)?;
             out.push('\n');
         }
     }
 
     out.push_str("}\n");
+    Ok(())
 }
 
 fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
@@ -70,15 +72,23 @@ fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
             .wire
             .clone()
             .unwrap_or_else(|| v.name.to_ascii_lowercase());
+        // Wire strings flow straight from CSL source into Rust attribute text;
+        // escape backslashes and quotes so a variant like `Q("val\"ue")` still
+        // produces valid Rust.
+        let wire_escaped = wire.replace('\\', "\\\\").replace('"', "\\\"");
         out.push_str(&format!(
-            "        #[serde(rename = \"{wire}\")] {ident},\n",
+            "        #[serde(rename = \"{wire_escaped}\")] {ident},\n",
             ident = v.name,
         ));
     }
     out.push_str("    }\n");
 }
 
-fn emit_schema_struct(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: &str) {
+fn emit_schema_struct(
+    out: &mut String,
+    decl: &crate::ast::SchemaDecl,
+    namespace: &str,
+) -> CslResult<()> {
     out.push_str("    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]\n");
     out.push_str(&format!("    pub struct {} {{\n", decl.name));
 
@@ -87,6 +97,26 @@ fn emit_schema_struct(out: &mut String, decl: &crate::ast::SchemaDecl, namespace
         // Vector<N> lives in the vector store, not on the struct. Spec §2.3.
         if matches!(field.ty, crate::ast::TypeExpr::Vector(_, _)) {
             continue;
+        }
+        // Guard: the SQL emitter always writes `tenant text NOT NULL`, so a
+        // user-declared `tenant` field must be String/Text. Otherwise serde
+        // deserialisation of `""` into e.g. `i32` fails at runtime with a
+        // cryptic "invalid type" error far from the declaration site.
+        if field.name == "tenant"
+            && !matches!(
+                field.ty,
+                crate::ast::TypeExpr::Primitive(
+                    crate::ast::PrimitiveType::String | crate::ast::PrimitiveType::Text,
+                    _,
+                ),
+            )
+        {
+            return Err(crate::error::CslError::Codegen {
+                message: format!(
+                    "schema `{}` declares `tenant` field with non-String type; the tenant column is always `text` in SQL and the Rust struct must match",
+                    decl.name,
+                ),
+            });
         }
         if field.name == "tenant" {
             emitted_tenant = true;
@@ -110,6 +140,7 @@ fn emit_schema_struct(out: &mut String, decl: &crate::ast::SchemaDecl, namespace
     out.push_str("    }\n\n");
 
     emit_schema_impl(out, decl, namespace);
+    Ok(())
 }
 
 fn emit_schema_impl(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: &str) {
@@ -152,21 +183,6 @@ fn emit_schema_impl(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: 
     }
 
     out.push_str("    }\n");
-}
-
-fn to_snake(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 4);
-    for (i, c) in s.chars().enumerate() {
-        if c.is_ascii_uppercase() {
-            if i > 0 {
-                out.push('_');
-            }
-            out.push(c.to_ascii_lowercase());
-        } else {
-            out.push(c);
-        }
-    }
-    out
 }
 
 fn namespace_module_name(namespace: &str) -> String {
@@ -242,5 +258,60 @@ mod type_mapper_tests {
     fn list_renders_vec() {
         let inner = Box::new(TypeExpr::Primitive(PrimitiveType::String, s()));
         assert_eq!(render_field_type(&TypeExpr::List(inner, s())), "Vec<String>");
+    }
+}
+
+#[cfg(test)]
+mod tenant_guard_tests {
+    use crate::{CompileTargets, compile};
+
+    #[test]
+    fn rejects_non_string_tenant_field() {
+        let src = r#"
+            schema Bad {
+                id: Ulid @primary
+                tenant: I32
+            }
+        "#;
+        let err = compile(src, CompileTargets::RUST).expect_err("should reject");
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("tenant") && msg.contains("String"),
+            "expected error mentioning tenant + String, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn accepts_string_tenant_field() {
+        let src = r#"
+            schema Good {
+                id: Ulid @primary
+                tenant: String
+            }
+        "#;
+        let out = compile(src, CompileTargets::RUST).expect("should compile");
+        assert!(out.rust.contains("pub tenant: String"));
+    }
+
+    #[test]
+    fn escapes_quotes_in_enum_wire_form() {
+        // Wire strings can't contain raw `"` via the CSL lexer's current
+        // string rules, so drive the emitter directly with a constructed AST.
+        use crate::ast::{EnumDecl, EnumVariant};
+        use crate::span::Span;
+
+        let en = EnumDecl {
+            name: "Weird".into(),
+            variants: vec![EnumVariant {
+                name: "Q".into(),
+                wire: Some(r#"val"ue"#.into()),
+                span: Span::point(0),
+            }],
+            span: Span::point(0),
+        };
+
+        let mut out = String::new();
+        super::emit_enum(&mut out, &en);
+        assert!(out.contains(r#"rename = "val\"ue""#), "got: {out}");
     }
 }
