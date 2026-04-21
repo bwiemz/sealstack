@@ -11,6 +11,7 @@
 #![no_main]
 
 mod json;
+mod interp;
 
 #[panic_handler]
 fn on_panic(_info: &core::panic::PanicInfo) -> ! {
@@ -63,10 +64,18 @@ pub extern "C" fn sealstack_alloc(n: i32) -> i32 {
 }
 
 /// Entry point from the host.
-///
-/// Phase B2–B10 replace the body with real logic. For now we return deny (0)
-/// so the crate compiles to wasm without pulling in any IR or JSON machinery.
 #[unsafe(no_mangle)]
-pub extern "C" fn sealstack_evaluate(_ptr: i32, _len: i32) -> i32 {
-    0
+pub extern "C" fn sealstack_evaluate(ptr: i32, len: i32) -> i32 {
+    if ptr < 0 || len < 0 {
+        return -1;
+    }
+    let input = unsafe {
+        core::slice::from_raw_parts(ptr as usize as *const u8, len as usize)
+    };
+    let ir_section = &PREDICATE_IR;
+    match interp::evaluate(input, ir_section) {
+        interp::Verdict::Allow => 1,
+        interp::Verdict::Deny => 0,
+        interp::Verdict::Error => -1,
+    }
 }
