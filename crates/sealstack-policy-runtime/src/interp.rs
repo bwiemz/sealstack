@@ -435,6 +435,10 @@ impl<'a> Interp<'a> {
             return Ok(());
         };
 
+        // `roles_at` is relative to `self.input[caller_at..]`; rebasing to
+        // `caller_at + roles_at` yields an absolute offset into `self.input`,
+        // which is what `each_element` expects. (No parallel to the
+        // `call_tenant_match` rebase bug.)
         let mut matched = false;
         json::each_element(self.input, caller_at + roles_at, |start, _end| {
             if let Ok(s) = json::as_str(self.input, skip_ws_fwd(self.input, start)) {
@@ -459,12 +463,17 @@ impl<'a> Interp<'a> {
         let caller_tenant = json::find_path(&self.input[self.caller_at..], &[b"tenant"]);
         let self_tenant = json::find_path(&self.input[self.self_at..], &[b"tenant"]);
         let (ct, st) = match (caller_tenant, self_tenant) {
-            (Ok(Some((a, _))), Ok(Some((b, _)))) => (
-                json::as_str(self.input, self.caller_at + skip_ws_fwd(self.input, a) - self.caller_at)
-                    .ok(),
-                json::as_str(self.input, self.self_at + skip_ws_fwd(self.input, b) - self.self_at)
-                    .ok(),
-            ),
+            (Ok(Some((a, _))), Ok(Some((b, _)))) => {
+                // find_path returns offsets relative to the slice it scanned;
+                // rebase to absolute indices into self.input before skip_ws_fwd
+                // and as_str (both of which index into the full buffer).
+                let abs_a = self.caller_at + a;
+                let abs_b = self.self_at + b;
+                (
+                    json::as_str(self.input, skip_ws_fwd(self.input, abs_a)).ok(),
+                    json::as_str(self.input, skip_ws_fwd(self.input, abs_b)).ok(),
+                )
+            }
             _ => (None, None),
         };
         let m = matches!((ct, st), (Some(a), Some(b)) if a == b);

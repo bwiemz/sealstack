@@ -56,9 +56,19 @@ static mut BUMP: usize = 1024;
 /// `memory.write` region and nothing else touches `BUMP` across calls.
 #[unsafe(no_mangle)]
 pub extern "C" fn sealstack_alloc(n: i32) -> i32 {
+    if n < 0 {
+        return -1;
+    }
     unsafe {
+        let new_bump = match BUMP.checked_add(n as usize) {
+            Some(v) => v,
+            None => return -1,
+        };
+        if new_bump > i32::MAX as usize {
+            return -1;
+        }
         let p = BUMP;
-        BUMP = BUMP.saturating_add(n as usize);
+        BUMP = new_bump;
         p as i32
     }
 }
