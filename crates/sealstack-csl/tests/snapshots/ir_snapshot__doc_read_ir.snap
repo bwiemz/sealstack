@@ -1,0 +1,6 @@
+---
+source: crates/sealstack-csl/tests/ir_snapshot.rs
+assertion_line: 24
+expression: hex
+---
+53 4c 49 52 15 00 00 00 01 01 00 00 10 01 02 00 69 64 11 01 05 00 6f 77 6e 65 72 20 fd
