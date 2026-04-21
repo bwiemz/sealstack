@@ -21,6 +21,8 @@ indexmap        = { version = "2", features = ["serde"] }
 miette          = { version = "7", features = ["fancy"] }
 bitflags        = "2"
 sealstack-policy-ir = { path = "../sealstack-policy-ir", features = ["host"] }
+wat             = "1"
+wasmparser      = "0.220"
 
 [dev-dependencies]
 insta           = { workspace = true }
