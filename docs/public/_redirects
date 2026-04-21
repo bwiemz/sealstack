@@ -1,0 +1,9 @@
+# 301 every request landing on the pages.dev preview URL to the canonical
+# domain. Cloudflare Pages honors full-URL source matches in _redirects, so
+# sealstack.ai traffic is unaffected — only sealstack-docs.pages.dev is.
+#
+# The trailing `!` is "force", meaning the redirect fires even when a file
+# exists at the same path — required since the build output itself is what
+# serves on the pages.dev hostname.
+
+https://sealstack-docs.pages.dev/* https://sealstack.ai/:splat 301!
