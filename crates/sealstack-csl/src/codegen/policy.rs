@@ -25,14 +25,45 @@ pub struct PolicyBundle {
 /// # Errors
 ///
 /// Returns [`CslError::Codegen`] if lowering produces IR that exceeds the
-/// reserved data-section size or if the runtime asset cannot be patched.
+/// reserved data-section size, if the native self-pass interpreter rejects
+/// the IR (malformed bytecode, stack underflow, unknown opcode), or if the
+/// runtime asset cannot be patched.
 pub fn emit_policy_bundles(typed: &TypedFile) -> CslResult<Vec<PolicyBundle>> {
+    use sealstack_policy_ir::{action_bit, host};
+
+    let empty_caller = serde_json::json!({
+        "id": "", "email": "", "groups": [], "team": "",
+        "tenant": "", "roles": [], "attrs": {}
+    });
+    let empty_record = serde_json::json!({ "tenant": "" });
+
     let mut out = Vec::with_capacity(typed.schemas.len());
     for name in &typed.decl_order {
         if !typed.schemas.contains_key(name) {
             continue;
         }
         let ir = lower_schema_to_ir(typed, name)?;
+
+        // Self-pass: interpret the IR natively against an empty input for
+        // every known action. The verdict is irrelevant — we're asserting
+        // the bytecode terminates without stack faults or bad opcodes. An
+        // error here means the emitter produced an IR the runtime cannot
+        // execute; catch it now rather than at wasmtime-instantiation time.
+        for bit in [
+            action_bit::READ,
+            action_bit::LIST,
+            action_bit::WRITE,
+            action_bit::DELETE,
+        ] {
+            if let Err(e) = host::interpret(&ir, &empty_caller, &empty_record, bit) {
+                return Err(CslError::Codegen {
+                    message: format!(
+                        "self-pass validation failed for schema `{name}`, action bit {bit:#04x}: {e}"
+                    ),
+                });
+            }
+        }
+
         let wasm = patch_runtime(&ir)?;
         out.push(PolicyBundle {
             namespace: if typed.namespace.is_empty() {
