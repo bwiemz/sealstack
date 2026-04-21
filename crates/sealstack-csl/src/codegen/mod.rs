@@ -42,6 +42,9 @@ pub fn emit(typed: &TypedFile, targets: CompileTargets) -> CslResult<CompileOutp
     if targets.contains(CompileTargets::PYTHON) {
         out.python = String::from("# Python codegen not yet implemented.\n");
     }
+    if targets.contains(CompileTargets::WASM_POLICY) {
+        out.policy_bundles = policy::emit_policy_bundles(typed)?;
+    }
 
     Ok(out)
 }
