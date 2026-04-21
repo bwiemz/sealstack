@@ -125,3 +125,52 @@ fn tampered_magic_returns_negative() {
     let input = r#"{"namespace":"default","schema":"Doc","action":"read","caller":{"id":"u","email":"","groups":[],"team":"","tenant":"","roles":[],"attrs":{}},"record":{"id":"r","tenant":""}}"#;
     assert_eq!(evaluate(&engine, &module, input), -1);
 }
+
+#[test]
+fn truncated_length_header_returns_negative() {
+    let src = r#"
+        schema Doc {
+            id: Ulid @primary
+            policy { read: true }
+        }
+    "#;
+    let file = parser::parse_file(src).unwrap();
+    let typed = types::check(&file).unwrap();
+    let mut bundle = policy::emit_policy_bundles(&typed).unwrap().remove(0);
+    // Find SLIR and overwrite the 4-byte length header with a value that
+    // exceeds the data section payload (IR_SECTION_BYTES = 4104 on the
+    // wasm side). 0x10000 is large enough to fail the runtime's
+    // `declared_len + 8 > ir_full.len()` length check while staying far
+    // below u32::MAX (u32::MAX + 8 would wrap on wasm32's 32-bit usize
+    // and bypass the check, triggering a slice-index panic — a latent
+    // runtime bug out of scope for this test).
+    let pos = bundle.wasm.windows(4).position(|w| w == b"SLIR").unwrap();
+    bundle.wasm[pos + 4..pos + 8].copy_from_slice(&0x0001_0000u32.to_le_bytes());
+
+    let engine = Engine::default();
+    let module = Module::new(&engine, &bundle.wasm).unwrap();
+    let input = r#"{"namespace":"default","schema":"Doc","action":"read","caller":{"id":"u","email":"","groups":[],"team":"","tenant":"","roles":[],"attrs":{}},"record":{"id":"r","tenant":""}}"#;
+    assert_eq!(evaluate(&engine, &module, input), -1);
+}
+
+#[test]
+fn missing_caller_attribute_compared_to_string_returns_false() {
+    // caller.attrs.region is absent; policy compares it to "us-east-1".
+    // Expected: Null == Str returns false, which yields deny (not -1 error).
+    let src = r#"
+        schema Doc {
+            id: Ulid @primary
+            policy { read: caller.region == "us-east-1" }
+        }
+    "#;
+    let file = parser::parse_file(src).unwrap();
+    let typed = types::check(&file).unwrap();
+    let bundles = policy::emit_policy_bundles(&typed).unwrap();
+    let bundle = bundles.iter().find(|b| b.schema == "Doc").unwrap();
+
+    let engine = Engine::default();
+    let module = Module::new(&engine, &bundle.wasm).unwrap();
+    // Caller has no `region` field.
+    let input = r#"{"namespace":"default","schema":"Doc","action":"read","caller":{"id":"u","email":"","groups":[],"team":"","tenant":"","roles":[],"attrs":{}},"record":{"id":"r","tenant":""}}"#;
+    assert_eq!(evaluate(&engine, &module, input), 0, "expected deny, got non-zero");
+}

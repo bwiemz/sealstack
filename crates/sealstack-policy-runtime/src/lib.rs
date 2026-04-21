@@ -102,6 +102,10 @@ pub extern "C" fn sealstack_alloc(n: i32) -> i32 {
     if n < 0 {
         return -1;
     }
+    // SAFETY: wasmtime instantiates one Instance per evaluate call, and the
+    // wasm spec guarantees single-threaded execution of a single Instance.
+    // BUMP is therefore never read/written concurrently, and the plain
+    // unsafe block below does not need atomic operations.
     unsafe {
         let new_bump = match BUMP.checked_add(n as usize) {
             Some(v) => v,

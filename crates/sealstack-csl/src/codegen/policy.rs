@@ -400,6 +400,3 @@ fn lower_call(name: &str, args: &[Expr], out: &mut Vec<u8>) -> CslResult<()> {
         }),
     }
 }
-
-// Used for tests only.
-pub(crate) const _IR_VERSION: u8 = 1;
