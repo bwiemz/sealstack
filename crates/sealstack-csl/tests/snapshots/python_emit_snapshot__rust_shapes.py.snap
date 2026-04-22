@@ -21,11 +21,32 @@ class Customer(TypedDict):
     created_at: str
     tenant: str
 
+CUSTOMER_META: Final = {
+    "NAMESPACE": "acme.crm",
+    "SCHEMA": "Customer",
+    "TABLE": "customer",
+    "VERSION": 2,
+    "PRIMARY_KEY": "id",
+    "RELATIONS": {
+        "tickets": {"target": "Ticket", "fk": "customer"},
+        "contracts": {"target": "Contract", "fk": "customer"},
+    },
+}
+
 class User(TypedDict):
     id: str
     email: str
     team: str
     tenant: str
+
+USER_META: Final = {
+    "NAMESPACE": "acme.crm",
+    "SCHEMA": "User",
+    "TABLE": "user",
+    "VERSION": 1,
+    "PRIMARY_KEY": "id",
+    "RELATIONS": {},
+}
 
 class Ticket(TypedDict):
     id: str
@@ -33,8 +54,26 @@ class Ticket(TypedDict):
     customer: str
     tenant: str
 
+TICKET_META: Final = {
+    "NAMESPACE": "acme.crm",
+    "SCHEMA": "Ticket",
+    "TABLE": "ticket",
+    "VERSION": 1,
+    "PRIMARY_KEY": "id",
+    "RELATIONS": {},
+}
+
 class Contract(TypedDict):
     id: str
     customer: str
     value: float
     tenant: str
+
+CONTRACT_META: Final = {
+    "NAMESPACE": "acme.crm",
+    "SCHEMA": "Contract",
+    "TABLE": "contract",
+    "VERSION": 1,
+    "PRIMARY_KEY": "id",
+    "RELATIONS": {},
+}

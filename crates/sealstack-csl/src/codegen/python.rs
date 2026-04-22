@@ -31,6 +31,8 @@ pub fn emit_python(typed: &TypedFile) -> CslResult<String> {
     for name in &typed.decl_order {
         if let Some(schema) = typed.schemas.get(name) {
             emit_schema(&mut out, &schema.decl)?;
+            emit_schema_meta(&mut out, &schema.decl, &typed.namespace);
+            out.push('\n');
         }
     }
     Ok(out)
@@ -180,6 +182,53 @@ fn emit_schema_class_form(out: &mut String, decl: &crate::ast::SchemaDecl) -> Cs
 
     out.push_str("\n");
     Ok(())
+}
+
+fn emit_schema_meta(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: &str) {
+    let primary_key = decl
+        .fields
+        .iter()
+        .find(|f| f.decorators.iter().any(|d| d.is("primary")))
+        .map(|f| f.name.clone())
+        .unwrap_or_else(|| "id".to_string());
+
+    let version = decl.version.unwrap_or(1);
+    let table = super::to_snake(&decl.name);
+    let ns_literal = if namespace.is_empty() { "default" } else { namespace };
+    let const_name = schema_meta_name(&decl.name);
+
+    out.push_str(&format!("{const_name}: Final = {{\n"));
+    out.push_str(&format!("    \"NAMESPACE\": \"{}\",\n", escape_wire(ns_literal)));
+    out.push_str(&format!("    \"SCHEMA\": \"{}\",\n", escape_wire(&decl.name)));
+    out.push_str(&format!("    \"TABLE\": \"{}\",\n", escape_wire(&table)));
+    out.push_str(&format!("    \"VERSION\": {version},\n"));
+    out.push_str(&format!("    \"PRIMARY_KEY\": \"{}\",\n", escape_wire(&primary_key)));
+
+    if decl.relations.is_empty() {
+        out.push_str("    \"RELATIONS\": {},\n");
+    } else {
+        out.push_str("    \"RELATIONS\": {\n");
+        for rel in &decl.relations {
+            let fk = rel.via.segments.last().cloned().unwrap_or_default();
+            // Relation name goes inside a string literal key, so it always needs
+            // escape_wire regardless of whether it's a Python keyword -- the dict
+            // form sidesteps keyword issues entirely.
+            out.push_str(&format!(
+                "        \"{name}\": {{\"target\": \"{target}\", \"fk\": \"{fk}\"}},\n",
+                name = escape_wire(&rel.name),
+                target = escape_wire(&rel.target),
+                fk = escape_wire(&fk),
+            ));
+        }
+        out.push_str("    },\n");
+    }
+
+    out.push_str("}\n");
+}
+
+/// `Customer` -> `CUSTOMER_META`. `AdminDoc` -> `ADMIN_DOC_META`.
+fn schema_meta_name(schema: &str) -> String {
+    format!("{}_META", super::to_snake(schema).to_uppercase())
 }
 
 fn is_python_keyword(name: &str) -> bool {
@@ -484,5 +533,76 @@ mod schema_emit_tests {
         assert!(out.python.contains("big: int"));
         // Python ints are arbitrary precision -- no JSDoc-style comment needed.
         assert!(!out.python.contains("2^53"));
+    }
+
+    #[test]
+    fn meta_const_uses_screaming_snake_case_name() {
+        let src = r#"
+            namespace acme.crm
+
+            schema Customer version 2 {
+                id:    Ulid @primary
+                owner: Ref<User>
+
+                relations {
+                    tickets: many Ticket via Ticket.customer on_delete cascade
+                }
+            }
+
+            schema User { id: Ulid @primary }
+            schema Ticket {
+                id:       Ulid @primary
+                customer: Ref<Customer>
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("compile");
+
+        for needle in [
+            "CUSTOMER_META: Final = {",
+            "\"NAMESPACE\": \"acme.crm\",",
+            "\"SCHEMA\": \"Customer\",",
+            "\"TABLE\": \"customer\",",
+            "\"VERSION\": 2,",
+            "\"PRIMARY_KEY\": \"id\",",
+            "\"RELATIONS\": {",
+            "\"tickets\": {\"target\": \"Ticket\", \"fk\": \"customer\"},",
+        ] {
+            assert!(
+                out.python.contains(needle),
+                "expected `{}` in output, got:\n{}",
+                needle,
+                out.python,
+            );
+        }
+    }
+
+    #[test]
+    fn meta_const_multiword_schema_name_gets_uppercased_snake() {
+        let src = r#"
+            schema AdminDoc {
+                id: Ulid @primary
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("compile");
+        assert!(
+            out.python.contains("ADMIN_DOC_META: Final = {"),
+            "expected ADMIN_DOC_META, got:\n{}",
+            out.python,
+        );
+    }
+
+    #[test]
+    fn meta_const_empty_relations_is_inline() {
+        let src = r#"
+            schema Simple {
+                id: Ulid @primary
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("compile");
+        assert!(
+            out.python.contains("\"RELATIONS\": {},"),
+            "expected RELATIONS: {{}}, got:\n{}",
+            out.python,
+        );
     }
 }

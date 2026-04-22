@@ -13,3 +13,12 @@ class Note(TypedDict):
     body: str
     created_at: str
     tenant: str
+
+NOTE_META: Final = {
+    "NAMESPACE": "default",
+    "SCHEMA": "Note",
+    "TABLE": "note",
+    "VERSION": 1,
+    "PRIMARY_KEY": "id",
+    "RELATIONS": {},
+}
