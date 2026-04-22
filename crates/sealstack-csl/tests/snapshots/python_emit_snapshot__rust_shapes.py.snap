@@ -6,3 +6,5 @@ expression: out.python
 # ruff: noqa
 
 from typing import Any, Final, Literal, NotRequired, TypedDict
+
+Tier = Literal["free", "pro", "enterprise"]

@@ -18,8 +18,17 @@ use crate::types::TypedFile;
 pub fn emit_python(typed: &TypedFile) -> CslResult<String> {
     let mut out = String::new();
     emit_file_header(&mut out);
-    // Enum and schema emission land in later tasks.
-    let _ = typed;
+    let mut enum_names: Vec<&String> = typed.enums.keys().collect();
+    enum_names.sort();
+    for name in enum_names {
+        if let Some(en) = typed.enums.get(name) {
+            emit_enum(&mut out, en);
+        }
+    }
+    if !typed.enums.is_empty() {
+        out.push('\n');
+    }
+    // Schema emission lands in Task T4.
     Ok(out)
 }
 
@@ -75,6 +84,47 @@ fn render_primitive(p: PrimitiveType) -> &'static str {
         PrimitiveType::Instant | PrimitiveType::Duration => "str",
         PrimitiveType::Json => "Any",
     }
+}
+
+fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
+    out.push_str(&format!("{} = Literal[", en.name));
+    let mut first = true;
+    for v in &en.variants {
+        if !first {
+            out.push_str(", ");
+        }
+        first = false;
+        let wire = v
+            .wire
+            .clone()
+            .unwrap_or_else(|| v.name.to_ascii_lowercase());
+        out.push('"');
+        out.push_str(&escape_wire(&wire));
+        out.push('"');
+    }
+    out.push_str("]\n");
+}
+
+fn escape_wire(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn is_python_keyword(name: &str) -> bool {
+    matches!(
+        name,
+        "False" | "None" | "True"
+        | "and" | "as" | "assert" | "async" | "await"
+        | "break" | "class" | "continue"
+        | "def" | "del"
+        | "elif" | "else" | "except"
+        | "finally" | "for" | "from"
+        | "global" | "if" | "import" | "in" | "is"
+        | "lambda" | "nonlocal" | "not" | "or"
+        | "pass" | "raise" | "return" | "try"
+        | "while" | "with" | "yield"
+        // Soft keywords in 3.10+ — treated as reserved for forward safety
+        | "match" | "case"
+    )
 }
 
 #[cfg(test)]
@@ -167,5 +217,87 @@ mod type_mapper_tests {
             render_field_type(&TypeExpr::Map(k, v, s()), false),
             Err(crate::error::CslError::Codegen { .. })
         ));
+    }
+}
+
+#[cfg(test)]
+mod enum_and_keyword_tests {
+    use super::*;
+    use crate::ast::{EnumDecl, EnumVariant};
+    use crate::span::Span;
+
+    fn s() -> Span {
+        Span::point(0)
+    }
+
+    #[test]
+    fn emit_enum_with_explicit_wire_forms() {
+        let en = EnumDecl {
+            name: "Tier".into(),
+            variants: vec![
+                EnumVariant { name: "Free".into(), wire: Some("free".into()), span: s() },
+                EnumVariant { name: "Pro".into(), wire: Some("pro".into()), span: s() },
+                EnumVariant { name: "Enterprise".into(), wire: Some("enterprise".into()), span: s() },
+            ],
+            span: s(),
+        };
+        let mut out = String::new();
+        emit_enum(&mut out, &en);
+        assert_eq!(out, "Tier = Literal[\"free\", \"pro\", \"enterprise\"]\n");
+    }
+
+    #[test]
+    fn emit_enum_falls_back_to_lowercased_ident() {
+        let en = EnumDecl {
+            name: "Status".into(),
+            variants: vec![
+                EnumVariant { name: "Active".into(), wire: None, span: s() },
+                EnumVariant { name: "Archived".into(), wire: None, span: s() },
+            ],
+            span: s(),
+        };
+        let mut out = String::new();
+        emit_enum(&mut out, &en);
+        assert_eq!(out, "Status = Literal[\"active\", \"archived\"]\n");
+    }
+
+    #[test]
+    fn escape_wire_handles_backslash_and_double_quote() {
+        assert_eq!(escape_wire("plain"), "plain");
+        assert_eq!(escape_wire(r#"with"quote"#), r#"with\"quote"#);
+        assert_eq!(escape_wire(r"with\backslash"), r"with\\backslash");
+    }
+
+    #[test]
+    fn is_python_keyword_hard_keywords() {
+        for kw in ["class", "from", "import", "yield", "lambda", "async", "await", "return"] {
+            assert!(is_python_keyword(kw), "expected {kw} to be a keyword");
+        }
+    }
+
+    #[test]
+    fn is_python_keyword_soft_keywords() {
+        assert!(is_python_keyword("match"));
+        assert!(is_python_keyword("case"));
+    }
+
+    #[test]
+    fn is_python_keyword_normal_names_are_not_keywords() {
+        for name in ["id", "tenant", "name", "email", "customer_id", "user_roles"] {
+            assert!(!is_python_keyword(name), "expected {name} to NOT be a keyword");
+        }
+    }
+
+    #[test]
+    fn is_python_keyword_is_case_sensitive() {
+        // "False", "None", "True" are capitalized keywords in Python; CSL lowercase
+        // identifiers cannot collide with them but lowercase variants DO in some
+        // Python idioms ("true"/"false" are allowed identifiers). Our lookup treats
+        // them case-sensitively.
+        assert!(is_python_keyword("False"));
+        assert!(is_python_keyword("None"));
+        assert!(is_python_keyword("True"));
+        assert!(!is_python_keyword("false"));
+        assert!(!is_python_keyword("none"));
     }
 }
