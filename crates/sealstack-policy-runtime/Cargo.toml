@@ -14,13 +14,6 @@ crate-type = ["cdylib"]
 [dependencies]
 sealstack-policy-ir = { path = "../sealstack-policy-ir", default-features = false }
 
-[profile.release]
-opt-level     = "z"
-lto           = "fat"
-codegen-units = 1
-panic         = "abort"
-strip         = "debuginfo"
-
 [lints.rust]
 unreachable_pub = "warn"
 

@@ -88,3 +88,8 @@ split-debuginfo = "unpacked"
 lto           = "thin"
 codegen-units = 1
 strip         = "debuginfo"
+
+[profile.release.package.sealstack-policy-runtime]
+opt-level     = "z"
+codegen-units = 1
+strip         = "debuginfo"
