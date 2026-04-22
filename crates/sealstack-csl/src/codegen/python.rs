@@ -32,3 +32,140 @@ fn emit_file_header(out: &mut String) {
          \n",
     );
 }
+
+use crate::ast::{PrimitiveType, TypeExpr};
+use crate::error::CslError;
+
+/// Render a CSL type expression as a Python type annotation.
+///
+/// When `optional` is true AND `ty` is `Optional<inner>`, wraps the inner
+/// render in `NotRequired[...]`. Any other call produces the direct render
+/// without optional-wrapping (e.g., `T` for `Optional<T>` with `optional=false`,
+/// or `T[]` for `List<T>` regardless).
+fn render_field_type(ty: &TypeExpr, optional: bool) -> CslResult<String> {
+    match ty {
+        TypeExpr::Primitive(p, _) => Ok(render_primitive(*p).to_string()),
+        TypeExpr::Ref(_, _) => Ok("str".to_string()),
+        TypeExpr::Named(name, _) => Ok(name.clone()),
+        TypeExpr::Optional(inner, _) => {
+            let inner_str = render_field_type(inner, false)?;
+            if optional {
+                Ok(format!("NotRequired[{inner_str}]"))
+            } else {
+                Ok(inner_str)
+            }
+        }
+        TypeExpr::List(inner, _) => Ok(format!("list[{}]", render_field_type(inner, false)?)),
+        TypeExpr::Vector(_, _) => Err(CslError::Codegen {
+            message: "Vector<N> reached render_field_type; callers must filter vector fields before rendering them (see emit_schema's is_vector guard)".into(),
+        }),
+        TypeExpr::Map(_, _, _) => Err(CslError::Codegen {
+            message: "Map<K, V> fields are not supported in Python codegen (type checker should have rejected this)".into(),
+        }),
+    }
+}
+
+fn render_primitive(p: PrimitiveType) -> &'static str {
+    match p {
+        PrimitiveType::String | PrimitiveType::Text => "str",
+        PrimitiveType::Ulid | PrimitiveType::Uuid => "str",
+        PrimitiveType::I32 | PrimitiveType::I64 => "int",
+        PrimitiveType::F32 | PrimitiveType::F64 => "float",
+        PrimitiveType::Bool => "bool",
+        PrimitiveType::Instant | PrimitiveType::Duration => "str",
+        PrimitiveType::Json => "Any",
+    }
+}
+
+#[cfg(test)]
+mod type_mapper_tests {
+    use super::*;
+    use crate::ast::{PrimitiveType, TypeExpr};
+    use crate::span::Span;
+
+    fn s() -> Span {
+        Span::point(0)
+    }
+
+    #[test]
+    fn primitives_map_to_default_types() {
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::String, s()), false).unwrap(), "str");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Text, s()), false).unwrap(), "str");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Ulid, s()), false).unwrap(), "str");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Uuid, s()), false).unwrap(), "str");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I32, s()), false).unwrap(), "int");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I64, s()), false).unwrap(), "int");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::F32, s()), false).unwrap(), "float");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::F64, s()), false).unwrap(), "float");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Bool, s()), false).unwrap(), "bool");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Instant, s()), false).unwrap(), "str");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Duration, s()), false).unwrap(), "str");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Json, s()), false).unwrap(), "Any");
+    }
+
+    #[test]
+    fn ref_and_named_schema_render_as_str() {
+        assert_eq!(render_field_type(&TypeExpr::Ref("User".into(), s()), false).unwrap(), "str");
+    }
+
+    #[test]
+    fn named_enum_renders_as_identifier() {
+        assert_eq!(render_field_type(&TypeExpr::Named("Tier".into(), s()), false).unwrap(), "Tier");
+    }
+
+    #[test]
+    fn list_renders_lowercase_generic() {
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::String, s()));
+        assert_eq!(render_field_type(&TypeExpr::List(inner, s()), false).unwrap(), "list[str]");
+    }
+
+    #[test]
+    fn nested_list_renders_correctly() {
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::I32, s()));
+        let outer = Box::new(TypeExpr::List(inner, s()));
+        assert_eq!(render_field_type(&TypeExpr::List(outer, s()), false).unwrap(), "list[list[int]]");
+    }
+
+    #[test]
+    fn optional_wrapper_uses_not_required() {
+        // Case A: render_field_type called on the outer Optional with optional=true
+        // (as emit_schema will do) -> inner type wrapped in NotRequired[...].
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::F32, s()));
+        assert_eq!(
+            render_field_type(&TypeExpr::Optional(inner, s()), true).unwrap(),
+            "NotRequired[float]",
+        );
+    }
+
+    #[test]
+    fn optional_with_optional_false_unwraps_without_wrapping() {
+        // Case B: defensive -- render_field_type can be called with optional=false
+        // even on an Optional type (e.g., recursion from List<T?>). It should
+        // return the inner type's render with no NotRequired wrapper.
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::F32, s()));
+        assert_eq!(
+            render_field_type(&TypeExpr::Optional(inner, s()), false).unwrap(),
+            "float",
+        );
+    }
+
+    #[test]
+    fn vector_errors_at_render_time() {
+        // Field-level code skips Vector before calling render. If it reaches here,
+        // it's a caller-contract violation -- surface loudly (parity with TS emit).
+        assert!(matches!(
+            render_field_type(&TypeExpr::Vector(32, s()), false),
+            Err(crate::error::CslError::Codegen { .. })
+        ));
+    }
+
+    #[test]
+    fn map_returns_codegen_error() {
+        let k = Box::new(TypeExpr::Primitive(PrimitiveType::String, s()));
+        let v = Box::new(TypeExpr::Primitive(PrimitiveType::I32, s()));
+        assert!(matches!(
+            render_field_type(&TypeExpr::Map(k, v, s()), false),
+            Err(crate::error::CslError::Codegen { .. })
+        ));
+    }
+}
