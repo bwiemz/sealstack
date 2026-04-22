@@ -7,3 +7,37 @@ expression: out.typescript
 /* tslint:disable */
 
 export type Tier = 'free' | 'pro' | 'enterprise';
+
+export interface Customer {
+  id: string;
+  external_id: string;
+  name: string;
+  domain: string;
+  tier: Tier;
+  owner: string;
+  health_score?: number;
+  summary: string;
+  created_at: string;
+  tenant: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  team: string;
+  tenant: string;
+}
+
+export interface Ticket {
+  id: string;
+  title: string;
+  customer: string;
+  tenant: string;
+}
+
+export interface Contract {
+  id: string;
+  customer: string;
+  value: number;
+  tenant: string;
+}

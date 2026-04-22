@@ -29,6 +29,12 @@ pub fn emit_typescript(typed: &TypedFile) -> CslResult<String> {
     if !typed.enums.is_empty() {
         out.push('\n');
     }
+    for name in &typed.decl_order {
+        if let Some(schema) = typed.schemas.get(name) {
+            emit_schema(&mut out, &schema.decl)?;
+            out.push('\n');
+        }
+    }
     Ok(out)
 }
 
@@ -100,6 +106,53 @@ fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
 
 fn escape_wire(s: &str) -> String {
     s.replace('\\', "\\\\").replace('\'', "\\'")
+}
+
+fn emit_schema(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
+    out.push_str(&format!("export interface {} {{\n", decl.name));
+
+    let mut emitted_tenant = false;
+    for field in &decl.fields {
+        // Vector<N> lives in the vector store, not on the record. §3.
+        if matches!(field.ty, crate::ast::TypeExpr::Vector(_, _)) {
+            continue;
+        }
+
+        if field.name == "tenant" {
+            let is_string_or_text = matches!(
+                &field.ty,
+                crate::ast::TypeExpr::Primitive(
+                    crate::ast::PrimitiveType::String | crate::ast::PrimitiveType::Text,
+                    _,
+                ),
+            );
+            if !is_string_or_text {
+                return Err(CslError::Codegen {
+                    message: format!(
+                        "schema `{}` declares `tenant` field with non-String type; the tenant column is always `text` in SQL and the TypeScript interface must match (see spec §6)",
+                        decl.name,
+                    ),
+                });
+            }
+            emitted_tenant = true;
+        }
+
+        if is_i64(&field.ty) {
+            out.push_str("  /** CSL I64; values above 2^53 lose precision. */\n");
+        }
+
+        let ty_str = render_field_type(&field.ty)?;
+        let optional = matches!(field.ty, crate::ast::TypeExpr::Optional(_, _));
+        let mark = if optional { "?" } else { "" };
+        out.push_str(&format!("  {name}{mark}: {ty};\n", name = field.name, ty = ty_str));
+    }
+
+    if !emitted_tenant {
+        out.push_str("  tenant: string;\n");
+    }
+
+    out.push_str("}\n");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -232,5 +285,98 @@ mod enum_emit_tests {
         // The wire string contains a literal `'` and a literal `\` followed by `n`.
         // Both must be escaped: `'` → `\'`, `\` → `\\`.
         assert_eq!(out, r"export type Weird = 'val\'ue\\n';" .to_string() + "\n");
+    }
+}
+
+#[cfg(test)]
+mod schema_emit_tests {
+    use crate::{CompileTargets, compile};
+
+    #[test]
+    fn rejects_non_string_tenant_field() {
+        let src = r#"
+            schema Bad {
+                id: Ulid @primary
+                tenant: I32
+            }
+        "#;
+        let err = compile(src, CompileTargets::TYPESCRIPT).expect_err("should reject");
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("tenant") && (msg.contains("String") || msg.contains("string")),
+            "expected error mentioning tenant + String, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn accepts_explicit_string_tenant_field() {
+        let src = r#"
+            schema Good {
+                id: Ulid @primary
+                tenant: String
+            }
+        "#;
+        let out = compile(src, CompileTargets::TYPESCRIPT).expect("should compile");
+        assert!(out.typescript.contains("tenant: string;"));
+    }
+
+    #[test]
+    fn auto_injects_tenant_when_absent() {
+        let src = r#"
+            schema Note {
+                id: Ulid @primary
+                title: String
+            }
+        "#;
+        let out = compile(src, CompileTargets::TYPESCRIPT).expect("should compile");
+        assert!(out.typescript.contains("tenant: string;"));
+    }
+
+    #[test]
+    fn optional_field_uses_question_mark_syntax() {
+        let src = r#"
+            schema Thing {
+                id: Ulid @primary
+                score: F32?
+            }
+        "#;
+        let out = compile(src, CompileTargets::TYPESCRIPT).expect("should compile");
+        assert!(
+            out.typescript.contains("score?: number;"),
+            "expected optional `?:` syntax, got:\n{}",
+            out.typescript
+        );
+    }
+
+    #[test]
+    fn vector_field_is_skipped() {
+        let src = r#"
+            schema Vec4 {
+                id: Ulid @primary
+                embedding: Vector<4>
+            }
+        "#;
+        let out = compile(src, CompileTargets::TYPESCRIPT).expect("should compile");
+        assert!(
+            !out.typescript.contains("embedding"),
+            "Vector<N> fields must be skipped, got:\n{}",
+            out.typescript
+        );
+    }
+
+    #[test]
+    fn i64_field_emits_jsdoc_precision_warning() {
+        let src = r#"
+            schema Big {
+                id: Ulid @primary
+                counter: I64
+            }
+        "#;
+        let out = compile(src, CompileTargets::TYPESCRIPT).expect("should compile");
+        assert!(
+            out.typescript.contains("2^53"),
+            "expected I64 JSDoc precision warning, got:\n{}",
+            out.typescript
+        );
     }
 }
