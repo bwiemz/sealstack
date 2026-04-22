@@ -1,0 +1,18 @@
+namespace examples
+
+schema AdminDoc {
+    id:    Ulid   @primary
+    title: String @searchable
+    body:  Text   @chunked
+
+    policy {
+        read: has_role(caller, "admin")
+        list: has_role(caller, "admin")
+    }
+
+    context {
+        chunking    = fixed(size = 400)
+        embedder    = "stub"
+        vector_dims = 64
+    }
+}
