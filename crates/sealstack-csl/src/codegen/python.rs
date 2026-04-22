@@ -115,6 +115,19 @@ fn escape_wire(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+/// Returns true for any `Vector<N>` type or an `Optional<Vector<N>>`. Both
+/// get skipped at the field-emit level — vector data lives in the vector
+/// store, not on the record. See spec §3.
+fn is_vector_type(ty: &crate::ast::TypeExpr) -> bool {
+    match ty {
+        crate::ast::TypeExpr::Vector(_, _) => true,
+        crate::ast::TypeExpr::Optional(inner, _) => {
+            matches!(inner.as_ref(), crate::ast::TypeExpr::Vector(_, _))
+        }
+        _ => false,
+    }
+}
+
 fn emit_schema(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
     if needs_functional_syntax(decl) {
         emit_schema_functional_form(out, decl)
@@ -128,16 +141,6 @@ fn needs_functional_syntax(decl: &crate::ast::SchemaDecl) -> bool {
 }
 
 fn emit_schema_functional_form(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
-    let is_vector = |ty: &crate::ast::TypeExpr| -> bool {
-        match ty {
-            crate::ast::TypeExpr::Vector(_, _) => true,
-            crate::ast::TypeExpr::Optional(inner, _) => {
-                matches!(inner.as_ref(), crate::ast::TypeExpr::Vector(_, _))
-            }
-            _ => false,
-        }
-    };
-
     out.push_str(&format!(
         "{name} = TypedDict(\n    \"{name}\",\n    {{\n",
         name = decl.name
@@ -145,7 +148,7 @@ fn emit_schema_functional_form(out: &mut String, decl: &crate::ast::SchemaDecl) 
 
     let mut emitted_tenant = false;
     for field in &decl.fields {
-        if is_vector(&field.ty) {
+        if is_vector_type(&field.ty) {
             continue;
         }
 
@@ -186,23 +189,12 @@ fn emit_schema_functional_form(out: &mut String, decl: &crate::ast::SchemaDecl) 
 }
 
 fn emit_schema_class_form(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
-    // Vector skip (both bare and optional-wrapped).
-    let is_vector = |ty: &crate::ast::TypeExpr| -> bool {
-        match ty {
-            crate::ast::TypeExpr::Vector(_, _) => true,
-            crate::ast::TypeExpr::Optional(inner, _) => {
-                matches!(inner.as_ref(), crate::ast::TypeExpr::Vector(_, _))
-            }
-            _ => false,
-        }
-    };
-
     out.push_str(&format!("class {}(TypedDict):\n", decl.name));
 
     let mut emitted_tenant = false;
     let mut emitted_any_field = false;
     for field in &decl.fields {
-        if is_vector(&field.ty) {
+        if is_vector_type(&field.ty) {
             continue;
         }
 
@@ -666,6 +658,28 @@ mod schema_emit_tests {
             out.python.contains("\"RELATIONS\": {},"),
             "expected RELATIONS: {{}}, got:\n{}",
             out.python,
+        );
+    }
+
+    #[test]
+    fn functional_form_also_rejects_non_string_tenant() {
+        // Ensures the tenant guard fires on the functional-syntax path too,
+        // not just the class-syntax path. Without this test, a schema with
+        // both a keyword-colliding field and a non-String tenant would be a
+        // silent correctness risk — the class-form test doesn't exercise
+        // this combination.
+        let src = r#"
+            schema Bad {
+                id:     Ulid   @primary
+                class:  String
+                tenant: I32
+            }
+        "#;
+        let err = compile(src, CompileTargets::PYTHON).expect_err("should reject");
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("tenant") && (msg.contains("String") || msg.contains("string")),
+            "expected tenant-guard error from functional path, got: {msg}"
         );
     }
 
