@@ -30,3 +30,113 @@ fn emit_file_header(out: &mut String) {
          \n",
     );
 }
+
+use crate::ast::{PrimitiveType, TypeExpr};
+use crate::error::CslError;
+
+fn render_field_type(ty: &TypeExpr) -> CslResult<String> {
+    match ty {
+        TypeExpr::Primitive(p, _) => Ok(render_primitive(*p).to_string()),
+        TypeExpr::Ref(_, _) => Ok("string".to_string()),
+        TypeExpr::Named(name, _) => Ok(name.clone()),
+        TypeExpr::Optional(inner, _) => render_field_type(inner),
+        TypeExpr::List(inner, _) => Ok(format!("{}[]", render_field_type(inner)?)),
+        TypeExpr::Vector(_, _) => Ok("never".to_string()), // skipped at field level; renderer unreachable in practice
+        TypeExpr::Map(_, _, _) => Err(CslError::Codegen {
+            message: "Map<K, V> fields are not supported in TypeScript codegen (type checker should have rejected this)".into(),
+        }),
+    }
+}
+
+fn render_primitive(p: PrimitiveType) -> &'static str {
+    match p {
+        PrimitiveType::String | PrimitiveType::Text => "string",
+        PrimitiveType::Ulid | PrimitiveType::Uuid => "string",
+        PrimitiveType::I32 | PrimitiveType::I64 | PrimitiveType::F32 | PrimitiveType::F64 => "number",
+        PrimitiveType::Bool => "boolean",
+        PrimitiveType::Instant | PrimitiveType::Duration => "string",
+        PrimitiveType::Json => "unknown",
+    }
+}
+
+/// Whether the given type expression is (or wraps) an `I64`. Used to emit the
+/// JSDoc precision warning on I64 fields.
+fn is_i64(ty: &TypeExpr) -> bool {
+    match ty {
+        TypeExpr::Primitive(PrimitiveType::I64, _) => true,
+        TypeExpr::Optional(inner, _) => is_i64(inner),
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod type_mapper_tests {
+    use super::*;
+    use crate::ast::{PrimitiveType, TypeExpr};
+    use crate::span::Span;
+
+    fn s() -> Span {
+        Span::point(0)
+    }
+
+    #[test]
+    fn primitives_map_to_default_types() {
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::String, s())).unwrap(), "string");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Text, s())).unwrap(), "string");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Ulid, s())).unwrap(), "string");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Uuid, s())).unwrap(), "string");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I32, s())).unwrap(), "number");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I64, s())).unwrap(), "number");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::F32, s())).unwrap(), "number");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::F64, s())).unwrap(), "number");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Bool, s())).unwrap(), "boolean");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Instant, s())).unwrap(), "string");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Duration, s())).unwrap(), "string");
+        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Json, s())).unwrap(), "unknown");
+    }
+
+    #[test]
+    fn ref_and_named_schema_render_as_string() {
+        assert_eq!(render_field_type(&TypeExpr::Ref("User".into(), s())).unwrap(), "string");
+    }
+
+    #[test]
+    fn list_renders_array_suffix() {
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::String, s()));
+        assert_eq!(render_field_type(&TypeExpr::List(inner, s())).unwrap(), "string[]");
+    }
+
+    #[test]
+    fn nested_list_renders_nested_array() {
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::I32, s()));
+        let outer = Box::new(TypeExpr::List(inner, s()));
+        assert_eq!(render_field_type(&TypeExpr::List(outer, s())).unwrap(), "number[][]");
+    }
+
+    #[test]
+    fn optional_is_transparent_to_type_renderer() {
+        // render_field_type does NOT prepend `| undefined` — the ?: syntax
+        // on the field handles optionality at the field level. This test
+        // asserts the renderer returns the inner type unchanged.
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::F32, s()));
+        assert_eq!(render_field_type(&TypeExpr::Optional(inner, s())).unwrap(), "number");
+    }
+
+    #[test]
+    fn map_returns_codegen_error() {
+        let k = Box::new(TypeExpr::Primitive(PrimitiveType::String, s()));
+        let v = Box::new(TypeExpr::Primitive(PrimitiveType::I32, s()));
+        assert!(matches!(
+            render_field_type(&TypeExpr::Map(k, v, s())),
+            Err(crate::error::CslError::Codegen { .. })
+        ));
+    }
+
+    #[test]
+    fn is_i64_sees_through_optional() {
+        assert!(is_i64(&TypeExpr::Primitive(PrimitiveType::I64, s())));
+        let inner = Box::new(TypeExpr::Primitive(PrimitiveType::I64, s()));
+        assert!(is_i64(&TypeExpr::Optional(inner, s())));
+        assert!(!is_i64(&TypeExpr::Primitive(PrimitiveType::I32, s())));
+    }
+}
