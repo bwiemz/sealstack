@@ -94,4 +94,13 @@ fn generated_typescript_compiles_under_tsc() {
         String::from_utf8_lossy(&tsc.stderr),
         out.typescript,
     );
+
+    // Spec §11.3 also requires empty stderr — tsc under --strict on a
+    // self-contained file produces none today. Any future deprecation /
+    // info message surfaces here rather than passing silently.
+    assert!(
+        tsc.stderr.is_empty(),
+        "tsc --noEmit exited 0 but emitted stderr:\n{}",
+        String::from_utf8_lossy(&tsc.stderr),
+    );
 }

@@ -59,7 +59,9 @@ fn render_field_type(ty: &TypeExpr) -> CslResult<String> {
         TypeExpr::Named(name, _) => Ok(name.clone()),
         TypeExpr::Optional(inner, _) => render_field_type(inner),
         TypeExpr::List(inner, _) => Ok(format!("{}[]", render_field_type(inner)?)),
-        TypeExpr::Vector(_, _) => Ok("never".to_string()), // skipped at field level; renderer unreachable in practice
+        TypeExpr::Vector(_, _) => Err(CslError::Codegen {
+            message: "Vector<N> reached render_field_type; callers must filter vector fields before rendering them (see emit_schema's is_vector guard)".into(),
+        }),
         TypeExpr::Map(_, _, _) => Err(CslError::Codegen {
             message: "Map<K, V> fields are not supported in TypeScript codegen (type checker should have rejected this)".into(),
         }),
@@ -137,6 +139,10 @@ fn emit_schema_meta(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: 
         for rel in &decl.relations {
             let fk = rel.via.segments.last().cloned().unwrap_or_default();
             let target = &rel.target;
+            // `rel.name` is a CSL identifier — lexer enforces `[a-z_][a-z0-9_]*`
+            // (see parser.rs::ident), which is a strict subset of valid JS
+            // identifier characters, so it emits safely as a bare object key.
+            // `target` and `fk` live inside string literals and still need escape_wire.
             out.push_str(&format!(
                 "    {name}: {{ target: '{target}', fk: '{fk}' }},\n",
                 name = rel.name,
