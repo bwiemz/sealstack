@@ -87,18 +87,26 @@ fn write_outputs(output_dir: &Path, source: &Path, out: &CompileOutput) -> anyho
     let mcp_dir = output_dir.join("mcp");
     let vector_dir = output_dir.join("vector");
     let rust_dir = output_dir.join("rust");
+    let ts_dir = output_dir.join("ts");
     let policy_dir = output_dir.join("policy");
     std::fs::create_dir_all(&schemas_dir)?;
     std::fs::create_dir_all(&sql_dir)?;
     std::fs::create_dir_all(&mcp_dir)?;
     std::fs::create_dir_all(&vector_dir)?;
     std::fs::create_dir_all(&rust_dir)?;
+    std::fs::create_dir_all(&ts_dir)?;
     std::fs::create_dir_all(&policy_dir)?;
 
     if !out.rust.is_empty()
         && !out.rust.starts_with("// Rust codegen not yet implemented")
     {
         std::fs::write(rust_dir.join("generated.rs"), &out.rust)?;
+    }
+
+    if !out.typescript.is_empty()
+        && !out.typescript.starts_with("// TypeScript codegen not yet implemented")
+    {
+        std::fs::write(ts_dir.join("generated.ts"), &out.typescript)?;
     }
 
     for bundle in &out.policy_bundles {
