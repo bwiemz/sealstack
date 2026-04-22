@@ -8,3 +8,33 @@ expression: out.python
 from typing import Any, Final, Literal, NotRequired, TypedDict
 
 Tier = Literal["free", "pro", "enterprise"]
+
+class Customer(TypedDict):
+    id: str
+    external_id: str
+    name: str
+    domain: str
+    tier: Tier
+    owner: str
+    health_score: NotRequired[float]
+    summary: str
+    created_at: str
+    tenant: str
+
+class User(TypedDict):
+    id: str
+    email: str
+    team: str
+    tenant: str
+
+class Ticket(TypedDict):
+    id: str
+    title: str
+    customer: str
+    tenant: str
+
+class Contract(TypedDict):
+    id: str
+    customer: str
+    value: float
+    tenant: str

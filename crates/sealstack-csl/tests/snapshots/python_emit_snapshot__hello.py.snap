@@ -6,3 +6,10 @@ expression: out.python
 # ruff: noqa
 
 from typing import Any, Final, Literal, NotRequired, TypedDict
+
+class Note(TypedDict):
+    id: str
+    title: str
+    body: str
+    created_at: str
+    tenant: str

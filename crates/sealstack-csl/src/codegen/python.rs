@@ -28,7 +28,11 @@ pub fn emit_python(typed: &TypedFile) -> CslResult<String> {
     if !typed.enums.is_empty() {
         out.push('\n');
     }
-    // Schema emission lands in Task T4.
+    for name in &typed.decl_order {
+        if let Some(schema) = typed.schemas.get(name) {
+            emit_schema(&mut out, &schema.decl)?;
+        }
+    }
     Ok(out)
 }
 
@@ -107,6 +111,75 @@ fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
 
 fn escape_wire(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn emit_schema(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
+    // Functional-syntax fallback (Task T6) slots in here. For T4 we emit
+    // the class form unconditionally; T6 flips the dispatch based on
+    // needs_functional_syntax.
+    emit_schema_class_form(out, decl)
+}
+
+fn emit_schema_class_form(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
+    // Vector skip (both bare and optional-wrapped).
+    let is_vector = |ty: &crate::ast::TypeExpr| -> bool {
+        match ty {
+            crate::ast::TypeExpr::Vector(_, _) => true,
+            crate::ast::TypeExpr::Optional(inner, _) => {
+                matches!(inner.as_ref(), crate::ast::TypeExpr::Vector(_, _))
+            }
+            _ => false,
+        }
+    };
+
+    out.push_str(&format!("class {}(TypedDict):\n", decl.name));
+
+    let mut emitted_tenant = false;
+    let mut emitted_any_field = false;
+    for field in &decl.fields {
+        if is_vector(&field.ty) {
+            continue;
+        }
+
+        if field.name == "tenant" {
+            let is_string_or_text = matches!(
+                &field.ty,
+                crate::ast::TypeExpr::Primitive(
+                    crate::ast::PrimitiveType::String | crate::ast::PrimitiveType::Text,
+                    _,
+                ),
+            );
+            if !is_string_or_text {
+                return Err(CslError::Codegen {
+                    message: format!(
+                        "schema `{}` declares `tenant` field with non-String type; the tenant column is always `text` in SQL and the Python TypedDict must match (see spec §6)",
+                        decl.name,
+                    ),
+                });
+            }
+            emitted_tenant = true;
+        }
+
+        let optional = matches!(field.ty, crate::ast::TypeExpr::Optional(_, _));
+        let ty_str = render_field_type(&field.ty, optional)?;
+        out.push_str(&format!("    {name}: {ty}\n", name = field.name, ty = ty_str));
+        emitted_any_field = true;
+    }
+
+    if !emitted_tenant {
+        out.push_str("    tenant: str\n");
+        emitted_any_field = true;
+    }
+
+    // An empty TypedDict body would be a SyntaxError; `pass` is the Python
+    // idiom. In practice every schema has at least a primary-key field,
+    // so this is belt-and-braces.
+    if !emitted_any_field {
+        out.push_str("    pass\n");
+    }
+
+    out.push_str("\n");
+    Ok(())
 }
 
 fn is_python_keyword(name: &str) -> bool {
@@ -299,5 +372,117 @@ mod enum_and_keyword_tests {
         assert!(is_python_keyword("True"));
         assert!(!is_python_keyword("false"));
         assert!(!is_python_keyword("none"));
+    }
+}
+
+#[cfg(test)]
+mod schema_emit_tests {
+    use crate::{CompileTargets, compile};
+
+    #[test]
+    fn rejects_non_string_tenant_field() {
+        let src = r#"
+            schema Bad {
+                id: Ulid @primary
+                tenant: I32
+            }
+        "#;
+        let err = compile(src, CompileTargets::PYTHON).expect_err("should reject");
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("tenant") && (msg.contains("String") || msg.contains("string")),
+            "expected error mentioning tenant + String, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn accepts_explicit_string_tenant_field() {
+        let src = r#"
+            schema Good {
+                id: Ulid @primary
+                tenant: String
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("should compile");
+        assert!(out.python.contains("tenant: str"));
+    }
+
+    #[test]
+    fn auto_injects_tenant_when_absent() {
+        let src = r#"
+            schema Note {
+                id: Ulid @primary
+                title: String
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("should compile");
+        assert!(out.python.contains("tenant: str"));
+    }
+
+    #[test]
+    fn optional_field_wraps_in_not_required() {
+        let src = r#"
+            schema Thing {
+                id: Ulid @primary
+                score: F32?
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("should compile");
+        assert!(
+            out.python.contains("score: NotRequired[float]"),
+            "expected NotRequired[float], got:\n{}",
+            out.python,
+        );
+    }
+
+    #[test]
+    fn vector_field_is_skipped() {
+        let src = r#"
+            schema Vec4 {
+                id: Ulid @primary
+                embedding: Vector<4>
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("should compile");
+        assert!(
+            !out.python.contains("embedding"),
+            "Vector<N> fields must be skipped, got:\n{}",
+            out.python,
+        );
+    }
+
+    #[test]
+    fn optional_vector_field_is_also_skipped() {
+        let src = r#"
+            schema Vec4 {
+                id: Ulid @primary
+                embedding: Vector<4>?
+            }
+        "#;
+        let result = compile(src, CompileTargets::PYTHON);
+        match result {
+            Ok(out) => assert!(
+                !out.python.contains("embedding"),
+                "Optional<Vector> must also be skipped, got:\n{}",
+                out.python,
+            ),
+            Err(_) => { /* type checker rejected -- also acceptable */ }
+        }
+    }
+
+    #[test]
+    fn i32_i64_both_render_as_int_no_precision_comment() {
+        let src = r#"
+            schema Counts {
+                id: Ulid @primary
+                small: I32
+                big: I64
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("should compile");
+        assert!(out.python.contains("small: int"));
+        assert!(out.python.contains("big: int"));
+        // Python ints are arbitrary precision -- no JSDoc-style comment needed.
+        assert!(!out.python.contains("2^53"));
     }
 }
