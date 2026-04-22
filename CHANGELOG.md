@@ -9,6 +9,14 @@ Maintained automatically by `release-please`.
 ## [Unreleased]
 
 ### Added
+- `sealstack compile` now emits Python `TypedDict` record types to
+  `out/py/generated.py` alongside the existing Rust and TypeScript outputs.
+  Zero external deps (Python 3.11+ stdlib only); `Literal` aliases for
+  enums; `<SCHEMA>_META: Final` dicts for reflection; functional
+  TypedDict fallback for schemas whose fields collide with Python
+  keywords. Deliberately out of scope: Pydantic flag (future slice),
+  runtime validation, rich types (`datetime`, `uuid.UUID`), sdks/python
+  migration.
 - `sealstack compile` now emits TypeScript record types to `out/ts/generated.ts`
   alongside the existing `out/rust/generated.rs`. Plain TypeScript interfaces,
   string-literal-union enums, per-schema `<Name>Meta` constants for reflection.

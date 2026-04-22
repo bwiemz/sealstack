@@ -88,6 +88,7 @@ fn write_outputs(output_dir: &Path, source: &Path, out: &CompileOutput) -> anyho
     let vector_dir = output_dir.join("vector");
     let rust_dir = output_dir.join("rust");
     let ts_dir = output_dir.join("ts");
+    let py_dir = output_dir.join("py");
     let policy_dir = output_dir.join("policy");
     std::fs::create_dir_all(&schemas_dir)?;
     std::fs::create_dir_all(&sql_dir)?;
@@ -95,6 +96,7 @@ fn write_outputs(output_dir: &Path, source: &Path, out: &CompileOutput) -> anyho
     std::fs::create_dir_all(&vector_dir)?;
     std::fs::create_dir_all(&rust_dir)?;
     std::fs::create_dir_all(&ts_dir)?;
+    std::fs::create_dir_all(&py_dir)?;
     std::fs::create_dir_all(&policy_dir)?;
 
     if !out.rust.is_empty()
@@ -107,6 +109,12 @@ fn write_outputs(output_dir: &Path, source: &Path, out: &CompileOutput) -> anyho
         && !out.typescript.starts_with("// TypeScript codegen not yet implemented")
     {
         std::fs::write(ts_dir.join("generated.ts"), &out.typescript)?;
+    }
+
+    if !out.python.is_empty()
+        && !out.python.starts_with("# Python codegen not yet implemented")
+    {
+        std::fs::write(py_dir.join("generated.py"), &out.python)?;
     }
 
     for bundle in &out.policy_bundles {

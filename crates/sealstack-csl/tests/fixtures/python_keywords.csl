@@ -1,0 +1,12 @@
+schema Holding {
+    id:     Ulid   @primary
+    class:  String
+    yield:  F64
+    rating: F32?
+}
+
+schema Normal {
+    id:    Ulid   @primary
+    name:  String
+    score: I32
+}

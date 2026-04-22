@@ -10,6 +10,7 @@ use crate::{CompileOutput, CompileTargets};
 
 pub mod mcp;
 pub mod policy;
+pub mod python;
 pub mod rust;
 pub mod sql;
 pub mod typescript;
@@ -41,7 +42,7 @@ pub fn emit(typed: &TypedFile, targets: CompileTargets) -> CslResult<CompileOutp
         out.typescript = typescript::emit_typescript(typed)?;
     }
     if targets.contains(CompileTargets::PYTHON) {
-        out.python = String::from("# Python codegen not yet implemented.\n");
+        out.python = python::emit_python(typed)?;
     }
     if targets.contains(CompileTargets::WASM_POLICY) {
         out.policy_bundles = policy::emit_policy_bundles(typed)?;
