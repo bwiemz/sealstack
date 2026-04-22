@@ -9,6 +9,12 @@ Maintained automatically by `release-please`.
 ## [Unreleased]
 
 ### Added
+- `sealstack compile` now emits TypeScript record types to `out/ts/generated.ts`
+  alongside the existing `out/rust/generated.rs`. Plain TypeScript interfaces,
+  string-literal-union enums, per-schema `<Name>Meta` constants for reflection.
+  No runtime deps; no validation-library wrappers. Deliberately out of scope:
+  Python codegen (separate slice), SvelteKit console migration, fetch-client
+  generation.
 - `sealstack compile` now emits typed Rust structs to `out/rust/generated.rs`
   and WASM policy bundles to `out/policy/<namespace>.<schema>.wasm`.
   Bundles drop straight into a directory configured via `SEALSTACK_POLICY_DIR`
