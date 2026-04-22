@@ -376,7 +376,7 @@ Borrowed-str keeps allocations out of the hot path; the whole evaluation runs ov
 
 **JSON-pointer resolution** (opcodes `LOAD_CALLER`, `LOAD_SELF`) walks a segment list (e.g., `["owner", "team"]`) down a `serde_json::Value`. Missing segments yield `Null`. The AST type checker has already validated depth ≤ 4 per spec §6.3, so no runtime depth guard is needed.
 
-**Comparison coercion** is minimal and explicit: two values are comparable only if their types match exactly (I64 vs I64, Str vs Str, etc.). Mixed-type comparison yields `false` for `EQ` and errors (return `-1`) for `LT`/`LE`/`GT`/`GE`. This matches the CSL type checker's expectations — at compile time, any comparison that mixes types will have been rejected, so a runtime mismatch indicates a bug or tampered IR.
+**Comparison coercion.** `EQ` / `NE` on matching types does the obvious thing. Across numeric types (`I64` vs `F64`), the values are coerced via `f64` and compared — so `I64(1) == F64(1.0)` returns `true`. This matches JSON's intuition where `{"age": 18}` and `{"age": 18.0}` are semantically the same value, and aligns with how most users write policy predicates (`policy { read: self.age == 18 }` works whether the field is emitted as integer or float). Non-numeric cross-type `EQ` (e.g., `Str` vs `I64`) returns `false`. `LT` / `LE` / `GT` / `GE` on non-numeric cross-type pairs returns `-1` (internal error) — ordering two unrelated types has no sensible meaning, so fail-loud rather than fail-quiet. At compile time the type checker rejects comparisons whose static types can't meet; a runtime mismatch here indicates a bug or tampered IR.
 
 ### 3.4 Compiler changes — AST → IR
 
