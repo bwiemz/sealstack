@@ -12,6 +12,7 @@ pub mod mcp;
 pub mod policy;
 pub mod rust;
 pub mod sql;
+pub mod typescript;
 
 /// Emit all requested targets. The MCP and SQL codegen are in this crate;
 /// Rust/TypeScript/Python codegen stubs live in sibling modules once implemented.
@@ -37,7 +38,7 @@ pub fn emit(typed: &TypedFile, targets: CompileTargets) -> CslResult<CompileOutp
         out.rust = rust::emit_rust(typed)?;
     }
     if targets.contains(CompileTargets::TYPESCRIPT) {
-        out.typescript = String::from("// TypeScript codegen not yet implemented.\n");
+        out.typescript = typescript::emit_typescript(typed)?;
     }
     if targets.contains(CompileTargets::PYTHON) {
         out.python = String::from("# Python codegen not yet implemented.\n");
