@@ -116,10 +116,73 @@ fn escape_wire(s: &str) -> String {
 }
 
 fn emit_schema(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
-    // Functional-syntax fallback (Task T6) slots in here. For T4 we emit
-    // the class form unconditionally; T6 flips the dispatch based on
-    // needs_functional_syntax.
-    emit_schema_class_form(out, decl)
+    if needs_functional_syntax(decl) {
+        emit_schema_functional_form(out, decl)
+    } else {
+        emit_schema_class_form(out, decl)
+    }
+}
+
+fn needs_functional_syntax(decl: &crate::ast::SchemaDecl) -> bool {
+    decl.fields.iter().any(|f| is_python_keyword(&f.name))
+}
+
+fn emit_schema_functional_form(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
+    let is_vector = |ty: &crate::ast::TypeExpr| -> bool {
+        match ty {
+            crate::ast::TypeExpr::Vector(_, _) => true,
+            crate::ast::TypeExpr::Optional(inner, _) => {
+                matches!(inner.as_ref(), crate::ast::TypeExpr::Vector(_, _))
+            }
+            _ => false,
+        }
+    };
+
+    out.push_str(&format!(
+        "{name} = TypedDict(\n    \"{name}\",\n    {{\n",
+        name = decl.name
+    ));
+
+    let mut emitted_tenant = false;
+    for field in &decl.fields {
+        if is_vector(&field.ty) {
+            continue;
+        }
+
+        if field.name == "tenant" {
+            let is_string_or_text = matches!(
+                &field.ty,
+                crate::ast::TypeExpr::Primitive(
+                    crate::ast::PrimitiveType::String | crate::ast::PrimitiveType::Text,
+                    _,
+                ),
+            );
+            if !is_string_or_text {
+                return Err(CslError::Codegen {
+                    message: format!(
+                        "schema `{}` declares `tenant` field with non-String type; the tenant column is always `text` in SQL and the Python TypedDict must match (see spec §6)",
+                        decl.name,
+                    ),
+                });
+            }
+            emitted_tenant = true;
+        }
+
+        let optional = matches!(field.ty, crate::ast::TypeExpr::Optional(_, _));
+        let ty_str = render_field_type(&field.ty, optional)?;
+        out.push_str(&format!(
+            "        \"{name}\": {ty},\n",
+            name = escape_wire(&field.name),
+            ty = ty_str,
+        ));
+    }
+
+    if !emitted_tenant {
+        out.push_str("        \"tenant\": str,\n");
+    }
+
+    out.push_str("    },\n)\n\n");
+    Ok(())
 }
 
 fn emit_schema_class_form(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
@@ -602,6 +665,65 @@ mod schema_emit_tests {
         assert!(
             out.python.contains("\"RELATIONS\": {},"),
             "expected RELATIONS: {{}}, got:\n{}",
+            out.python,
+        );
+    }
+
+    #[test]
+    fn schema_with_keyword_field_uses_functional_syntax() {
+        let src = r#"
+            schema Holding {
+                id:    Ulid   @primary
+                class: String
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("compile");
+        assert!(
+            out.python.contains("Holding = TypedDict("),
+            "expected functional form, got:\n{}",
+            out.python,
+        );
+        assert!(
+            out.python.contains("\"class\": str,"),
+            "expected 'class' as dict key, got:\n{}",
+            out.python,
+        );
+        assert!(
+            !out.python.contains("class Holding(TypedDict):"),
+            "should NOT emit class form when a field is a keyword, got:\n{}",
+            out.python,
+        );
+    }
+
+    #[test]
+    fn schema_without_keyword_field_uses_class_syntax() {
+        let src = r#"
+            schema Normal {
+                id:   Ulid   @primary
+                name: String
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("compile");
+        assert!(
+            out.python.contains("class Normal(TypedDict):"),
+            "expected class form, got:\n{}",
+            out.python,
+        );
+    }
+
+    #[test]
+    fn functional_syntax_preserves_not_required_for_optional_fields() {
+        let src = r#"
+            schema Holding {
+                id:     Ulid   @primary
+                class:  String
+                rating: F32?
+            }
+        "#;
+        let out = compile(src, CompileTargets::PYTHON).expect("compile");
+        assert!(
+            out.python.contains("\"rating\": NotRequired[float],"),
+            "expected optional field in functional form, got:\n{}",
             out.python,
         );
     }

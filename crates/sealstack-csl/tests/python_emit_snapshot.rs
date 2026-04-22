@@ -15,3 +15,10 @@ fn python_emit_matches_hello_snapshot() {
     let out = compile(src, CompileTargets::PYTHON).expect("compile");
     insta::assert_snapshot!("hello.py", out.python);
 }
+
+#[test]
+fn python_emit_matches_python_keywords_snapshot() {
+    let src = include_str!("fixtures/python_keywords.csl");
+    let out = compile(src, CompileTargets::PYTHON).expect("compile");
+    insta::assert_snapshot!("python_keywords.py", out.python);
+}
