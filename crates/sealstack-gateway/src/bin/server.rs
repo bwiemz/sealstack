@@ -171,28 +171,20 @@ fn build_voyage_embedder() -> anyhow::Result<Arc<dyn Embedder>> {
 /// * Directory set → scan it for `<ns>.<schema>.wasm` bundles and evaluate
 ///   compiled policies. `SEALSTACK_POLICY_DEFAULT=deny` flips missing-bundle
 ///   behavior to deny (fail-closed); default is `allow`.
+///
+/// The env-var reading lives here in the binary; the actual engine
+/// construction is delegated to [`sealstack_gateway::policy_from_dir`] so
+/// integration tests can exercise the same path without mutating the
+/// process-global environment.
 fn dev_policy() -> Arc<dyn PolicyEngine> {
     let dir = std::env::var("SEALSTACK_POLICY_DIR").unwrap_or_default();
-    if dir.is_empty() {
-        return sealstack_engine::policy::default_dev_policy();
-    }
-    let deny_missing =
-        std::env::var("SEALSTACK_POLICY_DEFAULT").map(|v| v == "deny").unwrap_or(false);
-    let result = if deny_missing {
-        sealstack_engine::policy::WasmPolicy::load_from_dir_deny_missing(&dir)
-    } else {
-        sealstack_engine::policy::WasmPolicy::load_from_dir(&dir)
-    };
-    match result {
-        Ok(p) => {
-            tracing::info!(%dir, deny_missing, "wasm policy engine initialized");
-            Arc::new(p)
-        }
-        Err(e) => {
-            tracing::error!(error = %e, %dir, "wasm policy init failed; falling back to AllowAllPolicy");
-            sealstack_engine::policy::default_dev_policy()
-        }
-    }
+    let deny_missing = std::env::var("SEALSTACK_POLICY_DEFAULT")
+        .map(|v| v == "deny")
+        .unwrap_or(false);
+    sealstack_gateway::policy_from_dir(
+        (!dir.is_empty()).then_some(dir.as_str()),
+        deny_missing,
+    )
 }
 
 /// Select the reranker backend at boot from `SEALSTACK_RERANKER`.
