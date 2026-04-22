@@ -17,8 +17,18 @@ use crate::types::TypedFile;
 pub fn emit_typescript(typed: &TypedFile) -> CslResult<String> {
     let mut out = String::new();
     emit_file_header(&mut out);
-    // Enum and schema emission land in tasks T2 and T3.
-    let _ = typed;
+    // Enums first (sorted by key for deterministic output), then schemas
+    // (source order from the CSL file). Schema emission lands in Task T4.
+    let mut enum_names: Vec<&String> = typed.enums.keys().collect();
+    enum_names.sort();
+    for name in enum_names {
+        if let Some(en) = typed.enums.get(name) {
+            emit_enum(&mut out, en);
+        }
+    }
+    if !typed.enums.is_empty() {
+        out.push('\n');
+    }
     Ok(out)
 }
 
@@ -67,6 +77,29 @@ fn is_i64(ty: &TypeExpr) -> bool {
         TypeExpr::Optional(inner, _) => is_i64(inner),
         _ => false,
     }
+}
+
+fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
+    out.push_str(&format!("export type {} = ", en.name));
+    let mut first = true;
+    for v in &en.variants {
+        if !first {
+            out.push_str(" | ");
+        }
+        first = false;
+        let wire = v
+            .wire
+            .clone()
+            .unwrap_or_else(|| v.name.to_ascii_lowercase());
+        out.push('\'');
+        out.push_str(&escape_wire(&wire));
+        out.push('\'');
+    }
+    out.push_str(";\n");
+}
+
+fn escape_wire(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
 #[cfg(test)]
@@ -138,5 +171,66 @@ mod type_mapper_tests {
         let inner = Box::new(TypeExpr::Primitive(PrimitiveType::I64, s()));
         assert!(is_i64(&TypeExpr::Optional(inner, s())));
         assert!(!is_i64(&TypeExpr::Primitive(PrimitiveType::I32, s())));
+    }
+}
+
+#[cfg(test)]
+mod enum_emit_tests {
+    use super::*;
+    use crate::ast::{EnumDecl, EnumVariant};
+    use crate::span::Span;
+
+    fn s() -> Span {
+        Span::point(0)
+    }
+
+    #[test]
+    fn emit_enum_with_explicit_wire_forms() {
+        let en = EnumDecl {
+            name: "Tier".into(),
+            variants: vec![
+                EnumVariant { name: "Free".into(), wire: Some("free".into()), span: s() },
+                EnumVariant { name: "Pro".into(), wire: Some("pro".into()), span: s() },
+                EnumVariant { name: "Enterprise".into(), wire: Some("enterprise".into()), span: s() },
+            ],
+            span: s(),
+        };
+        let mut out = String::new();
+        emit_enum(&mut out, &en);
+        assert_eq!(
+            out,
+            "export type Tier = 'free' | 'pro' | 'enterprise';\n"
+        );
+    }
+
+    #[test]
+    fn emit_enum_falls_back_to_lowercased_ident() {
+        let en = EnumDecl {
+            name: "Status".into(),
+            variants: vec![
+                EnumVariant { name: "Active".into(), wire: None, span: s() },
+                EnumVariant { name: "Archived".into(), wire: None, span: s() },
+            ],
+            span: s(),
+        };
+        let mut out = String::new();
+        emit_enum(&mut out, &en);
+        assert_eq!(out, "export type Status = 'active' | 'archived';\n");
+    }
+
+    #[test]
+    fn escapes_backslash_and_single_quote_in_wire_form() {
+        let en = EnumDecl {
+            name: "Weird".into(),
+            variants: vec![
+                EnumVariant { name: "Q".into(), wire: Some(r#"val'ue\n"#.into()), span: s() },
+            ],
+            span: s(),
+        };
+        let mut out = String::new();
+        emit_enum(&mut out, &en);
+        // The wire string contains a literal `'` and a literal `\` followed by `n`.
+        // Both must be escaped: `'` → `\'`, `\` → `\\`.
+        assert_eq!(out, r"export type Weird = 'val\'ue\\n';" .to_string() + "\n");
     }
 }
