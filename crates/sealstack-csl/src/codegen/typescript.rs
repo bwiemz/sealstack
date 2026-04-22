@@ -119,15 +119,15 @@ fn emit_schema_meta(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: 
         .unwrap_or_else(|| "id".to_string());
 
     let version = decl.version.unwrap_or(1);
-    let table = to_snake(&decl.name);
+    let table = super::to_snake(&decl.name);
     let ns_literal = if namespace.is_empty() { "default" } else { namespace };
 
     out.push_str(&format!("export const {}Meta = {{\n", decl.name));
-    out.push_str(&format!("  NAMESPACE: '{ns_literal}',\n"));
-    out.push_str(&format!("  SCHEMA: '{}',\n", decl.name));
-    out.push_str(&format!("  TABLE: '{table}',\n"));
+    out.push_str(&format!("  NAMESPACE: '{}',\n", escape_wire(ns_literal)));
+    out.push_str(&format!("  SCHEMA: '{}',\n", escape_wire(&decl.name)));
+    out.push_str(&format!("  TABLE: '{}',\n", escape_wire(&table)));
     out.push_str(&format!("  VERSION: {version},\n"));
-    out.push_str(&format!("  PRIMARY_KEY: '{primary_key}',\n"));
+    out.push_str(&format!("  PRIMARY_KEY: '{}',\n", escape_wire(&primary_key)));
 
     out.push_str("  RELATIONS: {");
     if decl.relations.is_empty() {
@@ -140,6 +140,8 @@ fn emit_schema_meta(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: 
             out.push_str(&format!(
                 "    {name}: {{ target: '{target}', fk: '{fk}' }},\n",
                 name = rel.name,
+                target = escape_wire(target),
+                fk = escape_wire(&fk),
             ));
         }
         out.push_str("  },\n");
@@ -148,28 +150,27 @@ fn emit_schema_meta(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: 
     out.push_str("} as const;\n");
 }
 
-fn to_snake(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 4);
-    for (i, c) in s.chars().enumerate() {
-        if c.is_ascii_uppercase() {
-            if i > 0 {
-                out.push('_');
-            }
-            out.push(c.to_ascii_lowercase());
-        } else {
-            out.push(c);
-        }
-    }
-    out
-}
-
 fn emit_schema(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
     out.push_str(&format!("export interface {} {{\n", decl.name));
 
+    // Vector fields live in the vector store, not on the record (§3.3). Skip
+    // both bare `Vector<N>` and `Optional<Vector<N>>` — the wrapper does not
+    // change where the data lives, and the parser accepts `Vector<N>?` today
+    // (parser.rs::type_expr attaches `?` after any non-optional type, and the
+    // type checker does not reject the combination).
+    let is_vector = |ty: &crate::ast::TypeExpr| -> bool {
+        match ty {
+            crate::ast::TypeExpr::Vector(_, _) => true,
+            crate::ast::TypeExpr::Optional(inner, _) => {
+                matches!(inner.as_ref(), crate::ast::TypeExpr::Vector(_, _))
+            }
+            _ => false,
+        }
+    };
+
     let mut emitted_tenant = false;
     for field in &decl.fields {
-        // Vector<N> lives in the vector store, not on the record. §3.
-        if matches!(field.ty, crate::ast::TypeExpr::Vector(_, _)) {
+        if is_vector(&field.ty) {
             continue;
         }
 
@@ -417,6 +418,28 @@ mod schema_emit_tests {
             "Vector<N> fields must be skipped, got:\n{}",
             out.typescript
         );
+    }
+
+    #[test]
+    fn optional_vector_field_is_handled() {
+        let src = r#"
+            schema Vec4 {
+                id: Ulid @primary
+                embedding: Vector<4>?
+            }
+        "#;
+        // Either the type checker rejects this (acceptable), or the emitter
+        // skips the field like a bare Vector (preferred). Both behaviours
+        // keep the generated TypeScript valid.
+        let result = compile(src, CompileTargets::TYPESCRIPT);
+        match result {
+            Ok(out) => assert!(
+                !out.typescript.contains("embedding"),
+                "optional Vector should be skipped like bare Vector; got:\n{}",
+                out.typescript
+            ),
+            Err(_) => { /* type checker rejected — also acceptable */ }
+        }
     }
 
     #[test]
