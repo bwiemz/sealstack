@@ -21,12 +21,33 @@ export interface Customer {
   tenant: string;
 }
 
+export const CustomerMeta = {
+  NAMESPACE: 'acme.crm',
+  SCHEMA: 'Customer',
+  TABLE: 'customer',
+  VERSION: 2,
+  PRIMARY_KEY: 'id',
+  RELATIONS: {
+    tickets: { target: 'Ticket', fk: 'customer' },
+    contracts: { target: 'Contract', fk: 'customer' },
+  },
+} as const;
+
 export interface User {
   id: string;
   email: string;
   team: string;
   tenant: string;
 }
+
+export const UserMeta = {
+  NAMESPACE: 'acme.crm',
+  SCHEMA: 'User',
+  TABLE: 'user',
+  VERSION: 1,
+  PRIMARY_KEY: 'id',
+  RELATIONS: {},
+} as const;
 
 export interface Ticket {
   id: string;
@@ -35,9 +56,27 @@ export interface Ticket {
   tenant: string;
 }
 
+export const TicketMeta = {
+  NAMESPACE: 'acme.crm',
+  SCHEMA: 'Ticket',
+  TABLE: 'ticket',
+  VERSION: 1,
+  PRIMARY_KEY: 'id',
+  RELATIONS: {},
+} as const;
+
 export interface Contract {
   id: string;
   customer: string;
   value: number;
   tenant: string;
 }
+
+export const ContractMeta = {
+  NAMESPACE: 'acme.crm',
+  SCHEMA: 'Contract',
+  TABLE: 'contract',
+  VERSION: 1,
+  PRIMARY_KEY: 'id',
+  RELATIONS: {},
+} as const;

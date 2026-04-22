@@ -13,3 +13,12 @@ export interface Note {
   created_at: string;
   tenant: string;
 }
+
+export const NoteMeta = {
+  NAMESPACE: 'default',
+  SCHEMA: 'Note',
+  TABLE: 'note',
+  VERSION: 1,
+  PRIMARY_KEY: 'id',
+  RELATIONS: {},
+} as const;

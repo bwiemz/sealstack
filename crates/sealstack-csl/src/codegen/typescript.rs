@@ -33,6 +33,8 @@ pub fn emit_typescript(typed: &TypedFile) -> CslResult<String> {
         if let Some(schema) = typed.schemas.get(name) {
             emit_schema(&mut out, &schema.decl)?;
             out.push('\n');
+            emit_schema_meta(&mut out, &schema.decl, &typed.namespace);
+            out.push('\n');
         }
     }
     Ok(out)
@@ -106,6 +108,59 @@ fn emit_enum(out: &mut String, en: &crate::ast::EnumDecl) {
 
 fn escape_wire(s: &str) -> String {
     s.replace('\\', "\\\\").replace('\'', "\\'")
+}
+
+fn emit_schema_meta(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: &str) {
+    let primary_key = decl
+        .fields
+        .iter()
+        .find(|f| f.decorators.iter().any(|d| d.is("primary")))
+        .map(|f| f.name.clone())
+        .unwrap_or_else(|| "id".to_string());
+
+    let version = decl.version.unwrap_or(1);
+    let table = to_snake(&decl.name);
+    let ns_literal = if namespace.is_empty() { "default" } else { namespace };
+
+    out.push_str(&format!("export const {}Meta = {{\n", decl.name));
+    out.push_str(&format!("  NAMESPACE: '{ns_literal}',\n"));
+    out.push_str(&format!("  SCHEMA: '{}',\n", decl.name));
+    out.push_str(&format!("  TABLE: '{table}',\n"));
+    out.push_str(&format!("  VERSION: {version},\n"));
+    out.push_str(&format!("  PRIMARY_KEY: '{primary_key}',\n"));
+
+    out.push_str("  RELATIONS: {");
+    if decl.relations.is_empty() {
+        out.push_str("},\n");
+    } else {
+        out.push('\n');
+        for rel in &decl.relations {
+            let fk = rel.via.segments.last().cloned().unwrap_or_default();
+            let target = &rel.target;
+            out.push_str(&format!(
+                "    {name}: {{ target: '{target}', fk: '{fk}' }},\n",
+                name = rel.name,
+            ));
+        }
+        out.push_str("  },\n");
+    }
+
+    out.push_str("} as const;\n");
+}
+
+fn to_snake(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                out.push('_');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 fn emit_schema(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()> {
@@ -376,6 +431,66 @@ mod schema_emit_tests {
         assert!(
             out.typescript.contains("2^53"),
             "expected I64 JSDoc precision warning, got:\n{}",
+            out.typescript
+        );
+    }
+
+    #[test]
+    fn meta_const_includes_all_reflection_fields() {
+        let src = r#"
+            namespace acme.crm
+
+            schema Customer version 2 {
+                id:    Ulid @primary
+                owner: Ref<User>
+
+                relations {
+                    tickets: many Ticket via Ticket.customer on_delete cascade
+                }
+            }
+
+            schema User {
+                id: Ulid @primary
+            }
+
+            schema Ticket {
+                id:       Ulid @primary
+                customer: Ref<Customer>
+            }
+        "#;
+        let out = compile(src, CompileTargets::TYPESCRIPT).expect("compile");
+        // Check the presence of every meta field on Customer.
+        for needle in [
+            "export const CustomerMeta = {",
+            "NAMESPACE: 'acme.crm',",
+            "SCHEMA: 'Customer',",
+            "TABLE: 'customer',",
+            "VERSION: 2,",
+            "PRIMARY_KEY: 'id',",
+            "RELATIONS: {",
+            "tickets: { target: 'Ticket', fk: 'customer' },",
+            "} as const;",
+        ] {
+            assert!(
+                out.typescript.contains(needle),
+                "expected `{}` in output, got:\n{}",
+                needle,
+                out.typescript,
+            );
+        }
+    }
+
+    #[test]
+    fn meta_const_emits_empty_relations_when_none() {
+        let src = r#"
+            schema Simple {
+                id: Ulid @primary
+            }
+        "#;
+        let out = compile(src, CompileTargets::TYPESCRIPT).expect("compile");
+        assert!(
+            out.typescript.contains("RELATIONS: {},"),
+            "expected RELATIONS: {{}} for relation-less schema, got:\n{}",
             out.typescript
         );
     }
