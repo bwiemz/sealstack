@@ -62,7 +62,7 @@ dashmap = "6"
 sqlx          = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "json", "time", "uuid"] }
 qdrant-client = "1.12"
 # Parser + codegen
-winnow     = "0.6"
+winnow     = "1.0"
 quote      = "1"
 proc-macro2 = "1"
 minijinja  = "2"
