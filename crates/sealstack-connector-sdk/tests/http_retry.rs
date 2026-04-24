@@ -106,7 +106,11 @@ async fn fourhundred_not_retried() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/bad"))
-        .respond_with(ResponseTemplate::new(404))
+        .respond_with(
+            ResponseTemplate::new(404)
+                .append_header("X-Trace-Id", "abc123")
+                .set_body_string(r#"{"error":"not found"}"#),
+        )
         .expect(1) // exactly one call — no retries.
         .mount(&server)
         .await;
@@ -114,10 +118,23 @@ async fn fourhundred_not_retried() {
     let c = client(&server).await;
     let rb = c.get(format!("{}/bad", server.uri()));
     let err = c.send(rb).await.unwrap_err();
-    assert!(
-        matches!(err, SealStackError::Backend(_)),
-        "404 should map to Backend, got {err}"
-    );
+    match err {
+        SealStackError::HttpStatus {
+            status,
+            headers,
+            body,
+        } => {
+            assert_eq!(status, 404);
+            assert!(
+                headers
+                    .iter()
+                    .any(|(k, v)| k.eq_ignore_ascii_case("x-trace-id") && v == "abc123"),
+                "missing X-Trace-Id header: {headers:?}",
+            );
+            assert!(body.contains("not found"), "body: {body}");
+        }
+        other => panic!("expected HttpStatus, got {other}"),
+    }
 }
 
 #[tokio::test]

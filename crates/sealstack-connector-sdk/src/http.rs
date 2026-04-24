@@ -200,8 +200,8 @@ impl HttpClient {
     ///
     /// # Errors
     ///
-    /// Returns [`SealStackError::Backend`] for non-retryable 4xx responses
-    /// and for credential build failures. Returns
+    /// Returns [`SealStackError::HttpStatus`] for non-retryable 4xx responses
+    /// (headers and body are captured under the body-size cap). Returns
     /// [`SealStackError::Unauthorized`] when a 401 persists after one
     /// credential invalidation (spec §6). Returns
     /// [`SealStackError::RetryExhausted`] when the retry budget is consumed
@@ -252,11 +252,26 @@ impl HttpClient {
                         && status != reqwest::StatusCode::REQUEST_TIMEOUT
                         && status != reqwest::StatusCode::TOO_MANY_REQUESTS
                     {
-                        return Err(SealStackError::Backend(format!(
-                            "HTTP {}: {}",
-                            status.as_u16(),
-                            status.canonical_reason().unwrap_or("")
-                        )));
+                        let code = status.as_u16();
+                        let headers: Vec<(String, String)> = resp
+                            .headers()
+                            .iter()
+                            .filter_map(|(k, v)| {
+                                v.to_str()
+                                    .ok()
+                                    .map(|s| (k.as_str().to_owned(), s.to_owned()))
+                            })
+                            .collect();
+                        // Stream the body under the cap — same code path as
+                        // the success case, so a hostile 4xx body cannot
+                        // exhaust memory.
+                        let cap = self.body_cap_bytes;
+                        let body = read_body_capped(resp, cap).await.unwrap_or_default();
+                        return Err(SealStackError::HttpStatus {
+                            status: code,
+                            headers,
+                            body,
+                        });
                     }
                     let delay = retry_delay_for(
                         &self.retry,
@@ -292,6 +307,28 @@ impl HttpClient {
             last_error: Box::new(last_err),
         })
     }
+}
+
+/// Read a `reqwest::Response` body into a `String` under the given cap.
+///
+/// Used by both the successful-body path and the 4xx-capture path so the
+/// cap is uniform.
+async fn read_body_capped(resp: reqwest::Response, cap: usize) -> SealStackResult<String> {
+    let mut stream_resp = resp;
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        match stream_resp.chunk().await {
+            Ok(Some(chunk)) => {
+                if buf.len() + chunk.len() > cap {
+                    return Err(SealStackError::BodyTooLarge { cap_bytes: cap });
+                }
+                buf.extend_from_slice(&chunk);
+            }
+            Ok(None) => break,
+            Err(e) => return Err(SealStackError::backend(format!("body stream: {e}"))),
+        }
+    }
+    Ok(String::from_utf8_lossy(&buf).into_owned())
 }
 
 /// Compute the next sleep duration.

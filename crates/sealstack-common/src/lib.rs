@@ -55,9 +55,7 @@ pub enum SealStackError {
     Other(String),
 
     /// HTTP retry loop exhausted its attempt budget.
-    #[error(
-        "retry exhausted after {attempts} attempts over {total_duration:?}: {last_error}"
-    )]
+    #[error("retry exhausted after {attempts} attempts over {total_duration:?}: {last_error}")]
     RetryExhausted {
         /// Number of attempts made.
         attempts: u32,
@@ -79,6 +77,20 @@ pub enum SealStackError {
     PaginatorCursorLoop {
         /// The repeated cursor value.
         cursor: String,
+    },
+
+    /// HTTP request produced a non-retryable status with headers + body the
+    /// caller may need to inspect (e.g. GitHub's 403 discrimination).
+    #[error("HTTP {status}")]
+    HttpStatus {
+        /// Status code.
+        status: u16,
+        /// Headers from the response, copied as `(name, value)` pairs.
+        headers: Vec<(String, String)>,
+        /// Body as UTF-8 text; empty if the body was non-UTF-8 or read
+        /// failed. The body is already size-capped per the `HttpClient`'s
+        /// configured cap.
+        body: String,
     },
 }
 
@@ -251,7 +263,9 @@ mod tests {
 
     #[test]
     fn body_too_large_reports_cap() {
-        let e = SealStackError::BodyTooLarge { cap_bytes: 52_428_800 };
+        let e = SealStackError::BodyTooLarge {
+            cap_bytes: 52_428_800,
+        };
         assert!(e.to_string().contains("52428800"));
     }
 
