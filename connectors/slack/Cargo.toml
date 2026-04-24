@@ -13,7 +13,6 @@ workspace = true
 sealstack-common        = { path = "../../crates/sealstack-common" }
 sealstack-connector-sdk = { path = "../../crates/sealstack-connector-sdk" }
 async-trait       = { workspace = true }
-reqwest           = { workspace = true }
 serde             = { workspace = true }
 serde_json        = { workspace = true }
 thiserror         = { workspace = true }
