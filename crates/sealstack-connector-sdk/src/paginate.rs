@@ -266,6 +266,105 @@ where
     }
 }
 
+/// Offset/limit paginator: numeric `start` + `limit` against a `total`.
+///
+/// Use for Jira REST API v3 (`startAt`/`maxResults`) and Confluence Cloud
+/// REST (`start`/`limit`). The response body must include both the item
+/// array (under a configurable JSON key) and a numeric `total` at the top
+/// level — the paginator uses `total` to detect exhaustion. If `total` is
+/// absent, the paginator stops when a page returns fewer items than `limit`.
+///
+/// # Type parameters
+///
+/// - `T` — deserialized item type.
+/// - `Req` — closure that builds a request given the client, the current
+///   `start` offset, and the configured `limit`.
+pub struct OffsetPaginator<T, Req>
+where
+    T: DeserializeOwned + Send + 'static,
+    Req: for<'a> Fn(&'a HttpClient, u64, u64) -> reqwest::RequestBuilder + Send + 'static,
+{
+    limit: u64,
+    request: Req,
+    items_key: &'static str,
+    next_start: u64,
+    total: Option<u64>,
+    _marker: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<T, Req> OffsetPaginator<T, Req>
+where
+    T: DeserializeOwned + Send + 'static,
+    Req: for<'a> Fn(&'a HttpClient, u64, u64) -> reqwest::RequestBuilder + Send + 'static,
+{
+    /// Build a new paginator with the given page size, request closure, and
+    /// response key under which items live.
+    pub fn new(limit: u64, request: Req, items_key: &'static str) -> Self {
+        Self {
+            limit,
+            request,
+            items_key,
+            next_start: 0,
+            total: None,
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+#[async_trait]
+impl<T, Req> Paginator for OffsetPaginator<T, Req>
+where
+    T: DeserializeOwned + Send + 'static,
+    Req: for<'a> Fn(&'a HttpClient, u64, u64) -> reqwest::RequestBuilder + Send + 'static,
+{
+    type Item = T;
+
+    async fn fetch_page(
+        &mut self,
+        client: &HttpClient,
+        _cursor: Option<String>,
+    ) -> SealStackResult<(Vec<T>, Option<String>)> {
+        let rb = (self.request)(client, self.next_start, self.limit);
+        let resp = client.send(rb).await?;
+        let body: serde_json::Value = resp.json().await?;
+
+        if self.total.is_none() {
+            self.total = body.get("total").and_then(serde_json::Value::as_u64);
+        }
+        let items: Vec<T> = body
+            .get(self.items_key)
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| {
+                SealStackError::backend(format!("missing array at `{}`", self.items_key))
+            })?
+            .iter()
+            .map(|x| {
+                serde_json::from_value::<T>(x.clone())
+                    .map_err(|e| SealStackError::backend(format!("{e}")))
+            })
+            .collect::<SealStackResult<Vec<_>>>()?;
+
+        let returned = items.len() as u64;
+        self.next_start += returned;
+
+        let done = match self.total {
+            Some(total) => self.next_start >= total,
+            // No total in response — stop when server returns fewer than limit.
+            None => returned < self.limit,
+        };
+
+        // The adapter threads cursors by value equality; use the offset as a
+        // stringified cursor so the cursor-loop detector works (each new offset
+        // produces a different cursor string).
+        let next = if done {
+            None
+        } else {
+            Some(self.next_start.to_string())
+        };
+        Ok((items, next))
+    }
+}
+
 #[cfg(test)]
 mod link_header_tests {
     use super::next_link;
