@@ -36,6 +36,7 @@
 
 pub mod auth;
 pub mod change_streams;
+pub mod retry;
 
 use std::pin::Pin;
 
