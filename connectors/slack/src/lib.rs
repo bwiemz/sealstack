@@ -21,9 +21,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use sealstack_common::{SealStackError, SealStackResult};
 use sealstack_connector_sdk::auth::StaticToken;
 use sealstack_connector_sdk::http::HttpClient;
+use sealstack_connector_sdk::paginate::{BodyCursorPaginator, paginate};
 use sealstack_connector_sdk::retry::RetryPolicy;
 use sealstack_connector_sdk::{
     Connector, PermissionPredicate, Resource, ResourceId, ResourceStream, change_streams,
@@ -124,28 +126,55 @@ impl SlackConnector {
     }
 
     async fn list_channels(&self) -> SealStackResult<Vec<Channel>> {
-        let mut cursor = String::new();
-        let mut out = Vec::new();
-        loop {
-            let url = if cursor.is_empty() {
-                format!(
-                    "{SLACK_API}/conversations.list?limit=1000&exclude_archived=true&types=public_channel,private_channel",
-                )
-            } else {
-                format!(
-                    "{SLACK_API}/conversations.list?limit=1000&exclude_archived=true&types=public_channel,private_channel&cursor={cursor}",
-                )
-            };
-            let resp: ListChannelsResp = self.get_json(&url).await?;
-            resp.ok_or_err()?;
-            for c in resp.channels.unwrap_or_default() {
-                if self.config.channels.is_empty() || self.config.channels.contains(&c.id) {
-                    out.push(c);
+        let url = format!("{SLACK_API}/conversations.list");
+        let pg = BodyCursorPaginator::<Channel, _, _, _>::new(
+            move |c: &HttpClient, cursor: Option<&str>| {
+                let mut rb = c.get(&url).query(&[
+                    ("limit", "1000"),
+                    ("exclude_archived", "true"),
+                    ("types", "public_channel,private_channel"),
+                ]);
+                if let Some(cur) = cursor {
+                    rb = rb.query(&[("cursor", cur)]);
                 }
-            }
-            match resp.response_metadata.and_then(|m| m.next_cursor) {
-                Some(c) if !c.is_empty() => cursor = c,
-                _ => break,
+                rb
+            },
+            |v: &serde_json::Value| {
+                if !v
+                    .get("ok")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false)
+                {
+                    let err = v.get("error").and_then(|e| e.as_str()).unwrap_or("unknown");
+                    return Err(SealStackError::backend(format!("slack api: {err}")));
+                }
+                let arr = v
+                    .get("channels")
+                    .and_then(|a| a.as_array())
+                    .ok_or_else(|| SealStackError::backend("missing channels"))?;
+                arr.iter()
+                    .map(|x| {
+                        serde_json::from_value::<Channel>(x.clone())
+                            .map_err(|e| SealStackError::backend(format!("{e}")))
+                    })
+                    .collect()
+            },
+            |v: &serde_json::Value| {
+                v.get("response_metadata")
+                    .and_then(|m| m.get("next_cursor"))
+                    .and_then(|c| c.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+            },
+        );
+
+        let allowed = self.config.channels.clone();
+        let mut stream = paginate(pg, Arc::clone(&self.http));
+        let mut out: Vec<Channel> = Vec::new();
+        while let Some(item) = stream.next().await {
+            let ch = item?;
+            if allowed.is_empty() || allowed.contains(&ch.id) {
+                out.push(ch);
             }
         }
         Ok(out)
@@ -153,26 +182,52 @@ impl SlackConnector {
 
     async fn list_messages(&self, channel_id: &str) -> SealStackResult<Vec<Message>> {
         let cap = self.config.max_messages_per_channel as usize;
-        let mut cursor = String::new();
+        let url = format!("{SLACK_API}/conversations.history");
+        let channel_id_owned = channel_id.to_owned();
+        let pg = BodyCursorPaginator::<Message, _, _, _>::new(
+            move |c: &HttpClient, cursor: Option<&str>| {
+                let mut rb = c
+                    .get(&url)
+                    .query(&[("channel", channel_id_owned.as_str()), ("limit", "1000")]);
+                if let Some(cur) = cursor {
+                    rb = rb.query(&[("cursor", cur)]);
+                }
+                rb
+            },
+            |v: &serde_json::Value| {
+                if !v
+                    .get("ok")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false)
+                {
+                    let err = v.get("error").and_then(|e| e.as_str()).unwrap_or("unknown");
+                    return Err(SealStackError::backend(format!("slack api: {err}")));
+                }
+                let arr = v
+                    .get("messages")
+                    .and_then(|a| a.as_array())
+                    .ok_or_else(|| SealStackError::backend("missing messages"))?;
+                arr.iter()
+                    .map(|x| {
+                        serde_json::from_value::<Message>(x.clone())
+                            .map_err(|e| SealStackError::backend(format!("{e}")))
+                    })
+                    .collect()
+            },
+            |v: &serde_json::Value| {
+                v.get("response_metadata")
+                    .and_then(|m| m.get("next_cursor"))
+                    .and_then(|c| c.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+            },
+        );
+
+        let mut stream = paginate(pg, Arc::clone(&self.http)).take(cap);
         let mut out: Vec<Message> = Vec::new();
-        while out.len() < cap {
-            let want = (cap - out.len()).min(1000);
-            let url = if cursor.is_empty() {
-                format!("{SLACK_API}/conversations.history?channel={channel_id}&limit={want}")
-            } else {
-                format!(
-                    "{SLACK_API}/conversations.history?channel={channel_id}&limit={want}&cursor={cursor}",
-                )
-            };
-            let resp: HistoryResp = self.get_json(&url).await?;
-            resp.ok_or_err()?;
-            out.extend(resp.messages.unwrap_or_default());
-            match resp.response_metadata.and_then(|m| m.next_cursor) {
-                Some(c) if !c.is_empty() => cursor = c,
-                _ => break,
-            }
+        while let Some(item) = stream.next().await {
+            out.push(item?);
         }
-        out.truncate(cap);
         Ok(out)
     }
 }
@@ -250,28 +305,6 @@ impl Connector for SlackConnector {
 // ---------------------------------------------------------------------------
 
 #[derive(Deserialize)]
-struct ListChannelsResp {
-    ok: bool,
-    #[serde(default)]
-    error: Option<String>,
-    #[serde(default)]
-    channels: Option<Vec<Channel>>,
-    #[serde(default)]
-    response_metadata: Option<ResponseMetadata>,
-}
-
-#[derive(Deserialize)]
-struct HistoryResp {
-    ok: bool,
-    #[serde(default)]
-    error: Option<String>,
-    #[serde(default)]
-    messages: Option<Vec<Message>>,
-    #[serde(default)]
-    response_metadata: Option<ResponseMetadata>,
-}
-
-#[derive(Deserialize)]
 struct AuthTestResp {
     ok: bool,
     #[serde(default)]
@@ -293,22 +326,6 @@ trait SlackOk {
     }
 }
 
-impl SlackOk for ListChannelsResp {
-    fn is_ok(&self) -> bool {
-        self.ok
-    }
-    fn err(&self) -> Option<&str> {
-        self.error.as_deref()
-    }
-}
-impl SlackOk for HistoryResp {
-    fn is_ok(&self) -> bool {
-        self.ok
-    }
-    fn err(&self) -> Option<&str> {
-        self.error.as_deref()
-    }
-}
 impl SlackOk for AuthTestResp {
     fn is_ok(&self) -> bool {
         self.ok
@@ -316,12 +333,6 @@ impl SlackOk for AuthTestResp {
     fn err(&self) -> Option<&str> {
         self.error.as_deref()
     }
-}
-
-#[derive(Deserialize)]
-struct ResponseMetadata {
-    #[serde(default)]
-    next_cursor: Option<String>,
 }
 
 #[derive(Deserialize)]
