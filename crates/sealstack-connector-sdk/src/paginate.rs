@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::Stream;
+use serde::de::DeserializeOwned;
 
 use sealstack_common::{SealStackError, SealStackResult};
 
@@ -98,6 +99,93 @@ pub fn paginate<P: Paginator>(
             }
         }
     })
+}
+
+/// Body-cursor paginator: the cursor lives inside the response body.
+///
+/// Use for Slack (`response_metadata.next_cursor`), Google Drive
+/// (`nextPageToken`), Notion (`next_cursor`), Linear (`pageInfo.endCursor`).
+///
+/// # Type parameters
+///
+/// - `T` — deserialized item type.
+/// - `Req` — closure that builds a [`reqwest::RequestBuilder`] given the
+///   client and the current cursor (`None` on the first call).
+/// - `EI` — closure that extracts the page's item array from the response JSON.
+/// - `EC` — closure that extracts the next-page cursor from the response JSON.
+///   Return `None` to terminate the stream.
+// clippy::type_complexity: the four-generic struct is intentional — each
+// generic represents a distinct user-supplied closure, not incidental
+// nesting.
+#[allow(clippy::type_complexity)]
+pub struct BodyCursorPaginator<T, Req, EI, EC>
+where
+    T: DeserializeOwned + Send + 'static,
+    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder
+        + Send
+        + 'static,
+    EI: Fn(&serde_json::Value) -> SealStackResult<Vec<T>> + Send + 'static,
+    EC: Fn(&serde_json::Value) -> Option<String> + Send + 'static,
+{
+    request: Req,
+    extract_items: EI,
+    extract_cursor: EC,
+    // PhantomData<fn() -> T>: marks T as used at the type level only, making
+    // the struct covariant in T without owning a T value.
+    _marker: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<T, Req, EI, EC> BodyCursorPaginator<T, Req, EI, EC>
+where
+    T: DeserializeOwned + Send + 'static,
+    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder
+        + Send
+        + 'static,
+    EI: Fn(&serde_json::Value) -> SealStackResult<Vec<T>> + Send + 'static,
+    EC: Fn(&serde_json::Value) -> Option<String> + Send + 'static,
+{
+    /// Build a new paginator.
+    ///
+    /// - `request`: closure that composes a request given the client and the
+    ///   current cursor (or `None` on the first call).
+    /// - `extract_items`: extracts the page's item array from the response
+    ///   JSON.
+    /// - `extract_cursor`: extracts the next-page cursor from the response
+    ///   JSON. Return `None` to terminate the stream.
+    pub fn new(request: Req, extract_items: EI, extract_cursor: EC) -> Self {
+        Self {
+            request,
+            extract_items,
+            extract_cursor,
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+#[async_trait]
+impl<T, Req, EI, EC> Paginator for BodyCursorPaginator<T, Req, EI, EC>
+where
+    T: DeserializeOwned + Send + 'static,
+    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder
+        + Send
+        + 'static,
+    EI: Fn(&serde_json::Value) -> SealStackResult<Vec<T>> + Send + 'static,
+    EC: Fn(&serde_json::Value) -> Option<String> + Send + 'static,
+{
+    type Item = T;
+
+    async fn fetch_page(
+        &mut self,
+        client: &HttpClient,
+        cursor: Option<String>,
+    ) -> SealStackResult<(Vec<T>, Option<String>)> {
+        let rb = (self.request)(client, cursor.as_deref());
+        let resp = client.send(rb).await?;
+        let body: serde_json::Value = resp.json().await?;
+        let items = (self.extract_items)(&body)?;
+        let next = (self.extract_cursor)(&body);
+        Ok((items, next))
+    }
 }
 
 #[cfg(test)]
