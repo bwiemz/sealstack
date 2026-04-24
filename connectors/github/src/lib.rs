@@ -23,13 +23,15 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
 
+pub mod retry_shim;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::StreamExt;
 use sealstack_common::{SealStackError, SealStackResult};
 use sealstack_connector_sdk::auth::StaticToken;
-use sealstack_connector_sdk::http::HttpClient;
+use sealstack_connector_sdk::http::{HttpClient, HttpResponse};
 use sealstack_connector_sdk::paginate::{LinkHeaderPaginator, next_link, paginate};
 use sealstack_connector_sdk::retry::RetryPolicy;
 use sealstack_connector_sdk::{
@@ -83,6 +85,46 @@ impl GithubConfig {
     }
 }
 
+/// At most: initial attempt + one shim-guided retry.
+async fn send_with_gh_shim<F>(http: &HttpClient, make_request: F) -> SealStackResult<HttpResponse>
+where
+    F: Fn() -> reqwest::RequestBuilder,
+{
+    for attempt in 0..2u8 {
+        match http.send(make_request()).await {
+            Ok(resp) => return Ok(resp),
+            Err(SealStackError::HttpStatus {
+                status: 403,
+                headers,
+                body,
+            }) => match retry_shim::classify_github_403(&headers, &body) {
+                retry_shim::Github403Action::WaitThenRetry(d) if attempt == 0 => {
+                    tracing::warn!(?d, "github: 403 rate-limit, waiting before retry");
+                    tokio::time::sleep(d).await;
+                }
+                retry_shim::Github403Action::BackoffThenRetry if attempt == 0 => {
+                    tracing::warn!("github: 403 secondary rate-limit, backing off before retry");
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                }
+                retry_shim::Github403Action::PermissionDenied => {
+                    return Err(SealStackError::Backend(
+                        "github 403: permission denied".into(),
+                    ));
+                }
+                _ => {
+                    return Err(SealStackError::Backend(
+                        "github 403: rate-limit retry exhausted".into(),
+                    ));
+                }
+            },
+            Err(e) => return Err(e),
+        }
+    }
+    Err(SealStackError::Backend(
+        "github: 403 retry loop terminated unexpectedly".into(),
+    ))
+}
+
 /// The GitHub connector.
 #[derive(Debug)]
 pub struct GithubConnector {
@@ -133,13 +175,14 @@ impl GithubConnector {
         &self,
         url: &str,
     ) -> SealStackResult<(T, Option<String>)> {
-        let rb = self
-            .http
-            .get(url)
-            .header("accept", "application/vnd.github+json")
-            .header("x-github-api-version", "2022-11-28");
+        let make = || {
+            self.http
+                .get(url)
+                .header("accept", "application/vnd.github+json")
+                .header("x-github-api-version", "2022-11-28")
+        };
 
-        let resp = self.http.send(rb).await?;
+        let resp = send_with_gh_shim(&self.http, make).await?;
 
         // Capture the Link header before consuming the response.
         let next = resp.header("link").and_then(next_link);

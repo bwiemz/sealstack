@@ -14,8 +14,10 @@ sealstack-common        = { path = "../../crates/sealstack-common" }
 sealstack-connector-sdk = { path = "../../crates/sealstack-connector-sdk" }
 async-trait       = { workspace = true }
 futures           = "0.3"
+reqwest           = { workspace = true }
 serde             = { workspace = true }
 serde_json        = { workspace = true }
 thiserror         = { workspace = true }
 time              = { workspace = true }
+tokio             = { workspace = true, features = ["time"] }
 tracing           = { workspace = true }
