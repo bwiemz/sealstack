@@ -23,8 +23,13 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use sealstack_common::{SealStackError, SealStackResult};
+use sealstack_connector_sdk::auth::StaticToken;
+use sealstack_connector_sdk::http::HttpClient;
+use sealstack_connector_sdk::retry::RetryPolicy;
 use sealstack_connector_sdk::{
     Connector, PermissionPredicate, Resource, ResourceId, ResourceStream, change_streams,
 };
@@ -33,14 +38,10 @@ use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
 const GITHUB_API: &str = "https://api.github.com";
-const UA: &str = concat!("sealstack-github/", env!("CARGO_PKG_VERSION"));
 
-/// Configuration for the GitHub connector.
+/// Configuration for the GitHub connector (non-secret fields only).
 #[derive(Clone, Debug)]
 pub struct GithubConfig {
-    /// PAT with `repo` + `read:org` scopes for private repo access; `public_repo`
-    /// is enough for open-source use.
-    pub token: String,
     /// The user or org login to pull from (e.g. `"sealstack"`). When
     /// `None`, pulls every repo the token can see.
     pub owner: Option<String>,
@@ -51,88 +52,98 @@ pub struct GithubConfig {
 }
 
 impl GithubConfig {
-    /// Parse a [`GithubConfig`] from the opaque JSON the CLI stores on
-    /// connector bindings. Shape:
+    /// Parse non-secret fields from the binding config JSON shape:
     ///
     /// ```json
-    /// { "token": "ghp_...", "owner": "acme", "repos": ["docs", "core"], "include_issues": true }
+    /// { "owner": "acme", "repos": ["docs", "core"], "include_issues": true }
     /// ```
-    pub fn from_json(v: &serde_json::Value) -> SealStackResult<Self> {
-        let token = v
-            .get("token")
-            .and_then(|x| x.as_str())
-            .map(str::to_owned)
-            .or_else(|| std::env::var("GITHUB_TOKEN").ok())
-            .ok_or_else(|| {
-                SealStackError::Config("github connector requires `token` or GITHUB_TOKEN env".into())
-            })?;
-        let owner = v
-            .get("owner")
-            .and_then(|x| x.as_str())
-            .map(str::to_owned);
+    #[must_use]
+    pub fn from_json(v: &serde_json::Value) -> Self {
+        let owner = v.get("owner").and_then(|x| x.as_str()).map(str::to_owned);
         let repos: Vec<String> = v
             .get("repos")
             .and_then(|x| x.as_array())
-            .map(|arr| arr.iter().filter_map(|e| e.as_str().map(str::to_owned)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|e| e.as_str().map(str::to_owned))
+                    .collect()
+            })
             .unwrap_or_default();
         let include_issues = v
             .get("include_issues")
             .and_then(|x| x.as_bool())
             .unwrap_or(true);
-        Ok(Self {
-            token,
+        Self {
             owner,
             repos,
             include_issues,
-        })
+        }
     }
 }
 
 /// The GitHub connector.
+#[derive(Debug)]
 pub struct GithubConnector {
-    client: reqwest::Client,
+    http: Arc<HttpClient>,
     config: GithubConfig,
 }
 
 impl GithubConnector {
-    /// Build a connector. Validates the token at first API call, not here.
-    #[must_use]
-    pub fn new(config: GithubConfig) -> Self {
-        let client = reqwest::Client::builder()
-            .user_agent(UA)
-            .build()
-            .expect("reqwest client");
-        Self { client, config }
+    /// Build a connector from a JSON config value.
+    ///
+    /// Token precedence:
+    /// - Config `token` field present → use it (warns if `GITHUB_TOKEN` is
+    ///   also set).
+    /// - Config absent + `GITHUB_TOKEN` env var present and non-empty → use
+    ///   env var.
+    /// - Both absent or empty → returns `SealStackError::Config`.
+    ///
+    /// Token is not validated against the API until the first call.
+    pub fn from_json(v: &serde_json::Value) -> SealStackResult<Self> {
+        let token = match (
+            v.get("token").and_then(|x| x.as_str()),
+            std::env::var("GITHUB_TOKEN").ok(),
+        ) {
+            (Some(t), env_present) => {
+                if env_present.is_some() {
+                    tracing::warn!("github: config `token` set; GITHUB_TOKEN env ignored");
+                }
+                t.to_owned()
+            }
+            (None, Some(env)) if !env.is_empty() => env,
+            _ => {
+                return Err(SealStackError::Config(
+                    "github connector requires `token` in config or GITHUB_TOKEN env".into(),
+                ));
+            }
+        };
+
+        let credential = Arc::new(StaticToken::new(token));
+        let http = Arc::new(
+            HttpClient::new(credential, RetryPolicy::default())?
+                .with_user_agent_suffix(format!("github-connector/{}", env!("CARGO_PKG_VERSION"))),
+        );
+        let config = GithubConfig::from_json(v);
+        Ok(Self { http, config })
     }
 
-    async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> SealStackResult<(T, Option<String>)> {
-        let resp = self
-            .client
+    async fn get_json<T: for<'de> Deserialize<'de>>(
+        &self,
+        url: &str,
+    ) -> SealStackResult<(T, Option<String>)> {
+        let rb = self
+            .http
             .get(url)
-            .bearer_auth(&self.config.token)
             .header("accept", "application/vnd.github+json")
-            .header("x-github-api-version", "2022-11-28")
-            .send()
-            .await
-            .map_err(|e| SealStackError::Backend(format!("github request: {e}")))?;
+            .header("x-github-api-version", "2022-11-28");
 
-        if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(SealStackError::Unauthorized("github token rejected".into()));
-        }
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(SealStackError::Backend(format!(
-                "github {status}: {}",
-                truncate_for_log(&body),
-            )));
-        }
+        let resp = self.http.send(rb).await?;
 
-        let next = next_link(resp.headers().get(reqwest::header::LINK));
-        let value = resp
-            .json::<T>()
-            .await
-            .map_err(|e| SealStackError::Backend(format!("github decode: {e}")))?;
+        // Capture the Link header before consuming the response.
+        let link_hdr = resp.header("link").map(str::to_owned);
+        let next = next_link(link_hdr.as_deref());
+
+        let value = resp.json::<T>().await?;
         Ok((value, next))
     }
 
@@ -146,9 +157,7 @@ impl GithubConnector {
         loop {
             let (batch, next) = self.get_json::<Vec<Repo>>(&url).await?;
             for r in batch {
-                if self.config.repos.is_empty()
-                    || self.config.repos.iter().any(|w| w == &r.name)
-                {
+                if self.config.repos.is_empty() || self.config.repos.iter().any(|w| w == &r.name) {
                     out.push(r);
                 }
             }
@@ -170,8 +179,7 @@ impl GithubConnector {
     }
 
     async fn list_issues(&self, owner: &str, repo: &str) -> SealStackResult<Vec<Issue>> {
-        let mut url =
-            format!("{GITHUB_API}/repos/{owner}/{repo}/issues?state=all&per_page=100");
+        let mut url = format!("{GITHUB_API}/repos/{owner}/{repo}/issues?state=all&per_page=100");
         let mut out = Vec::new();
         loop {
             let (batch, next) = self.get_json::<Vec<Issue>>(&url).await?;
@@ -225,8 +233,7 @@ impl Connector for GithubConnector {
 
             if self.config.include_issues {
                 for issue in self.list_issues(&owner, &repo.name).await? {
-                    let iu =
-                        parse_time(&issue.updated_at).unwrap_or_else(OffsetDateTime::now_utc);
+                    let iu = parse_time(&issue.updated_at).unwrap_or_else(OffsetDateTime::now_utc);
                     out.push(Resource {
                         id: ResourceId::new(format!(
                             "github://{owner}/{}/issues/{}",
@@ -240,14 +247,8 @@ impl Connector for GithubConnector {
                                 "repo".into(),
                                 serde_json::Value::String(format!("{owner}/{}", repo.name)),
                             ),
-                            (
-                                "number".into(),
-                                serde_json::Value::from(issue.number),
-                            ),
-                            (
-                                "state".into(),
-                                serde_json::Value::String(issue.state),
-                            ),
+                            ("number".into(), serde_json::Value::from(issue.number)),
+                            ("state".into(), serde_json::Value::String(issue.state)),
                         ]),
                         permissions: perms.clone(),
                         source_updated_at: iu,
@@ -328,8 +329,8 @@ fn decode_base64_content(raw: &str) -> String {
 }
 
 /// Parse the `next` URL out of an RFC 5988 `Link` header.
-fn next_link(hdr: Option<&reqwest::header::HeaderValue>) -> Option<String> {
-    let raw = hdr?.to_str().ok()?;
+fn next_link(hdr: Option<&str>) -> Option<String> {
+    let raw = hdr?;
     for part in raw.split(',') {
         let part = part.trim();
         let Some(rel_idx) = part.find("rel=\"next\"") else {
@@ -343,14 +344,6 @@ fn next_link(hdr: Option<&reqwest::header::HeaderValue>) -> Option<String> {
         }
     }
     None
-}
-
-fn truncate_for_log(s: &str) -> String {
-    if s.len() > 500 {
-        format!("{}…", &s[..500])
-    } else {
-        s.to_owned()
-    }
 }
 
 // Minimal inline base64 decoder — kept in-crate to avoid pulling a full
@@ -411,31 +404,26 @@ mod tests {
 
     #[test]
     fn next_link_extracts_next_url() {
-        let hdr = reqwest::header::HeaderValue::from_static(
-            r#"<https://api.github.com/x?page=2>; rel="next", <https://api.github.com/x?page=5>; rel="last""#,
-        );
         assert_eq!(
-            next_link(Some(&hdr)),
+            next_link(Some(
+                r#"<https://api.github.com/x?page=2>; rel="next", <https://api.github.com/x?page=5>; rel="last""#
+            )),
             Some("https://api.github.com/x?page=2".to_owned()),
         );
     }
 
     #[test]
     fn next_link_none_when_absent() {
-        let hdr = reqwest::header::HeaderValue::from_static(
-            r#"<https://api.github.com/x?page=1>; rel="prev""#,
-        );
-        assert!(next_link(Some(&hdr)).is_none());
+        assert!(next_link(Some(r#"<https://api.github.com/x?page=1>; rel="prev""#)).is_none());
     }
 
     #[test]
     fn config_from_json_accepts_minimal_shape() {
         let v = serde_json::json!({ "token": "t" });
-        let c = GithubConfig::from_json(&v).unwrap();
-        assert_eq!(c.token, "t");
-        assert!(c.owner.is_none());
-        assert!(c.repos.is_empty());
-        assert!(c.include_issues);
+        let c = GithubConnector::from_json(&v).unwrap();
+        assert!(c.config.owner.is_none());
+        assert!(c.config.repos.is_empty());
+        assert!(c.config.include_issues);
     }
 
     #[test]
@@ -446,9 +434,23 @@ mod tests {
             "repos": ["docs"],
             "include_issues": false,
         });
-        let c = GithubConfig::from_json(&v).unwrap();
-        assert_eq!(c.owner.as_deref(), Some("acme"));
-        assert_eq!(c.repos, vec!["docs".to_string()]);
-        assert!(!c.include_issues);
+        let c = GithubConnector::from_json(&v).unwrap();
+        assert_eq!(c.config.owner.as_deref(), Some("acme"));
+        assert_eq!(c.config.repos, vec!["docs".to_string()]);
+        assert!(!c.config.include_issues);
+    }
+
+    #[test]
+    fn from_json_missing_token_errors() {
+        // This test only works when GITHUB_TOKEN is unset. Skip if the var
+        // is present in the environment (CI may set it).
+        if std::env::var("GITHUB_TOKEN").is_ok() {
+            return;
+        }
+        let v = serde_json::json!({});
+        match GithubConnector::from_json(&v) {
+            Err(SealStackError::Config(_)) => {}
+            other => panic!("expected Config error, got {other:?}"),
+        }
     }
 }
