@@ -151,10 +151,46 @@ impl HttpResponse {
         self.inner
     }
 
-    /// Expose the body cap for downstream body-reading helpers.
-    #[allow(dead_code)]
-    pub(crate) const fn body_cap_bytes(&self) -> usize {
-        self.body_cap_bytes
+    /// Read the response body into memory, enforcing the body-size cap via
+    /// streaming read.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealStackError::BodyTooLarge`] if the running total exceeds
+    /// the cap mid-stream. The response connection is dropped on overrun so
+    /// the rest of the body is never downloaded. Returns [`SealStackError::Backend`]
+    /// if a network error occurs mid-stream.
+    pub async fn bytes(mut self) -> SealStackResult<bytes::Bytes> {
+        let cap = self.body_cap_bytes;
+        let mut buf: Vec<u8> = Vec::new();
+
+        loop {
+            match self.inner.chunk().await {
+                Ok(Some(chunk)) => {
+                    if buf.len() + chunk.len() > cap {
+                        return Err(SealStackError::BodyTooLarge { cap_bytes: cap });
+                    }
+                    buf.extend_from_slice(&chunk);
+                }
+                Ok(None) => break,
+                Err(e) => return Err(SealStackError::backend(format!("body stream: {e}"))),
+            }
+        }
+
+        Ok(bytes::Bytes::from(buf))
+    }
+
+    /// Read the response body as JSON, enforcing the body-size cap via
+    /// streaming read.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Self::bytes`] plus a `Backend` error if the body is not
+    /// valid JSON for the target type.
+    pub async fn json<T: serde::de::DeserializeOwned>(self) -> SealStackResult<T> {
+        let bytes = self.bytes().await?;
+        serde_json::from_slice(&bytes)
+            .map_err(|e| SealStackError::backend(format!("json parse: {e}")))
     }
 }
 
