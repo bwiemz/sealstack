@@ -5,11 +5,13 @@
 //! non-retrying request path in v1.
 
 use std::sync::Arc;
+use std::time::Instant;
 
+use rand::Rng;
 use sealstack_common::{SealStackError, SealStackResult};
 
 use crate::auth::Credential;
-use crate::retry::RetryPolicy;
+use crate::retry::{parse_retry_after, RetryPolicy};
 
 /// Hard upper bound on the response body-size cap, in bytes (500 MiB).
 ///
@@ -23,7 +25,6 @@ pub const DEFAULT_BODY_CAP_BYTES: usize = 50 * 1024 * 1024;
 /// Connector-side HTTP client.
 pub struct HttpClient {
     inner: reqwest::Client,
-    #[allow(dead_code)]
     credential: Arc<dyn Credential>,
     retry: RetryPolicy,
     user_agent: String,
@@ -113,6 +114,197 @@ impl HttpClient {
     /// Begin a POST request.
     pub fn post(&self, url: impl reqwest::IntoUrl) -> reqwest::RequestBuilder {
         self.inner.post(url)
+    }
+}
+
+/// Wrapped HTTP response returned by [`HttpClient::send`].
+///
+/// The body-size cap is enforced by the `bytes` / `json` accessors (Task 8).
+#[derive(Debug)]
+pub struct HttpResponse {
+    inner: reqwest::Response,
+    body_cap_bytes: usize,
+}
+
+impl HttpResponse {
+    /// HTTP status code.
+    #[must_use]
+    pub fn status(&self) -> reqwest::StatusCode {
+        self.inner.status()
+    }
+
+    /// Access a response header value.
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.inner
+            .headers()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+    }
+
+    /// Consume the response and yield the underlying `reqwest::Response`.
+    ///
+    /// Escape hatch for callers that want full access before the body-cap
+    /// machinery lands.
+    #[must_use]
+    pub fn into_inner(self) -> reqwest::Response {
+        self.inner
+    }
+
+    /// Expose the body cap for downstream body-reading helpers.
+    #[allow(dead_code)]
+    pub(crate) const fn body_cap_bytes(&self) -> usize {
+        self.body_cap_bytes
+    }
+}
+
+impl HttpClient {
+    /// Execute a request under the retry policy.
+    ///
+    /// Injects the `Authorization` header from the configured [`Credential`]
+    /// and the client's `User-Agent`. Applies retry logic per the policy.
+    /// See the spec §6 for the retry-decision table.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SealStackError::Backend`] for non-retryable 4xx responses
+    /// and for credential build failures. Returns
+    /// [`SealStackError::RetryExhausted`] when the retry budget is consumed
+    /// without a success.
+    pub async fn send(
+        &self,
+        rb: reqwest::RequestBuilder,
+    ) -> SealStackResult<HttpResponse> {
+        let start = Instant::now();
+        let mut attempt: u32 = 0;
+        // Sentinel: always overwritten before read; rustc cannot see that the
+        // loop body sets `last_err` before any `break`.
+        #[allow(unused_assignments)]
+        let mut last_err: SealStackError = SealStackError::backend("unknown");
+
+        loop {
+            let try_rb = rb
+                .try_clone()
+                .ok_or_else(|| SealStackError::backend("request body not cloneable"))?;
+            let auth = self.credential.authorization_header().await?;
+            let req = try_rb
+                .header("Authorization", auth)
+                .header("User-Agent", &self.user_agent);
+
+            match req.send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        return Ok(HttpResponse {
+                            inner: resp,
+                            body_cap_bytes: self.body_cap_bytes,
+                        });
+                    }
+                    attempt += 1;
+                    if status.is_client_error()
+                        && status != reqwest::StatusCode::REQUEST_TIMEOUT
+                        && status != reqwest::StatusCode::TOO_MANY_REQUESTS
+                    {
+                        return Err(SealStackError::Backend(format!(
+                            "HTTP {}: {}",
+                            status.as_u16(),
+                            status.canonical_reason().unwrap_or("")
+                        )));
+                    }
+                    let delay = retry_delay_for(
+                        &self.retry,
+                        attempt - 1,
+                        resp.headers()
+                            .get("Retry-After")
+                            .and_then(|v| v.to_str().ok()),
+                    );
+                    last_err = SealStackError::Backend(format!(
+                        "HTTP {} (attempt {attempt})",
+                        status.as_u16()
+                    ));
+                    if attempt >= self.retry.max_attempts {
+                        break;
+                    }
+                    tokio::time::sleep(delay).await;
+                }
+                Err(e) => {
+                    attempt += 1;
+                    last_err = SealStackError::backend(format!("network: {e}"));
+                    if attempt >= self.retry.max_attempts {
+                        break;
+                    }
+                    let delay = retry_delay_for(&self.retry, attempt - 1, None);
+                    tokio::time::sleep(delay).await;
+                }
+            }
+        }
+
+        Err(SealStackError::RetryExhausted {
+            attempts: attempt,
+            total_duration: start.elapsed(),
+            last_error: Box::new(last_err),
+        })
+    }
+}
+
+/// Compute the next sleep duration.
+///
+/// - If `retry_after` is present and parseable, use `min(max_delay,
+///   retry_after + rand(0..1000ms))`.
+/// - Otherwise exponential: `delay = min(max_delay, base * 2^attempt)`, then
+///   full-jitter with `rand(0..delay)`.
+fn retry_delay_for(
+    policy: &RetryPolicy,
+    attempt: u32,
+    retry_after_header: Option<&str>,
+) -> std::time::Duration {
+    use std::time::Duration;
+
+    if let Some(raw) = retry_after_header
+        && let Some(base) = parse_retry_after(raw)
+    {
+        let jitter_ms = rand::thread_rng().gen_range(0..1000);
+        let with_jitter = base + Duration::from_millis(jitter_ms);
+        return std::cmp::min(policy.max_delay, with_jitter);
+    }
+
+    let shift = attempt.min(20); // cap at 2^20 to avoid overflow
+    let exp = policy
+        .base_delay
+        .saturating_mul(1u32.checked_shl(shift).unwrap_or(u32::MAX));
+    let capped = std::cmp::min(policy.max_delay, exp);
+    // SAFETY: `capped` is bounded by `policy.max_delay` which is a Duration
+    // configured by the caller. A delay above 2^63 ms (~300 million years)
+    // is structurally impossible in practice; the cast from u128 to u64 is safe.
+    #[allow(clippy::cast_possible_truncation)]
+    let jittered_ms = rand::thread_rng().gen_range(0..=capped.as_millis() as u64);
+    Duration::from_millis(jittered_ms)
+}
+
+#[cfg(test)]
+mod retry_delay_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn respects_max_delay_cap() {
+        let p = RetryPolicy {
+            max_attempts: 5,
+            base_delay: Duration::from_millis(100),
+            max_delay: Duration::from_millis(500),
+        };
+        for _ in 0..20 {
+            let d = retry_delay_for(&p, 30, None);
+            assert!(d <= p.max_delay);
+        }
+    }
+
+    #[test]
+    fn retry_after_dominates_exponential() {
+        let p = RetryPolicy::default();
+        let d = retry_delay_for(&p, 0, Some("2"));
+        assert!(d >= Duration::from_secs(2));
+        assert!(d < Duration::from_secs(4)); // 2s + <1s jitter
     }
 }
 
