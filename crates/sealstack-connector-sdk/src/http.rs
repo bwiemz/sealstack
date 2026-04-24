@@ -169,6 +169,8 @@ impl HttpClient {
     ///
     /// Returns [`SealStackError::Backend`] for non-retryable 4xx responses
     /// and for credential build failures. Returns
+    /// [`SealStackError::Unauthorized`] when a 401 persists after one
+    /// credential invalidation (spec §6). Returns
     /// [`SealStackError::RetryExhausted`] when the retry budget is consumed
     /// without a success.
     pub async fn send(
@@ -181,6 +183,7 @@ impl HttpClient {
         // loop body sets `last_err` before any `break`.
         #[allow(unused_assignments)]
         let mut last_err: SealStackError = SealStackError::backend("unknown");
+        let mut invalidated_once = false;
 
         loop {
             let try_rb = rb
@@ -200,6 +203,20 @@ impl HttpClient {
                             body_cap_bytes: self.body_cap_bytes,
                         });
                     }
+                    if status == reqwest::StatusCode::UNAUTHORIZED {
+                        if invalidated_once {
+                            return Err(SealStackError::Unauthorized(
+                                "HTTP 401 after credential invalidation".into(),
+                            ));
+                        }
+                        tracing::warn!(
+                            attempt,
+                            "401 received; invalidating credential and retrying once"
+                        );
+                        self.credential.invalidate().await;
+                        invalidated_once = true;
+                        continue; // no budget consumed, no sleep
+                    }
                     attempt += 1;
                     if status.is_client_error()
                         && status != reqwest::StatusCode::REQUEST_TIMEOUT
@@ -214,9 +231,7 @@ impl HttpClient {
                     let delay = retry_delay_for(
                         &self.retry,
                         attempt - 1,
-                        resp.headers()
-                            .get("Retry-After")
-                            .and_then(|v| v.to_str().ok()),
+                        resp.headers().get("Retry-After").and_then(|v| v.to_str().ok()),
                     );
                     last_err = SealStackError::Backend(format!(
                         "HTTP {} (attempt {attempt})",
