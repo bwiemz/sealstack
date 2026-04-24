@@ -182,6 +182,126 @@ where
     }
 }
 
+/// Parse a `Link` header value and return the URL of the `rel="next"` entry.
+///
+/// Used by [`LinkHeaderPaginator`]; `pub` so connectors with Link-like
+/// custom headers can reuse it.
+#[must_use]
+pub fn next_link(header: &str) -> Option<String> {
+    for part in header.split(',') {
+        let part = part.trim();
+        let mut it = part.split(';');
+        let url_bracket = it.next()?.trim();
+        let url = url_bracket.strip_prefix('<')?.strip_suffix('>')?;
+        let mut is_next = false;
+        for attr in it {
+            let attr = attr.trim();
+            if attr == "rel=\"next\"" || attr == "rel=next" {
+                is_next = true;
+                break;
+            }
+        }
+        if is_next {
+            return Some(url.to_owned());
+        }
+    }
+    None
+}
+
+/// Link-header paginator: cursor is the URL from `Link: rel="next"`.
+///
+/// Use for GitHub REST, GitLab REST, anything following RFC 8288 link headers.
+///
+/// # Type parameters
+///
+/// - `T` — deserialized item type. The response body is parsed as `Vec<T>`.
+/// - `Req` — closure that builds a request given the client and the current
+///   cursor URL (`None` on the first call).
+pub struct LinkHeaderPaginator<T, Req>
+where
+    T: DeserializeOwned + Send + 'static,
+    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder + Send + 'static,
+{
+    request: Req,
+    _marker: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<T, Req> LinkHeaderPaginator<T, Req>
+where
+    T: DeserializeOwned + Send + 'static,
+    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder + Send + 'static,
+{
+    /// Build a new paginator.
+    ///
+    /// `request` receives `cursor = None` on the first call; subsequent
+    /// calls receive the URL extracted from the previous response's
+    /// `Link: rel="next"` header.
+    pub fn new(request: Req) -> Self {
+        Self {
+            request,
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+#[async_trait]
+impl<T, Req> Paginator for LinkHeaderPaginator<T, Req>
+where
+    T: DeserializeOwned + Send + 'static,
+    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder + Send + 'static,
+{
+    type Item = T;
+
+    async fn fetch_page(
+        &mut self,
+        client: &HttpClient,
+        cursor: Option<String>,
+    ) -> SealStackResult<(Vec<T>, Option<String>)> {
+        let rb = (self.request)(client, cursor.as_deref());
+        let resp = client.send(rb).await?;
+        // Extract the Link header before consuming the response body.
+        let next = resp.header("Link").and_then(next_link);
+        let items: Vec<T> = resp.json().await?;
+        Ok((items, next))
+    }
+}
+
+#[cfg(test)]
+mod link_header_tests {
+    use super::next_link;
+
+    #[test]
+    fn parses_next_link() {
+        let hdr = r#"<https://api.example.com/p?page=2>; rel="next", <https://api.example.com/p?page=9>; rel="last""#;
+        assert_eq!(
+            next_link(hdr),
+            Some("https://api.example.com/p?page=2".to_owned())
+        );
+    }
+
+    #[test]
+    fn no_next_link_returns_none() {
+        let hdr = r#"<https://api.example.com/p?page=9>; rel="last""#;
+        assert_eq!(next_link(hdr), None);
+    }
+
+    #[test]
+    fn parses_unquoted_rel_next() {
+        let hdr = "<https://api.example.com/p?page=2>; rel=next";
+        assert_eq!(
+            next_link(hdr),
+            Some("https://api.example.com/p?page=2".to_owned())
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_bracket() {
+        // Missing closing `>` — should not match.
+        let hdr = r#"<https://api.example.com; rel="next""#;
+        assert_eq!(next_link(hdr), None);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
