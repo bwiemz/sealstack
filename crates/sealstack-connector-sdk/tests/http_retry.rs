@@ -125,9 +125,7 @@ async fn respects_retry_after_on_429() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/throttle"))
-        .respond_with(
-            ResponseTemplate::new(429).append_header("Retry-After", "0"),
-        )
+        .respond_with(ResponseTemplate::new(429).append_header("Retry-After", "0"))
         .up_to_n_times(1)
         .mount(&server)
         .await;
@@ -149,13 +147,19 @@ async fn fourhundred_one_triggers_invalidate_and_retries_once() {
     // First request: token-1 → 401. Second: token-2 → 200.
     Mock::given(method("GET"))
         .and(path("/auth"))
-        .and(wiremock::matchers::header("Authorization", "Bearer token-1"))
+        .and(wiremock::matchers::header(
+            "Authorization",
+            "Bearer token-1",
+        ))
         .respond_with(ResponseTemplate::new(401))
         .mount(&server)
         .await;
     Mock::given(method("GET"))
         .and(path("/auth"))
-        .and(wiremock::matchers::header("Authorization", "Bearer token-2"))
+        .and(wiremock::matchers::header(
+            "Authorization",
+            "Bearer token-2",
+        ))
         .respond_with(ResponseTemplate::new(200))
         .mount(&server)
         .await;
@@ -236,7 +240,6 @@ async fn body_cap_rejects_oversized_response() {
         "expected BodyTooLarge {{ cap_bytes: 1024 }}, got {err}"
     );
 }
-
 
 #[tokio::test]
 async fn body_stream_error_propagates_not_truncated() {

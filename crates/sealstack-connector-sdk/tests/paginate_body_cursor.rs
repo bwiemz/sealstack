@@ -29,15 +29,15 @@ async fn body_cursor_paginator_walks_pages() {
     Mock::given(method("GET"))
         .and(path("/list"))
         .and(wiremock::matchers::query_param("cursor", "p2"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(
-            serde_json::json!({ "items": [{ "id": 3 }], "next": null }),
-        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({ "items": [{ "id": 3 }], "next": null })),
+        )
         .mount(&server)
         .await;
 
-    let client = Arc::new(
-        HttpClient::new(Arc::new(StaticToken::new("t")), RetryPolicy::default()).unwrap(),
-    );
+    let client =
+        Arc::new(HttpClient::new(Arc::new(StaticToken::new("t")), RetryPolicy::default()).unwrap());
     let url = format!("{}/list", server.uri());
 
     let pg = BodyCursorPaginator::<Item, _, _, _>::new(
@@ -60,11 +60,7 @@ async fn body_cursor_paginator_walks_pages() {
                 })
                 .collect()
         },
-        |v: &serde_json::Value| {
-            v.get("next")
-                .and_then(|c| c.as_str())
-                .map(str::to_owned)
-        },
+        |v: &serde_json::Value| v.get("next").and_then(|c| c.as_str()).map(str::to_owned),
     );
     let items: Vec<_> = paginate(pg, client).collect().await;
     let ok: Vec<Item> = items.into_iter().map(Result::unwrap).collect();

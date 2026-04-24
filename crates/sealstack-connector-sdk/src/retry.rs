@@ -76,10 +76,7 @@ mod tests {
     fn parse_retry_after_http_date_returns_none_in_v1() {
         // v1 supports integer seconds only; HTTP-date falls through to
         // exponential backoff rather than being parsed.
-        assert_eq!(
-            parse_retry_after("Wed, 21 Oct 2099 07:28:00 GMT"),
-            None,
-        );
+        assert_eq!(parse_retry_after("Wed, 21 Oct 2099 07:28:00 GMT"), None,);
     }
 
     #[test]

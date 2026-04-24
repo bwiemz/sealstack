@@ -69,12 +69,10 @@ impl StaticToken {
         result: Result<String, std::env::VarError>,
     ) -> SealStackResult<Self> {
         match result {
-            Err(_) => Err(SealStackError::Config(format!(
-                "env var `{var}` not set"
-            ))),
-            Ok(s) if s.is_empty() => Err(SealStackError::Config(format!(
-                "env var `{var}` is empty"
-            ))),
+            Err(_) => Err(SealStackError::Config(format!("env var `{var}` not set"))),
+            Ok(s) if s.is_empty() => {
+                Err(SealStackError::Config(format!("env var `{var}` is empty")))
+            }
             Ok(s) => Ok(Self::new(s)),
         }
     }
@@ -126,31 +124,21 @@ mod tests {
         // `std::env::set_var` because Rust 2024 marked it unsafe, and the
         // crate forbids unsafe. The pure helper is equivalent.
 
-        let err_missing = StaticToken::from_env_result(
-            "SEALSTACK_NOT_SET",
-            Err(std::env::VarError::NotPresent),
-        )
-        .unwrap_err()
-        .to_string();
+        let err_missing =
+            StaticToken::from_env_result("SEALSTACK_NOT_SET", Err(std::env::VarError::NotPresent))
+                .unwrap_err()
+                .to_string();
         assert!(
             err_missing.contains("not set"),
             "missing case: {err_missing}"
         );
 
-        let err_empty = StaticToken::from_env_result(
-            "SEALSTACK_EMPTY",
-            Ok(String::new()),
-        )
-        .unwrap_err()
-        .to_string();
-        assert!(
-            err_empty.contains("is empty"),
-            "empty case: {err_empty}"
-        );
+        let err_empty = StaticToken::from_env_result("SEALSTACK_EMPTY", Ok(String::new()))
+            .unwrap_err()
+            .to_string();
+        assert!(err_empty.contains("is empty"), "empty case: {err_empty}");
 
         // Valid value: helper returns Ok.
-        assert!(
-            StaticToken::from_env_result("SEALSTACK_OK", Ok("abc".to_owned())).is_ok()
-        );
+        assert!(StaticToken::from_env_result("SEALSTACK_OK", Ok("abc".to_owned())).is_ok());
     }
 }

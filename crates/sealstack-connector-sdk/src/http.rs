@@ -11,7 +11,7 @@ use rand::Rng;
 use sealstack_common::{SealStackError, SealStackResult};
 
 use crate::auth::Credential;
-use crate::retry::{parse_retry_after, RetryPolicy};
+use crate::retry::{RetryPolicy, parse_retry_after};
 
 /// Hard upper bound on the response body-size cap, in bytes (500 MiB).
 ///
@@ -45,14 +45,14 @@ impl std::fmt::Debug for HttpClient {
 impl HttpClient {
     /// Base User-Agent without suffix.
     fn base_ua() -> String {
-        format!("sealstack-connector-sdk/{} (rust)", env!("CARGO_PKG_VERSION"))
+        format!(
+            "sealstack-connector-sdk/{} (rust)",
+            env!("CARGO_PKG_VERSION")
+        )
     }
 
     /// Build a client with the given credential and retry policy.
-    pub fn new(
-        credential: Arc<dyn Credential>,
-        retry: RetryPolicy,
-    ) -> SealStackResult<Self> {
+    pub fn new(credential: Arc<dyn Credential>, retry: RetryPolicy) -> SealStackResult<Self> {
         let inner = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
@@ -136,10 +136,7 @@ impl HttpResponse {
     /// Access a response header value.
     #[must_use]
     pub fn header(&self, name: &str) -> Option<&str> {
-        self.inner
-            .headers()
-            .get(name)
-            .and_then(|v| v.to_str().ok())
+        self.inner.headers().get(name).and_then(|v| v.to_str().ok())
     }
 
     /// Consume the response and yield the underlying `reqwest::Response`.
@@ -209,10 +206,7 @@ impl HttpClient {
     /// credential invalidation (spec §6). Returns
     /// [`SealStackError::RetryExhausted`] when the retry budget is consumed
     /// without a success.
-    pub async fn send(
-        &self,
-        rb: reqwest::RequestBuilder,
-    ) -> SealStackResult<HttpResponse> {
+    pub async fn send(&self, rb: reqwest::RequestBuilder) -> SealStackResult<HttpResponse> {
         let start = Instant::now();
         let mut attempt: u32 = 0;
         // Sentinel: always overwritten before read; rustc cannot see that the
@@ -267,7 +261,9 @@ impl HttpClient {
                     let delay = retry_delay_for(
                         &self.retry,
                         attempt - 1,
-                        resp.headers().get("Retry-After").and_then(|v| v.to_str().ok()),
+                        resp.headers()
+                            .get("Retry-After")
+                            .and_then(|v| v.to_str().ok()),
                     );
                     last_err = SealStackError::Backend(format!(
                         "HTTP {} (attempt {attempt})",
@@ -365,11 +361,7 @@ mod tests {
     use crate::auth::StaticToken;
 
     fn test_client() -> HttpClient {
-        HttpClient::new(
-            Arc::new(StaticToken::new("t")),
-            RetryPolicy::default(),
-        )
-        .unwrap()
+        HttpClient::new(Arc::new(StaticToken::new("t")), RetryPolicy::default()).unwrap()
     }
 
     #[test]

@@ -121,9 +121,7 @@ pub fn paginate<P: Paginator>(
 pub struct BodyCursorPaginator<T, Req, EI, EC>
 where
     T: DeserializeOwned + Send + 'static,
-    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder
-        + Send
-        + 'static,
+    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder + Send + 'static,
     EI: Fn(&serde_json::Value) -> SealStackResult<Vec<T>> + Send + 'static,
     EC: Fn(&serde_json::Value) -> Option<String> + Send + 'static,
 {
@@ -138,9 +136,7 @@ where
 impl<T, Req, EI, EC> BodyCursorPaginator<T, Req, EI, EC>
 where
     T: DeserializeOwned + Send + 'static,
-    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder
-        + Send
-        + 'static,
+    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder + Send + 'static,
     EI: Fn(&serde_json::Value) -> SealStackResult<Vec<T>> + Send + 'static,
     EC: Fn(&serde_json::Value) -> Option<String> + Send + 'static,
 {
@@ -166,9 +162,7 @@ where
 impl<T, Req, EI, EC> Paginator for BodyCursorPaginator<T, Req, EI, EC>
 where
     T: DeserializeOwned + Send + 'static,
-    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder
-        + Send
-        + 'static,
+    Req: for<'a> Fn(&'a HttpClient, Option<&'a str>) -> reqwest::RequestBuilder + Send + 'static,
     EI: Fn(&serde_json::Value) -> SealStackResult<Vec<T>> + Send + 'static,
     EC: Fn(&serde_json::Value) -> Option<String> + Send + 'static,
 {
@@ -252,10 +246,7 @@ mod tests {
     }
 
     fn dummy_client() -> Arc<HttpClient> {
-        Arc::new(
-            HttpClient::new(Arc::new(StaticToken::new("t")), RetryPolicy::default())
-                .unwrap(),
-        )
+        Arc::new(HttpClient::new(Arc::new(StaticToken::new("t")), RetryPolicy::default()).unwrap())
     }
 
     #[tokio::test]

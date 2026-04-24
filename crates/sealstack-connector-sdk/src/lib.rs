@@ -240,7 +240,6 @@ pub trait Connector: Send + Sync + 'static {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
