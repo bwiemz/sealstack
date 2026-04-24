@@ -26,9 +26,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use sealstack_common::{SealStackError, SealStackResult};
 use sealstack_connector_sdk::auth::StaticToken;
 use sealstack_connector_sdk::http::HttpClient;
+use sealstack_connector_sdk::paginate::{LinkHeaderPaginator, next_link, paginate};
 use sealstack_connector_sdk::retry::RetryPolicy;
 use sealstack_connector_sdk::{
     Connector, PermissionPredicate, Resource, ResourceId, ResourceStream, change_streams,
@@ -140,30 +142,31 @@ impl GithubConnector {
         let resp = self.http.send(rb).await?;
 
         // Capture the Link header before consuming the response.
-        let link_hdr = resp.header("link").map(str::to_owned);
-        let next = next_link(link_hdr.as_deref());
+        let next = resp.header("link").and_then(next_link);
 
         let value = resp.json::<T>().await?;
         Ok((value, next))
     }
 
     async fn list_repos(&self) -> SealStackResult<Vec<Repo>> {
-        let first = match &self.config.owner {
+        let initial = match &self.config.owner {
             Some(o) => format!("{GITHUB_API}/users/{o}/repos?per_page=100&type=owner"),
             None => format!("{GITHUB_API}/user/repos?per_page=100&affiliation=owner"),
         };
-        let mut url = first;
+        let pg =
+            LinkHeaderPaginator::<Repo, _>::new(move |c: &HttpClient, cursor: Option<&str>| {
+                let url = cursor.unwrap_or(initial.as_str());
+                c.get(url)
+                    .header("accept", "application/vnd.github+json")
+                    .header("x-github-api-version", "2022-11-28")
+            });
+        let mut stream = paginate(pg, self.http.clone());
+        let allow = &self.config.repos;
         let mut out: Vec<Repo> = Vec::new();
-        loop {
-            let (batch, next) = self.get_json::<Vec<Repo>>(&url).await?;
-            for r in batch {
-                if self.config.repos.is_empty() || self.config.repos.iter().any(|w| w == &r.name) {
-                    out.push(r);
-                }
-            }
-            match next {
-                Some(n) => url = n,
-                None => break,
+        while let Some(item) = stream.next().await {
+            let r = item?;
+            if allow.is_empty() || allow.iter().any(|w| w == &r.name) {
+                out.push(r);
             }
         }
         Ok(out)
@@ -179,15 +182,21 @@ impl GithubConnector {
     }
 
     async fn list_issues(&self, owner: &str, repo: &str) -> SealStackResult<Vec<Issue>> {
-        let mut url = format!("{GITHUB_API}/repos/{owner}/{repo}/issues?state=all&per_page=100");
-        let mut out = Vec::new();
-        loop {
-            let (batch, next) = self.get_json::<Vec<Issue>>(&url).await?;
+        let initial = format!("{GITHUB_API}/repos/{owner}/{repo}/issues?state=all&per_page=100");
+        let pg =
+            LinkHeaderPaginator::<Issue, _>::new(move |c: &HttpClient, cursor: Option<&str>| {
+                let url = cursor.unwrap_or(initial.as_str());
+                c.get(url)
+                    .header("accept", "application/vnd.github+json")
+                    .header("x-github-api-version", "2022-11-28")
+            });
+        let mut stream = paginate(pg, self.http.clone());
+        let mut out: Vec<Issue> = Vec::new();
+        while let Some(item) = stream.next().await {
+            let issue = item?;
             // The issues endpoint returns PRs too — filter them out.
-            out.extend(batch.into_iter().filter(|i| i.pull_request.is_none()));
-            match next {
-                Some(n) => url = n,
-                None => break,
+            if issue.pull_request.is_none() {
+                out.push(issue);
             }
         }
         Ok(out)
@@ -328,24 +337,6 @@ fn decode_base64_content(raw: &str) -> String {
     }
 }
 
-/// Parse the `next` URL out of an RFC 5988 `Link` header.
-fn next_link(hdr: Option<&str>) -> Option<String> {
-    let raw = hdr?;
-    for part in raw.split(',') {
-        let part = part.trim();
-        let Some(rel_idx) = part.find("rel=\"next\"") else {
-            continue;
-        };
-        let before = &part[..rel_idx];
-        let start = before.find('<')?;
-        let end = before.find('>')?;
-        if end > start {
-            return Some(part[start + 1..end].to_owned());
-        }
-    }
-    None
-}
-
 // Minimal inline base64 decoder — kept in-crate to avoid pulling a full
 // `base64` dependency just for README content. GitHub emits standard base64.
 mod base64_lite {
@@ -401,21 +392,6 @@ mod base64_lite {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn next_link_extracts_next_url() {
-        assert_eq!(
-            next_link(Some(
-                r#"<https://api.github.com/x?page=2>; rel="next", <https://api.github.com/x?page=5>; rel="last""#
-            )),
-            Some("https://api.github.com/x?page=2".to_owned()),
-        );
-    }
-
-    #[test]
-    fn next_link_none_when_absent() {
-        assert!(next_link(Some(r#"<https://api.github.com/x?page=1>; rel="prev""#)).is_none());
-    }
 
     #[test]
     fn config_from_json_accepts_minimal_shape() {
