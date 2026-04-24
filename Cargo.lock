@@ -3012,6 +3012,7 @@ name = "sealstack-connector-github"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "futures",
  "reqwest",
  "sealstack-common",
  "sealstack-connector-sdk",
@@ -3020,7 +3021,6 @@ dependencies = [
  "thiserror 2.0.18",
  "time",
  "tokio",
- "tokio-stream",
  "tracing",
 ]
 
@@ -3069,7 +3069,7 @@ name = "sealstack-connector-slack"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "reqwest",
+ "futures",
  "sealstack-common",
  "sealstack-connector-sdk",
  "serde",
