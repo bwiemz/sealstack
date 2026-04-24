@@ -37,6 +37,7 @@
 pub mod auth;
 pub mod change_streams;
 pub mod http;
+pub mod paginate;
 pub mod retry;
 
 use std::pin::Pin;
