@@ -53,6 +53,45 @@ pub enum SealStackError {
     /// Generic error with a pass-through message.
     #[error("{0}")]
     Other(String),
+
+    /// HTTP retry loop exhausted its attempt budget.
+    #[error("retry exhausted after {attempts} attempts over {total_duration:?}: {last_error}")]
+    RetryExhausted {
+        /// Number of attempts made.
+        attempts: u32,
+        /// Wall time elapsed across all attempts.
+        total_duration: std::time::Duration,
+        /// Final error observed.
+        last_error: Box<Self>,
+    },
+
+    /// Response body exceeded the configured size cap.
+    #[error("response body exceeded cap: {cap_bytes} bytes")]
+    BodyTooLarge {
+        /// The cap that was exceeded, in bytes.
+        cap_bytes: usize,
+    },
+
+    /// Paginator returned the same cursor twice consecutively.
+    #[error("paginator cursor did not advance: {cursor}")]
+    PaginatorCursorLoop {
+        /// The repeated cursor value.
+        cursor: String,
+    },
+
+    /// HTTP request produced a non-retryable status with headers + body the
+    /// caller may need to inspect (e.g. GitHub's 403 discrimination).
+    #[error("HTTP {status}")]
+    HttpStatus {
+        /// Status code.
+        status: u16,
+        /// Headers from the response, copied as `(name, value)` pairs.
+        headers: Vec<(String, String)>,
+        /// Body as UTF-8 text; empty if the body was non-UTF-8 or read
+        /// failed. The body is already size-capped per the `HttpClient`'s
+        /// configured cap.
+        body: String,
+    },
 }
 
 impl SealStackError {
@@ -207,5 +246,34 @@ mod tests {
     fn sealstack_error_display() {
         let e = SealStackError::Backend("boom".into());
         assert_eq!(format!("{e}"), "backend: boom");
+    }
+
+    #[test]
+    fn retry_exhausted_renders_attempts_and_duration() {
+        use std::time::Duration;
+        let e = SealStackError::RetryExhausted {
+            attempts: 5,
+            total_duration: Duration::from_millis(7500),
+            last_error: Box::new(SealStackError::Backend("502 bad gateway".into())),
+        };
+        let msg = e.to_string();
+        assert!(msg.contains("5"), "missing attempts: {msg}");
+        assert!(msg.contains("502"), "missing last_error detail: {msg}");
+    }
+
+    #[test]
+    fn body_too_large_reports_cap() {
+        let e = SealStackError::BodyTooLarge {
+            cap_bytes: 52_428_800,
+        };
+        assert!(e.to_string().contains("52428800"));
+    }
+
+    #[test]
+    fn paginator_cursor_loop_reports_cursor() {
+        let e = SealStackError::PaginatorCursorLoop {
+            cursor: "abc".into(),
+        };
+        assert!(e.to_string().contains("abc"));
     }
 }

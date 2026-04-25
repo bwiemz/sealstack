@@ -13,8 +13,13 @@ workspace = true
 [dependencies]
 sealstack-common   = { path = "../sealstack-common" }
 
+async-stream = "0.3"
 async-trait  = "0.1"
+bytes        = "1"
 futures      = "0.3"
+rand         = "0.8"
+reqwest      = { workspace = true }
+secrecy      = "0.10"
 serde        = { workspace = true, features = ["derive"] }
 serde_json   = { workspace = true }
 thiserror    = { workspace = true }
@@ -23,4 +28,5 @@ tokio        = { workspace = true, features = ["sync"] }
 tracing      = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio    = { workspace = true, features = ["macros", "rt-multi-thread"] }
+wiremock = "0.6"

@@ -23,8 +23,17 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
 
+pub mod retry_shim;
+
+use std::sync::Arc;
+
 use async_trait::async_trait;
+use futures::StreamExt;
 use sealstack_common::{SealStackError, SealStackResult};
+use sealstack_connector_sdk::auth::StaticToken;
+use sealstack_connector_sdk::http::{HttpClient, HttpResponse};
+use sealstack_connector_sdk::paginate::{LinkHeaderPaginator, next_link, paginate};
+use sealstack_connector_sdk::retry::RetryPolicy;
 use sealstack_connector_sdk::{
     Connector, PermissionPredicate, Resource, ResourceId, ResourceStream, change_streams,
 };
@@ -33,14 +42,10 @@ use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
 const GITHUB_API: &str = "https://api.github.com";
-const UA: &str = concat!("sealstack-github/", env!("CARGO_PKG_VERSION"));
 
-/// Configuration for the GitHub connector.
+/// Configuration for the GitHub connector (non-secret fields only).
 #[derive(Clone, Debug)]
 pub struct GithubConfig {
-    /// PAT with `repo` + `read:org` scopes for private repo access; `public_repo`
-    /// is enough for open-source use.
-    pub token: String,
     /// The user or org login to pull from (e.g. `"sealstack"`). When
     /// `None`, pulls every repo the token can see.
     pub owner: Option<String>,
@@ -51,135 +56,215 @@ pub struct GithubConfig {
 }
 
 impl GithubConfig {
-    /// Parse a [`GithubConfig`] from the opaque JSON the CLI stores on
-    /// connector bindings. Shape:
+    /// Parse non-secret fields from the binding config JSON shape:
     ///
     /// ```json
-    /// { "token": "ghp_...", "owner": "acme", "repos": ["docs", "core"], "include_issues": true }
+    /// { "owner": "acme", "repos": ["docs", "core"], "include_issues": true }
     /// ```
-    pub fn from_json(v: &serde_json::Value) -> SealStackResult<Self> {
-        let token = v
-            .get("token")
-            .and_then(|x| x.as_str())
-            .map(str::to_owned)
-            .or_else(|| std::env::var("GITHUB_TOKEN").ok())
-            .ok_or_else(|| {
-                SealStackError::Config("github connector requires `token` or GITHUB_TOKEN env".into())
-            })?;
-        let owner = v
-            .get("owner")
-            .and_then(|x| x.as_str())
-            .map(str::to_owned);
+    #[must_use]
+    pub fn from_json(v: &serde_json::Value) -> Self {
+        let owner = v.get("owner").and_then(|x| x.as_str()).map(str::to_owned);
         let repos: Vec<String> = v
             .get("repos")
             .and_then(|x| x.as_array())
-            .map(|arr| arr.iter().filter_map(|e| e.as_str().map(str::to_owned)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|e| e.as_str().map(str::to_owned))
+                    .collect()
+            })
             .unwrap_or_default();
         let include_issues = v
             .get("include_issues")
             .and_then(|x| x.as_bool())
             .unwrap_or(true);
-        Ok(Self {
-            token,
+        Self {
             owner,
             repos,
             include_issues,
-        })
+        }
     }
+}
+
+/// At most: initial attempt + one shim-guided retry.
+async fn send_with_gh_shim<F>(http: &HttpClient, make_request: F) -> SealStackResult<HttpResponse>
+where
+    F: Fn() -> reqwest::RequestBuilder,
+{
+    for attempt in 0..2u8 {
+        match http.send(make_request()).await {
+            Ok(resp) => return Ok(resp),
+            Err(SealStackError::HttpStatus {
+                status: 403,
+                headers,
+                body,
+            }) => match retry_shim::classify_github_403(&headers, &body) {
+                retry_shim::Github403Action::WaitThenRetry(d) if attempt == 0 => {
+                    tracing::warn!(?d, "github: 403 rate-limit, waiting before retry");
+                    tokio::time::sleep(d).await;
+                }
+                retry_shim::Github403Action::BackoffThenRetry if attempt == 0 => {
+                    tracing::warn!("github: 403 secondary rate-limit, backing off before retry");
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                }
+                retry_shim::Github403Action::PermissionDenied => {
+                    return Err(SealStackError::Backend(
+                        "github 403: permission denied".into(),
+                    ));
+                }
+                _ => {
+                    return Err(SealStackError::Backend(
+                        "github 403: rate-limit retry exhausted".into(),
+                    ));
+                }
+            },
+            Err(e) => return Err(e),
+        }
+    }
+    // The loop above always returns or breaks within two iterations.
+    // On the first 403, we either retry (continuing the loop) or return
+    // immediately (PermissionDenied). On the second iteration, the `_`
+    // arm always returns. This `unreachable!` documents that invariant.
+    unreachable!("send_with_gh_shim loop must return or break within 2 iterations")
 }
 
 /// The GitHub connector.
+#[derive(Debug)]
 pub struct GithubConnector {
-    client: reqwest::Client,
+    http: Arc<HttpClient>,
     config: GithubConfig,
+    /// Base URL for the GitHub REST API.
+    ///
+    /// Defaults to `https://api.github.com`. Tests can override this via the
+    /// `api_base` field in the config JSON to point at a wiremock server.
+    api_base: String,
 }
 
 impl GithubConnector {
-    /// Build a connector. Validates the token at first API call, not here.
-    #[must_use]
-    pub fn new(config: GithubConfig) -> Self {
-        let client = reqwest::Client::builder()
-            .user_agent(UA)
-            .build()
-            .expect("reqwest client");
-        Self { client, config }
+    /// Build a connector from a JSON config value.
+    ///
+    /// Token precedence:
+    /// - Config `token` field present → use it (warns if `GITHUB_TOKEN` is
+    ///   also set).
+    /// - Config absent + `GITHUB_TOKEN` env var present and non-empty → use
+    ///   env var.
+    /// - Both absent or empty → returns `SealStackError::Config`.
+    ///
+    /// Token is not validated against the API until the first call.
+    pub fn from_json(v: &serde_json::Value) -> SealStackResult<Self> {
+        let token = match (
+            v.get("token").and_then(|x| x.as_str()),
+            std::env::var("GITHUB_TOKEN").ok(),
+        ) {
+            (Some(t), env_present) => {
+                if env_present.is_some() {
+                    tracing::warn!("github: config `token` set; GITHUB_TOKEN env ignored");
+                }
+                t.to_owned()
+            }
+            (None, Some(env)) if !env.is_empty() => env,
+            _ => {
+                return Err(SealStackError::Config(
+                    "github connector requires `token` in config or GITHUB_TOKEN env".into(),
+                ));
+            }
+        };
+
+        let credential = Arc::new(StaticToken::new(token));
+        let http = Arc::new(
+            HttpClient::new(credential, RetryPolicy::default())?
+                .with_user_agent_suffix(format!("github-connector/{}", env!("CARGO_PKG_VERSION"))),
+        );
+        let config = GithubConfig::from_json(v);
+        let api_base = v
+            .get("api_base")
+            .and_then(|x| x.as_str())
+            .unwrap_or(GITHUB_API)
+            .trim_end_matches('/')
+            .to_owned();
+        Ok(Self {
+            http,
+            config,
+            api_base,
+        })
     }
 
-    async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> SealStackResult<(T, Option<String>)> {
-        let resp = self
-            .client
-            .get(url)
-            .bearer_auth(&self.config.token)
-            .header("accept", "application/vnd.github+json")
-            .header("x-github-api-version", "2022-11-28")
-            .send()
-            .await
-            .map_err(|e| SealStackError::Backend(format!("github request: {e}")))?;
+    async fn get_json<T: for<'de> Deserialize<'de>>(
+        &self,
+        url: &str,
+    ) -> SealStackResult<(T, Option<String>)> {
+        let make = || {
+            self.http
+                .get(url)
+                .header("accept", "application/vnd.github+json")
+                .header("x-github-api-version", "2022-11-28")
+        };
 
-        if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(SealStackError::Unauthorized("github token rejected".into()));
-        }
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(SealStackError::Backend(format!(
-                "github {status}: {}",
-                truncate_for_log(&body),
-            )));
-        }
+        let resp = send_with_gh_shim(&self.http, make).await?;
 
-        let next = next_link(resp.headers().get(reqwest::header::LINK));
-        let value = resp
-            .json::<T>()
-            .await
-            .map_err(|e| SealStackError::Backend(format!("github decode: {e}")))?;
+        // Capture the Link header before consuming the response.
+        let next = resp.header("link").and_then(next_link);
+
+        let value = resp.json::<T>().await?;
         Ok((value, next))
     }
 
     async fn list_repos(&self) -> SealStackResult<Vec<Repo>> {
-        let first = match &self.config.owner {
-            Some(o) => format!("{GITHUB_API}/users/{o}/repos?per_page=100&type=owner"),
-            None => format!("{GITHUB_API}/user/repos?per_page=100&affiliation=owner"),
+        let base = &self.api_base;
+        let initial = match &self.config.owner {
+            Some(o) => format!("{base}/users/{o}/repos?per_page=100&type=owner"),
+            None => format!("{base}/user/repos?per_page=100&affiliation=owner"),
         };
-        let mut url = first;
+        let pg =
+            LinkHeaderPaginator::<Repo, _>::new(move |c: &HttpClient, cursor: Option<&str>| {
+                let url = cursor.unwrap_or(initial.as_str());
+                c.get(url)
+                    .header("accept", "application/vnd.github+json")
+                    .header("x-github-api-version", "2022-11-28")
+            });
+        let mut stream = paginate(pg, self.http.clone());
+        let allow = &self.config.repos;
         let mut out: Vec<Repo> = Vec::new();
-        loop {
-            let (batch, next) = self.get_json::<Vec<Repo>>(&url).await?;
-            for r in batch {
-                if self.config.repos.is_empty()
-                    || self.config.repos.iter().any(|w| w == &r.name)
-                {
-                    out.push(r);
-                }
-            }
-            match next {
-                Some(n) => url = n,
-                None => break,
+        while let Some(item) = stream.next().await {
+            let r = item?;
+            if allow.is_empty() || allow.iter().any(|w| w == &r.name) {
+                out.push(r);
             }
         }
         Ok(out)
     }
 
     async fn fetch_readme(&self, owner: &str, repo: &str) -> SealStackResult<Option<String>> {
-        let url = format!("{GITHUB_API}/repos/{owner}/{repo}/readme");
+        let url = format!("{}/repos/{owner}/{repo}/readme", self.api_base);
         match self.get_json::<ReadmeBody>(&url).await {
             Ok((body, _)) => Ok(Some(decode_base64_content(&body.content))),
-            Err(SealStackError::Backend(m)) if m.contains("404") => Ok(None),
+            // After the SDK-side HttpStatus refactor, non-retryable 4xx
+            // responses surface as HttpStatus, not Backend. A repo without
+            // a README returns 404 here — treat as "no README" rather than
+            // a fatal error.
+            Err(SealStackError::HttpStatus { status: 404, .. }) => Ok(None),
             Err(e) => Err(e),
         }
     }
 
     async fn list_issues(&self, owner: &str, repo: &str) -> SealStackResult<Vec<Issue>> {
-        let mut url =
-            format!("{GITHUB_API}/repos/{owner}/{repo}/issues?state=all&per_page=100");
-        let mut out = Vec::new();
-        loop {
-            let (batch, next) = self.get_json::<Vec<Issue>>(&url).await?;
+        let initial = format!(
+            "{}/repos/{owner}/{repo}/issues?state=all&per_page=100",
+            self.api_base
+        );
+        let pg =
+            LinkHeaderPaginator::<Issue, _>::new(move |c: &HttpClient, cursor: Option<&str>| {
+                let url = cursor.unwrap_or(initial.as_str());
+                c.get(url)
+                    .header("accept", "application/vnd.github+json")
+                    .header("x-github-api-version", "2022-11-28")
+            });
+        let mut stream = paginate(pg, self.http.clone());
+        let mut out: Vec<Issue> = Vec::new();
+        while let Some(item) = stream.next().await {
+            let issue = item?;
             // The issues endpoint returns PRs too — filter them out.
-            out.extend(batch.into_iter().filter(|i| i.pull_request.is_none()));
-            match next {
-                Some(n) => url = n,
-                None => break,
+            if issue.pull_request.is_none() {
+                out.push(issue);
             }
         }
         Ok(out)
@@ -225,8 +310,7 @@ impl Connector for GithubConnector {
 
             if self.config.include_issues {
                 for issue in self.list_issues(&owner, &repo.name).await? {
-                    let iu =
-                        parse_time(&issue.updated_at).unwrap_or_else(OffsetDateTime::now_utc);
+                    let iu = parse_time(&issue.updated_at).unwrap_or_else(OffsetDateTime::now_utc);
                     out.push(Resource {
                         id: ResourceId::new(format!(
                             "github://{owner}/{}/issues/{}",
@@ -240,14 +324,8 @@ impl Connector for GithubConnector {
                                 "repo".into(),
                                 serde_json::Value::String(format!("{owner}/{}", repo.name)),
                             ),
-                            (
-                                "number".into(),
-                                serde_json::Value::from(issue.number),
-                            ),
-                            (
-                                "state".into(),
-                                serde_json::Value::String(issue.state),
-                            ),
+                            ("number".into(), serde_json::Value::from(issue.number)),
+                            ("state".into(), serde_json::Value::String(issue.state)),
                         ]),
                         permissions: perms.clone(),
                         source_updated_at: iu,
@@ -269,7 +347,7 @@ impl Connector for GithubConnector {
     }
 
     async fn healthcheck(&self) -> SealStackResult<()> {
-        let url = format!("{GITHUB_API}/user");
+        let url = format!("{}/user", self.api_base);
         let _: (serde_json::Value, _) = self.get_json(&url).await?;
         Ok(())
     }
@@ -324,32 +402,6 @@ fn decode_base64_content(raw: &str) -> String {
     match decode(&joined) {
         Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
         Err(_) => String::new(),
-    }
-}
-
-/// Parse the `next` URL out of an RFC 5988 `Link` header.
-fn next_link(hdr: Option<&reqwest::header::HeaderValue>) -> Option<String> {
-    let raw = hdr?.to_str().ok()?;
-    for part in raw.split(',') {
-        let part = part.trim();
-        let Some(rel_idx) = part.find("rel=\"next\"") else {
-            continue;
-        };
-        let before = &part[..rel_idx];
-        let start = before.find('<')?;
-        let end = before.find('>')?;
-        if end > start {
-            return Some(part[start + 1..end].to_owned());
-        }
-    }
-    None
-}
-
-fn truncate_for_log(s: &str) -> String {
-    if s.len() > 500 {
-        format!("{}…", &s[..500])
-    } else {
-        s.to_owned()
     }
 }
 
@@ -410,32 +462,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn next_link_extracts_next_url() {
-        let hdr = reqwest::header::HeaderValue::from_static(
-            r#"<https://api.github.com/x?page=2>; rel="next", <https://api.github.com/x?page=5>; rel="last""#,
-        );
-        assert_eq!(
-            next_link(Some(&hdr)),
-            Some("https://api.github.com/x?page=2".to_owned()),
-        );
-    }
-
-    #[test]
-    fn next_link_none_when_absent() {
-        let hdr = reqwest::header::HeaderValue::from_static(
-            r#"<https://api.github.com/x?page=1>; rel="prev""#,
-        );
-        assert!(next_link(Some(&hdr)).is_none());
-    }
-
-    #[test]
     fn config_from_json_accepts_minimal_shape() {
         let v = serde_json::json!({ "token": "t" });
-        let c = GithubConfig::from_json(&v).unwrap();
-        assert_eq!(c.token, "t");
-        assert!(c.owner.is_none());
-        assert!(c.repos.is_empty());
-        assert!(c.include_issues);
+        let c = GithubConnector::from_json(&v).unwrap();
+        assert!(c.config.owner.is_none());
+        assert!(c.config.repos.is_empty());
+        assert!(c.config.include_issues);
     }
 
     #[test]
@@ -446,9 +478,23 @@ mod tests {
             "repos": ["docs"],
             "include_issues": false,
         });
-        let c = GithubConfig::from_json(&v).unwrap();
-        assert_eq!(c.owner.as_deref(), Some("acme"));
-        assert_eq!(c.repos, vec!["docs".to_string()]);
-        assert!(!c.include_issues);
+        let c = GithubConnector::from_json(&v).unwrap();
+        assert_eq!(c.config.owner.as_deref(), Some("acme"));
+        assert_eq!(c.config.repos, vec!["docs".to_string()]);
+        assert!(!c.config.include_issues);
+    }
+
+    #[test]
+    fn from_json_missing_token_errors() {
+        // This test only works when GITHUB_TOKEN is unset. Skip if the var
+        // is present in the environment (CI may set it).
+        if std::env::var("GITHUB_TOKEN").is_ok() {
+            return;
+        }
+        let v = serde_json::json!({});
+        match GithubConnector::from_json(&v) {
+            Err(SealStackError::Config(_)) => {}
+            other => panic!("expected Config error, got {other:?}"),
+        }
     }
 }

@@ -18,8 +18,15 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
+use futures::StreamExt;
 use sealstack_common::{SealStackError, SealStackResult};
+use sealstack_connector_sdk::auth::StaticToken;
+use sealstack_connector_sdk::http::HttpClient;
+use sealstack_connector_sdk::paginate::{BodyCursorPaginator, paginate};
+use sealstack_connector_sdk::retry::RetryPolicy;
 use sealstack_connector_sdk::{
     Connector, PermissionPredicate, Resource, ResourceId, ResourceStream, change_streams,
 };
@@ -27,13 +34,11 @@ use serde::Deserialize;
 use time::OffsetDateTime;
 
 const SLACK_API: &str = "https://slack.com/api";
-const UA: &str = concat!("sealstack-slack/", env!("CARGO_PKG_VERSION"));
+const UA_SUFFIX: &str = concat!("sealstack-slack/", env!("CARGO_PKG_VERSION"));
 
-/// Slack connector configuration.
+/// Slack connector configuration (non-secret fields only).
 #[derive(Clone, Debug)]
 pub struct SlackConfig {
-    /// Bot token (`xoxb-…`).
-    pub token: String,
     /// Optional allow-list of channel ids (e.g. `["C01234"]`). Empty = every
     /// channel the bot is a member of.
     pub channels: Vec<String>,
@@ -42,100 +47,149 @@ pub struct SlackConfig {
 }
 
 impl SlackConfig {
-    /// Parse from the binding config JSON shape:
+    /// Parse non-secret fields from the binding config JSON shape:
     ///
     /// ```json
-    /// { "token": "xoxb-...", "channels": ["C01234"], "max_messages_per_channel": 500 }
+    /// { "channels": ["C01234"], "max_messages_per_channel": 500 }
     /// ```
-    pub fn from_json(v: &serde_json::Value) -> SealStackResult<Self> {
-        let token = v
-            .get("token")
-            .and_then(|x| x.as_str())
-            .map(str::to_owned)
-            .or_else(|| std::env::var("SLACK_BOT_TOKEN").ok())
-            .ok_or_else(|| {
-                SealStackError::Config("slack connector requires `token` or SLACK_BOT_TOKEN env".into())
-            })?;
+    #[must_use]
+    pub fn from_json(v: &serde_json::Value) -> Self {
         let channels: Vec<String> = v
             .get("channels")
             .and_then(|x| x.as_array())
-            .map(|arr| arr.iter().filter_map(|e| e.as_str().map(str::to_owned)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|e| e.as_str().map(str::to_owned))
+                    .collect()
+            })
             .unwrap_or_default();
         let max_messages_per_channel = v
             .get("max_messages_per_channel")
-            .and_then(|x| x.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .map_or(500, |n| n.min(10_000) as u32);
-        Ok(Self {
-            token,
+        Self {
             channels,
             max_messages_per_channel,
-        })
+        }
     }
 }
 
 /// The Slack connector.
+#[derive(Debug)]
 pub struct SlackConnector {
-    client: reqwest::Client,
+    http: Arc<HttpClient>,
     config: SlackConfig,
+    /// Base URL for the Slack Web API.
+    ///
+    /// Defaults to `https://slack.com/api`. Tests can override this via the
+    /// `api_base` field in the config JSON to point at a wiremock server.
+    api_base: String,
 }
 
 impl SlackConnector {
-    /// Build a connector. Token is not validated until the first API call.
-    #[must_use]
-    pub fn new(config: SlackConfig) -> Self {
-        let client = reqwest::Client::builder()
-            .user_agent(UA)
-            .build()
-            .expect("reqwest client");
-        Self { client, config }
+    /// Build a connector from a JSON config value.
+    ///
+    /// Token precedence:
+    /// - Config `token` field present → use it (warns if `SLACK_BOT_TOKEN` is
+    ///   also set).
+    /// - Config absent + `SLACK_BOT_TOKEN` env var present and non-empty → use
+    ///   env var.
+    /// - Both absent or empty → returns `SealStackError::Config`.
+    ///
+    /// Token is not validated against the API until the first call.
+    pub fn from_json(v: &serde_json::Value) -> SealStackResult<Self> {
+        let token = match (
+            v.get("token").and_then(|x| x.as_str()),
+            std::env::var("SLACK_BOT_TOKEN").ok(),
+        ) {
+            (Some(t), env_present) => {
+                if env_present.is_some() {
+                    tracing::warn!("slack: config `token` set; SLACK_BOT_TOKEN env ignored");
+                }
+                t.to_owned()
+            }
+            (None, Some(env)) if !env.is_empty() => env,
+            _ => {
+                return Err(SealStackError::Config(
+                    "slack connector requires `token` in config or SLACK_BOT_TOKEN env".into(),
+                ));
+            }
+        };
+
+        let credential = Arc::new(StaticToken::new(token));
+        let http = Arc::new(
+            HttpClient::new(credential, RetryPolicy::default())?.with_user_agent_suffix(UA_SUFFIX),
+        );
+        let config = SlackConfig::from_json(v);
+        let api_base = v
+            .get("api_base")
+            .and_then(|x| x.as_str())
+            .unwrap_or(SLACK_API)
+            .trim_end_matches('/')
+            .to_owned();
+        Ok(Self {
+            http,
+            config,
+            api_base,
+        })
     }
 
     async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> SealStackResult<T> {
-        let resp = self
-            .client
-            .get(url)
-            .bearer_auth(&self.config.token)
-            .header("accept", "application/json")
-            .send()
-            .await
-            .map_err(|e| SealStackError::Backend(format!("slack request: {e}")))?;
-
-        if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(SealStackError::Unauthorized("slack token rejected".into()));
-        }
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(SealStackError::Backend(format!("slack {status}: {body}")));
-        }
-        resp.json::<T>()
-            .await
-            .map_err(|e| SealStackError::Backend(format!("slack decode: {e}")))
+        let rb = self.http.get(url);
+        let resp = self.http.send(rb).await?;
+        resp.json::<T>().await
     }
 
     async fn list_channels(&self) -> SealStackResult<Vec<Channel>> {
-        let mut cursor = String::new();
-        let mut out = Vec::new();
-        loop {
-            let url = if cursor.is_empty() {
-                format!(
-                    "{SLACK_API}/conversations.list?limit=1000&exclude_archived=true&types=public_channel,private_channel",
-                )
-            } else {
-                format!(
-                    "{SLACK_API}/conversations.list?limit=1000&exclude_archived=true&types=public_channel,private_channel&cursor={cursor}",
-                )
-            };
-            let resp: ListChannelsResp = self.get_json(&url).await?;
-            resp.ok_or_err()?;
-            for c in resp.channels.unwrap_or_default() {
-                if self.config.channels.is_empty() || self.config.channels.contains(&c.id) {
-                    out.push(c);
+        let url = format!("{}/conversations.list", self.api_base);
+        let pg = BodyCursorPaginator::<Channel, _, _, _>::new(
+            move |c: &HttpClient, cursor: Option<&str>| {
+                let mut rb = c.get(&url).query(&[
+                    ("limit", "1000"),
+                    ("exclude_archived", "true"),
+                    ("types", "public_channel,private_channel"),
+                ]);
+                if let Some(cur) = cursor {
+                    rb = rb.query(&[("cursor", cur)]);
                 }
-            }
-            match resp.response_metadata.and_then(|m| m.next_cursor) {
-                Some(c) if !c.is_empty() => cursor = c,
-                _ => break,
+                rb
+            },
+            |v: &serde_json::Value| {
+                if !v
+                    .get("ok")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false)
+                {
+                    let err = v.get("error").and_then(|e| e.as_str()).unwrap_or("unknown");
+                    return Err(SealStackError::backend(format!("slack api: {err}")));
+                }
+                let arr = v
+                    .get("channels")
+                    .and_then(|a| a.as_array())
+                    .ok_or_else(|| SealStackError::backend("missing channels"))?;
+                arr.iter()
+                    .map(|x| {
+                        serde_json::from_value::<Channel>(x.clone())
+                            .map_err(|e| SealStackError::backend(format!("{e}")))
+                    })
+                    .collect()
+            },
+            |v: &serde_json::Value| {
+                v.get("response_metadata")
+                    .and_then(|m| m.get("next_cursor"))
+                    .and_then(|c| c.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+            },
+        );
+
+        let allowed = self.config.channels.clone();
+        let mut stream = paginate(pg, Arc::clone(&self.http));
+        let mut out: Vec<Channel> = Vec::new();
+        while let Some(item) = stream.next().await {
+            let ch = item?;
+            if allowed.is_empty() || allowed.contains(&ch.id) {
+                out.push(ch);
             }
         }
         Ok(out)
@@ -143,39 +197,63 @@ impl SlackConnector {
 
     async fn list_messages(&self, channel_id: &str) -> SealStackResult<Vec<Message>> {
         let cap = self.config.max_messages_per_channel as usize;
-        let mut cursor = String::new();
+        let url = format!("{}/conversations.history", self.api_base);
+        let channel_id_owned = channel_id.to_owned();
+        let pg = BodyCursorPaginator::<Message, _, _, _>::new(
+            move |c: &HttpClient, cursor: Option<&str>| {
+                let mut rb = c
+                    .get(&url)
+                    .query(&[("channel", channel_id_owned.as_str()), ("limit", "1000")]);
+                if let Some(cur) = cursor {
+                    rb = rb.query(&[("cursor", cur)]);
+                }
+                rb
+            },
+            |v: &serde_json::Value| {
+                if !v
+                    .get("ok")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false)
+                {
+                    let err = v.get("error").and_then(|e| e.as_str()).unwrap_or("unknown");
+                    return Err(SealStackError::backend(format!("slack api: {err}")));
+                }
+                let arr = v
+                    .get("messages")
+                    .and_then(|a| a.as_array())
+                    .ok_or_else(|| SealStackError::backend("missing messages"))?;
+                arr.iter()
+                    .map(|x| {
+                        serde_json::from_value::<Message>(x.clone())
+                            .map_err(|e| SealStackError::backend(format!("{e}")))
+                    })
+                    .collect()
+            },
+            |v: &serde_json::Value| {
+                v.get("response_metadata")
+                    .and_then(|m| m.get("next_cursor"))
+                    .and_then(|c| c.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+            },
+        );
+
+        let mut stream = paginate(pg, Arc::clone(&self.http)).take(cap);
         let mut out: Vec<Message> = Vec::new();
-        while out.len() < cap {
-            let want = (cap - out.len()).min(1000);
-            let url = if cursor.is_empty() {
-                format!(
-                    "{SLACK_API}/conversations.history?channel={channel_id}&limit={want}",
-                )
-            } else {
-                format!(
-                    "{SLACK_API}/conversations.history?channel={channel_id}&limit={want}&cursor={cursor}",
-                )
-            };
-            let resp: HistoryResp = self.get_json(&url).await?;
-            resp.ok_or_err()?;
-            out.extend(resp.messages.unwrap_or_default());
-            match resp.response_metadata.and_then(|m| m.next_cursor) {
-                Some(c) if !c.is_empty() => cursor = c,
-                _ => break,
-            }
+        while let Some(item) = stream.next().await {
+            out.push(item?);
         }
-        out.truncate(cap);
         Ok(out)
     }
 }
 
 #[async_trait]
 impl Connector for SlackConnector {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "slack"
     }
 
-    fn version(&self) -> &str {
+    fn version(&self) -> &'static str {
         env!("CARGO_PKG_VERSION")
     }
 
@@ -203,7 +281,10 @@ impl Connector for SlackConnector {
                     title: Some(channel.name.clone().unwrap_or_else(|| channel.id.clone())),
                     body,
                     metadata: serde_json::Map::from_iter([
-                        ("channel".into(), serde_json::Value::String(channel.id.clone())),
+                        (
+                            "channel".into(),
+                            serde_json::Value::String(channel.id.clone()),
+                        ),
                         ("ts".into(), serde_json::Value::String(ts.clone())),
                         (
                             "user".into(),
@@ -228,7 +309,7 @@ impl Connector for SlackConnector {
     }
 
     async fn healthcheck(&self) -> SealStackResult<()> {
-        let url = format!("{SLACK_API}/auth.test");
+        let url = format!("{}/auth.test", self.api_base);
         let resp: AuthTestResp = self.get_json(&url).await?;
         resp.ok_or_err()
     }
@@ -237,28 +318,6 @@ impl Connector for SlackConnector {
 // ---------------------------------------------------------------------------
 // Wire types
 // ---------------------------------------------------------------------------
-
-#[derive(Deserialize)]
-struct ListChannelsResp {
-    ok: bool,
-    #[serde(default)]
-    error: Option<String>,
-    #[serde(default)]
-    channels: Option<Vec<Channel>>,
-    #[serde(default)]
-    response_metadata: Option<ResponseMetadata>,
-}
-
-#[derive(Deserialize)]
-struct HistoryResp {
-    ok: bool,
-    #[serde(default)]
-    error: Option<String>,
-    #[serde(default)]
-    messages: Option<Vec<Message>>,
-    #[serde(default)]
-    response_metadata: Option<ResponseMetadata>,
-}
 
 #[derive(Deserialize)]
 struct AuthTestResp {
@@ -282,22 +341,6 @@ trait SlackOk {
     }
 }
 
-impl SlackOk for ListChannelsResp {
-    fn is_ok(&self) -> bool {
-        self.ok
-    }
-    fn err(&self) -> Option<&str> {
-        self.error.as_deref()
-    }
-}
-impl SlackOk for HistoryResp {
-    fn is_ok(&self) -> bool {
-        self.ok
-    }
-    fn err(&self) -> Option<&str> {
-        self.error.as_deref()
-    }
-}
 impl SlackOk for AuthTestResp {
     fn is_ok(&self) -> bool {
         self.ok
@@ -305,12 +348,6 @@ impl SlackOk for AuthTestResp {
     fn err(&self) -> Option<&str> {
         self.error.as_deref()
     }
-}
-
-#[derive(Deserialize)]
-struct ResponseMetadata {
-    #[serde(default)]
-    next_cursor: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -334,7 +371,9 @@ struct Message {
 /// (e.g. `"1712345678.000100"`).
 fn parse_slack_ts(ts: &str) -> Option<OffsetDateTime> {
     let secs: f64 = ts.parse().ok()?;
+    #[allow(clippy::cast_possible_truncation)]
     let whole = secs.trunc() as i128;
+    #[allow(clippy::cast_possible_truncation)]
     let nanos = (secs.fract() * 1e9) as i128;
     let total = whole * 1_000_000_000 + nanos;
     OffsetDateTime::from_unix_timestamp_nanos(total).ok()
@@ -351,9 +390,30 @@ mod tests {
             "channels": ["C1", "C2"],
             "max_messages_per_channel": 100,
         });
-        let c = SlackConfig::from_json(&v).unwrap();
+        let c = SlackConfig::from_json(&v);
         assert_eq!(c.channels, vec!["C1".to_string(), "C2".to_string()]);
         assert_eq!(c.max_messages_per_channel, 100);
+    }
+
+    #[test]
+    fn connector_from_json_with_token() {
+        let v = serde_json::json!({ "token": "xoxb-test" });
+        let conn = SlackConnector::from_json(&v).unwrap();
+        assert_eq!(conn.name(), "slack");
+    }
+
+    #[test]
+    fn connector_from_json_missing_token_errors() {
+        // This test only works when SLACK_BOT_TOKEN is unset. Skip if the var
+        // is present in the environment (CI may set it).
+        if std::env::var("SLACK_BOT_TOKEN").is_ok() {
+            return;
+        }
+        let v = serde_json::json!({});
+        match SlackConnector::from_json(&v) {
+            Err(SealStackError::Config(_)) => {}
+            other => panic!("expected Config error, got {other:?}"),
+        }
     }
 
     #[test]
