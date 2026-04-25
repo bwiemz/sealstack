@@ -132,6 +132,11 @@ where
 pub struct GithubConnector {
     http: Arc<HttpClient>,
     config: GithubConfig,
+    /// Base URL for the GitHub REST API.
+    ///
+    /// Defaults to `https://api.github.com`. Tests can override this via the
+    /// `api_base` field in the config JSON to point at a wiremock server.
+    api_base: String,
 }
 
 impl GithubConnector {
@@ -170,7 +175,17 @@ impl GithubConnector {
                 .with_user_agent_suffix(format!("github-connector/{}", env!("CARGO_PKG_VERSION"))),
         );
         let config = GithubConfig::from_json(v);
-        Ok(Self { http, config })
+        let api_base = v
+            .get("api_base")
+            .and_then(|x| x.as_str())
+            .unwrap_or(GITHUB_API)
+            .trim_end_matches('/')
+            .to_owned();
+        Ok(Self {
+            http,
+            config,
+            api_base,
+        })
     }
 
     async fn get_json<T: for<'de> Deserialize<'de>>(
@@ -194,9 +209,10 @@ impl GithubConnector {
     }
 
     async fn list_repos(&self) -> SealStackResult<Vec<Repo>> {
+        let base = &self.api_base;
         let initial = match &self.config.owner {
-            Some(o) => format!("{GITHUB_API}/users/{o}/repos?per_page=100&type=owner"),
-            None => format!("{GITHUB_API}/user/repos?per_page=100&affiliation=owner"),
+            Some(o) => format!("{base}/users/{o}/repos?per_page=100&type=owner"),
+            None => format!("{base}/user/repos?per_page=100&affiliation=owner"),
         };
         let pg =
             LinkHeaderPaginator::<Repo, _>::new(move |c: &HttpClient, cursor: Option<&str>| {
@@ -218,7 +234,7 @@ impl GithubConnector {
     }
 
     async fn fetch_readme(&self, owner: &str, repo: &str) -> SealStackResult<Option<String>> {
-        let url = format!("{GITHUB_API}/repos/{owner}/{repo}/readme");
+        let url = format!("{}/repos/{owner}/{repo}/readme", self.api_base);
         match self.get_json::<ReadmeBody>(&url).await {
             Ok((body, _)) => Ok(Some(decode_base64_content(&body.content))),
             // After the SDK-side HttpStatus refactor, non-retryable 4xx
@@ -231,7 +247,10 @@ impl GithubConnector {
     }
 
     async fn list_issues(&self, owner: &str, repo: &str) -> SealStackResult<Vec<Issue>> {
-        let initial = format!("{GITHUB_API}/repos/{owner}/{repo}/issues?state=all&per_page=100");
+        let initial = format!(
+            "{}/repos/{owner}/{repo}/issues?state=all&per_page=100",
+            self.api_base
+        );
         let pg =
             LinkHeaderPaginator::<Issue, _>::new(move |c: &HttpClient, cursor: Option<&str>| {
                 let url = cursor.unwrap_or(initial.as_str());
@@ -328,7 +347,7 @@ impl Connector for GithubConnector {
     }
 
     async fn healthcheck(&self) -> SealStackResult<()> {
-        let url = format!("{GITHUB_API}/user");
+        let url = format!("{}/user", self.api_base);
         let _: (serde_json::Value, _) = self.get_json(&url).await?;
         Ok(())
     }
