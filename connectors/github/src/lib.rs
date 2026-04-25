@@ -120,9 +120,11 @@ where
             Err(e) => return Err(e),
         }
     }
-    Err(SealStackError::Backend(
-        "github: 403 retry loop terminated unexpectedly".into(),
-    ))
+    // The loop above always returns or breaks within two iterations.
+    // On the first 403, we either retry (continuing the loop) or return
+    // immediately (PermissionDenied). On the second iteration, the `_`
+    // arm always returns. This `unreachable!` documents that invariant.
+    unreachable!("send_with_gh_shim loop must return or break within 2 iterations")
 }
 
 /// The GitHub connector.
@@ -219,7 +221,11 @@ impl GithubConnector {
         let url = format!("{GITHUB_API}/repos/{owner}/{repo}/readme");
         match self.get_json::<ReadmeBody>(&url).await {
             Ok((body, _)) => Ok(Some(decode_base64_content(&body.content))),
-            Err(SealStackError::Backend(m)) if m.contains("404") => Ok(None),
+            // After the SDK-side HttpStatus refactor, non-retryable 4xx
+            // responses surface as HttpStatus, not Backend. A repo without
+            // a README returns 404 here — treat as "no README" rather than
+            // a fatal error.
+            Err(SealStackError::HttpStatus { status: 404, .. }) => Ok(None),
             Err(e) => Err(e),
         }
     }
