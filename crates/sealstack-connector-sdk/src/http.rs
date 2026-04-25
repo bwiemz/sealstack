@@ -207,6 +207,22 @@ impl HttpClient {
     /// [`SealStackError::RetryExhausted`] when the retry budget is consumed
     /// without a success.
     pub async fn send(&self, rb: reqwest::RequestBuilder) -> SealStackResult<HttpResponse> {
+        // Probe the request to populate method + url on the tracing span.
+        // The probe is consumed; the loop below uses fresh `rb.try_clone()`
+        // for each attempt.
+        let probe = rb
+            .try_clone()
+            .ok_or_else(|| SealStackError::backend("request body not cloneable"))?
+            .build()
+            .map_err(|e| SealStackError::backend(format!("request build: {e}")))?;
+        let span = tracing::info_span!(
+            "http.request",
+            method = %probe.method(),
+            url = %probe.url(),
+        );
+        drop(probe);
+        let _enter = span.enter();
+
         let start = Instant::now();
         let mut attempt: u32 = 0;
         // Sentinel: always overwritten before read; rustc cannot see that the

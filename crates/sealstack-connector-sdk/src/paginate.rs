@@ -498,4 +498,84 @@ mod tests {
             "expected PaginatorCursorLoop, got {err}"
         );
     }
+
+    /// Single-page response — first call returns items + None.
+    struct SinglePage;
+
+    #[async_trait]
+    impl Paginator for SinglePage {
+        type Item = u32;
+        async fn fetch_page(
+            &mut self,
+            _c: &HttpClient,
+            cursor: Option<String>,
+        ) -> SealStackResult<(Vec<u32>, Option<String>)> {
+            assert!(cursor.is_none(), "single-page test should only fetch once");
+            Ok((vec![7, 8, 9], None))
+        }
+    }
+
+    #[tokio::test]
+    async fn single_page_response() {
+        let items: Vec<_> = paginate(SinglePage, dummy_client()).collect().await;
+        let ok: Vec<u32> = items.into_iter().map(Result::unwrap).collect();
+        assert_eq!(ok, vec![7, 8, 9]);
+    }
+
+    /// First call returns empty items and None — the stream terminates with
+    /// zero items.
+    struct EmptyTerminal;
+
+    #[async_trait]
+    impl Paginator for EmptyTerminal {
+        type Item = u32;
+        async fn fetch_page(
+            &mut self,
+            _c: &HttpClient,
+            _cursor: Option<String>,
+        ) -> SealStackResult<(Vec<u32>, Option<String>)> {
+            Ok((vec![], None))
+        }
+    }
+
+    #[tokio::test]
+    async fn empty_first_page_terminates() {
+        let items: Vec<_> = paginate(EmptyTerminal, dummy_client()).collect().await;
+        assert!(items.is_empty(), "expected empty stream, got {items:?}");
+    }
+
+    /// Yields one page of items, then errors. The adapter must yield the
+    /// items, then yield the error, then never call `fetch_page` again.
+    struct ErrorAfterFirst {
+        calls: u32,
+    }
+
+    #[async_trait]
+    impl Paginator for ErrorAfterFirst {
+        type Item = u32;
+        async fn fetch_page(
+            &mut self,
+            _c: &HttpClient,
+            cursor: Option<String>,
+        ) -> SealStackResult<(Vec<u32>, Option<String>)> {
+            self.calls += 1;
+            assert!(self.calls <= 2, "adapter must not re-enter after error");
+            match cursor.as_deref() {
+                None => Ok((vec![1, 2], Some("p2".into()))),
+                Some("p2") => Err(SealStackError::backend("upstream blew up")),
+                Some(other) => panic!("unexpected cursor {other}"),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn error_mid_stream_poisons_paginator() {
+        let mut s = paginate(ErrorAfterFirst { calls: 0 }, dummy_client());
+        assert_eq!(s.next().await.unwrap().unwrap(), 1);
+        assert_eq!(s.next().await.unwrap().unwrap(), 2);
+        let err = s.next().await.unwrap().unwrap_err();
+        assert!(matches!(err, SealStackError::Backend(_)), "got {err}");
+        // After Err, the stream is done — adapter must not call fetch_page again.
+        assert!(s.next().await.is_none());
+    }
 }
