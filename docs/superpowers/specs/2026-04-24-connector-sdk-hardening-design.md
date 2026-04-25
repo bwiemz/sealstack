@@ -180,9 +180,15 @@ silently masked by server-side instability, while still preventing infinite
 **Worked example (defaults):** retry delays 500 ms, 1 s, 2 s, 4 s. Worst-case
 cumulative before final error: **~7.5 s** (no jitter; less with jitter).
 
-**`Retry-After` parsing:** integer-seconds and HTTP-date. Unparseable or
-negative → fall back to exponential. Small random jitter added to prevent
-synchronized retries across many clients.
+**`Retry-After` parsing:** integer-seconds only in v1 — the form used by
+GitHub, Slack, Stripe, and the vast majority of servers. HTTP-date form
+(`"Wed, 21 Oct 2099 07:28:00 GMT"`) returns `None` and falls through to
+exponential backoff; this is acceptable because servers that send HTTP-date
+typically send integer seconds in sibling headers, and exponential backoff
+is a safe fallback. Negative or unparseable values also fall through. Small
+random jitter (0..1000ms) is added to prevent synchronized retries across
+many clients. HTTP-date support is a deliberate follow-up if observed need
+warrants it.
 
 ### Error shape
 
@@ -229,7 +235,7 @@ OpenTelemetry integration in v1; downstream consumers can add it via
 - 500 twice, then 200 → retry + success.
 - 500 five times → `RetryExhausted { attempts: 5, .. }`.
 - 403 → `Backend` with status, no retry.
-- `Retry-After` parsing: integer, HTTP-date, garbage, negative (unit tests).
+- `Retry-After` parsing: integer-seconds happy path, garbage, negative, and HTTP-date (which falls through to exponential backoff per v1 scope) — unit tests.
 - Body cap: 51 MB response with 50 MB cap → `BodyTooLarge`.
 - User-Agent emission + suffix composition.
 
