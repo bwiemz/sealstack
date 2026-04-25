@@ -3022,6 +3022,7 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
+ "wiremock",
 ]
 
 [[package]]
@@ -3079,6 +3080,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
+ "wiremock",
 ]
 
 [[package]]

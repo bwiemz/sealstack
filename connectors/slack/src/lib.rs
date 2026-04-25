@@ -79,6 +79,11 @@ impl SlackConfig {
 pub struct SlackConnector {
     http: Arc<HttpClient>,
     config: SlackConfig,
+    /// Base URL for the Slack Web API.
+    ///
+    /// Defaults to `https://slack.com/api`. Tests can override this via the
+    /// `api_base` field in the config JSON to point at a wiremock server.
+    api_base: String,
 }
 
 impl SlackConnector {
@@ -116,7 +121,17 @@ impl SlackConnector {
             HttpClient::new(credential, RetryPolicy::default())?.with_user_agent_suffix(UA_SUFFIX),
         );
         let config = SlackConfig::from_json(v);
-        Ok(Self { http, config })
+        let api_base = v
+            .get("api_base")
+            .and_then(|x| x.as_str())
+            .unwrap_or(SLACK_API)
+            .trim_end_matches('/')
+            .to_owned();
+        Ok(Self {
+            http,
+            config,
+            api_base,
+        })
     }
 
     async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> SealStackResult<T> {
@@ -126,7 +141,7 @@ impl SlackConnector {
     }
 
     async fn list_channels(&self) -> SealStackResult<Vec<Channel>> {
-        let url = format!("{SLACK_API}/conversations.list");
+        let url = format!("{}/conversations.list", self.api_base);
         let pg = BodyCursorPaginator::<Channel, _, _, _>::new(
             move |c: &HttpClient, cursor: Option<&str>| {
                 let mut rb = c.get(&url).query(&[
@@ -182,7 +197,7 @@ impl SlackConnector {
 
     async fn list_messages(&self, channel_id: &str) -> SealStackResult<Vec<Message>> {
         let cap = self.config.max_messages_per_channel as usize;
-        let url = format!("{SLACK_API}/conversations.history");
+        let url = format!("{}/conversations.history", self.api_base);
         let channel_id_owned = channel_id.to_owned();
         let pg = BodyCursorPaginator::<Message, _, _, _>::new(
             move |c: &HttpClient, cursor: Option<&str>| {
@@ -294,7 +309,7 @@ impl Connector for SlackConnector {
     }
 
     async fn healthcheck(&self) -> SealStackResult<()> {
-        let url = format!("{SLACK_API}/auth.test");
+        let url = format!("{}/auth.test", self.api_base);
         let resp: AuthTestResp = self.get_json(&url).await?;
         resp.ok_or_err()
     }

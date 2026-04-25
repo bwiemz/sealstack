@@ -9,6 +9,11 @@ repository   = { workspace = true }
 [lints]
 workspace = true
 
+[dev-dependencies]
+wiremock  = "0.6"
+tokio     = { workspace = true, features = ["full"] }
+serde_json = { workspace = true }
+
 [dependencies]
 sealstack-common        = { path = "../../crates/sealstack-common" }
 sealstack-connector-sdk = { path = "../../crates/sealstack-connector-sdk" }
