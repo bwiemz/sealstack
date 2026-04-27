@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.100
         with: { components: rustfmt, clippy }
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.100
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   policy-runtime-drift:
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.100
       - uses: Swatinem/rust-cache@v2
       - name: Install wasm32 target
         run: rustup target add wasm32-unknown-unknown
@@ -79,7 +79,7 @@ jobs:
         ports: ["6333:6333", "6334:6334"]
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.100
       - uses: Swatinem/rust-cache@v2
       # The e2e test target is added in Phase 12. Until then this job is a
       # no-op placeholder; once `tests/e2e.rs` lands in sealstack-gateway, swap
