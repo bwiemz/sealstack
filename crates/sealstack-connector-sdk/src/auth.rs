@@ -611,6 +611,55 @@ mod oauth2_tests {
     }
 
     #[tokio::test]
+    async fn oauth2_negative_cache_clears_after_window() {
+        // Verify the 5-second negative-cache window expires correctly: a
+        // transient failure populates the cache, subsequent calls hit it,
+        // and after the window passes the next call attempts a fresh refresh.
+        //
+        // Manipulate the cache directly rather than waiting wall-clock 5s —
+        // we set negative_cache.expires to a past Instant, which simulates
+        // window expiry without slowing the test.
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": "ya29.fresh_after_window",
+                "expires_in": 3599,
+                "token_type": "Bearer"
+            })))
+            .expect(1) // exactly one call — only fires after we mark the cache stale.
+            .mount(&server)
+            .await;
+
+        let cred = make_credential(&format!("{}/token", server.uri()));
+
+        // Pre-populate negative cache with an entry that has already expired.
+        {
+            let mut cache = cred.cache.lock().await;
+            cache.negative_cache = Some(NegativeCache {
+                expires: Instant::now()
+                    .checked_sub(Duration::from_secs(1))
+                    .expect("test clock supports 1s rewind"),
+                message: "stale negative cache".to_owned(),
+            });
+        }
+
+        // Call should bypass the stale negative-cache entry, refresh, succeed.
+        let h = cred.authorization_header().await.unwrap();
+        assert_eq!(h, "Bearer ya29.fresh_after_window");
+
+        // After successful refresh, the negative cache should be cleared.
+        let negative_cache_cleared = {
+            let cache = cred.cache.lock().await;
+            cache.negative_cache.is_none()
+        };
+        assert!(
+            negative_cache_cleared,
+            "stale negative cache should have been cleared"
+        );
+    }
+
+    #[tokio::test]
     async fn oauth2_skew_triggers_refresh_at_60s_before_expiry() {
         // Pre-populate cache with a token that "expires" 50s from now.
         // 50s < 60s skew margin, so authorization_header should refresh.

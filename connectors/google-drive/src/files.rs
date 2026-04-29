@@ -187,13 +187,16 @@ pub(crate) async fn fetch_body(
     match file.mime_type.as_str() {
         "application/vnd.google-apps.document" => {
             // Google Docs: export as text/plain.
+            // Routed through send_with_drive_shim so a 403 userRateLimitExceeded
+            // during the bulk list() body-fetch path is retried with backoff
+            // rather than aborting the entire sync cycle.
             let url = format!(
                 "{}/drive/v3/files/{}/export",
                 api_base.trim_end_matches('/'),
                 file.id
             );
-            let rb = http.get(&url).query(&[("mimeType", "text/plain")]);
-            let resp = http.send(rb).await?;
+            let make = || http.get(&url).query(&[("mimeType", "text/plain")]);
+            let resp = crate::retry_shim::send_with_drive_shim(http, make).await?;
             let bytes = resp.bytes().await?;
             // Strict UTF-8 — Docs export contract guarantees UTF-8; a violation
             // is a Google-side bug, not a user-side mistake, so error rather
@@ -204,13 +207,15 @@ pub(crate) async fn fetch_body(
         }
         "text/plain" | "text/markdown" => {
             // Direct binary fetch.
+            // Same shim wrapping as Docs export — Drive 403 rate-limits during
+            // bulk body-fetch are retried with backoff, not aborting list().
             let url = format!(
                 "{}/drive/v3/files/{}",
                 api_base.trim_end_matches('/'),
                 file.id
             );
-            let rb = http.get(&url).query(&[("alt", "media")]);
-            let resp = http.send(rb).await?;
+            let make = || http.get(&url).query(&[("alt", "media")]);
+            let resp = crate::retry_shim::send_with_drive_shim(http, make).await?;
             let bytes = resp.bytes().await?;
             // Strict UTF-8 — text MIME is a user-supplied claim Drive doesn't
             // validate. A non-UTF-8 file claimed as text/plain is a config

@@ -10,7 +10,7 @@
 //! | `body`                 | Full file contents (UTF-8)                     |
 //! | `metadata.path`        | Canonical path                                 |
 //! | `metadata.size_bytes`  | File size in bytes                             |
-//! | `permissions`          | `[{ principal: "*", action: "read" }]`         |
+//! | `permissions`          | `[{ principal: "anyone", action: "read" }]`    |
 //! | `source_updated_at`    | File's `mtime`                                 |
 //!
 //! # Supported extensions
