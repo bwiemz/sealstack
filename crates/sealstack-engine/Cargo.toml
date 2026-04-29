@@ -38,7 +38,7 @@ sqlx        = { workspace = true, features = ["postgres", "uuid", "time", "json"
 tracing     = { workspace = true }
 
 # Hashing for receipts / dedup
-blake3      = "1.5"
+blake3      = "1.8"
 
 # Optional reranker HTTP client
 reqwest     = { workspace = true, optional = true }
