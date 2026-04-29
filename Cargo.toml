@@ -13,6 +13,7 @@ members = [
     "crates/sealstack-policy-ir",
     "crates/sealstack-policy-runtime",
     "crates/sealstack-cli",
+    "connectors/google-drive",
     "connectors/local-files",
     "connectors/github",
     "connectors/slack",
