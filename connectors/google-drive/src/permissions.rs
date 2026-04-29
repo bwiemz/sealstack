@@ -1,4 +1,6 @@
-//! Map Drive `permissions[]` entries to SealStack [`PermissionPredicate`]s.
+//! Map Drive `permissions[]` entries to `SealStack` [`PermissionPredicate`]s.
+
+#![allow(clippy::redundant_pub_crate)]
 
 use sealstack_connector_sdk::{PermissionPredicate, Principal};
 use serde::Deserialize;
@@ -18,7 +20,7 @@ pub(crate) struct DrivePermission {
     pub allow_file_discovery: Option<bool>,
 }
 
-/// Map a Drive permission to a SealStack `PermissionPredicate`.
+/// Map a Drive permission to a `SealStack` `PermissionPredicate`.
 ///
 /// Returns `None` for permission kinds the connector doesn't recognize
 /// (logged at warn level — these are real ACL signals being silently
@@ -59,7 +61,7 @@ pub(crate) fn drive_permission_to_predicate(p: &DrivePermission) -> Option<Permi
     })
 }
 
-/// Project a Drive role to a SealStack action.
+/// Project a Drive role to a `SealStack` action.
 ///
 /// # Read-tier mapping rationale
 ///
