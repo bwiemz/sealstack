@@ -363,7 +363,7 @@ fn retry_delay_for(
     if let Some(raw) = retry_after_header
         && let Some(base) = parse_retry_after(raw)
     {
-        let jitter_ms = rand::thread_rng().gen_range(0..1000);
+        let jitter_ms = rand::rng().random_range(0..1000);
         let with_jitter = base + Duration::from_millis(jitter_ms);
         return std::cmp::min(policy.max_delay, with_jitter);
     }
@@ -377,7 +377,7 @@ fn retry_delay_for(
     // configured by the caller. A delay above 2^63 ms (~300 million years)
     // is structurally impossible in practice; the cast from u128 to u64 is safe.
     #[allow(clippy::cast_possible_truncation)]
-    let jittered_ms = rand::thread_rng().gen_range(0..=capped.as_millis() as u64);
+    let jittered_ms = rand::rng().random_range(0..=capped.as_millis() as u64);
     Duration::from_millis(jittered_ms)
 }
 
