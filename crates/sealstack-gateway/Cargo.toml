@@ -32,7 +32,19 @@ time            = { workspace = true }
 async-trait     = "0.1"
 dashmap         = "6"
 futures         = "0.3"
-jsonwebtoken    = "9.2"
+# jsonwebtoken 10 made crypto-backend selection explicit. We pick `aws_lc_rs`
+# (BoringSSL via C, used elsewhere in the rustls stack via reqwest) over
+# `rust_crypto` deliberately:
+#   - `rust_crypto` transitively pulls the pure-Rust `rsa` crate, which has
+#     RUSTSEC-2023-0071 ("Marvin Attack" — RSA key recovery via timing side-
+#     channel) open with no patched version available. We only call HS256, but
+#     `cargo deny` operates on the dep graph, not call sites, so the advisory
+#     blocks CI.
+#   - `aws_lc_rs` avoids the `rsa` crate entirely; same advisory surface as
+#     reqwest/rustls, which we already link in.
+# Local Windows dev build of aws-lc-sys requires NASM (`choco install nasm` or
+# `winget install nasm`). Linux CI uses GAS and works out of the box.
+jsonwebtoken    = { version = "10.3", default-features = false, features = ["aws_lc_rs"] }
 reqwest         = { workspace = true }
 # Internal crates
 sealstack-common                  = { path = "../sealstack-common" }
