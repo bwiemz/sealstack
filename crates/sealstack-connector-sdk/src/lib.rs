@@ -38,6 +38,7 @@ pub mod auth;
 pub mod change_streams;
 pub mod http;
 pub mod paginate;
+pub mod principal;
 pub mod retry;
 
 use std::pin::Pin;
@@ -46,6 +47,7 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 
+pub use principal::Principal;
 pub use sealstack_common::{SealStackError, SealStackResult};
 
 // ---------------------------------------------------------------------------
