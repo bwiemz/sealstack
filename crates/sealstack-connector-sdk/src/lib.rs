@@ -150,26 +150,28 @@ impl Resource {
 
 /// Coarse source-side permission predicate.
 ///
-/// `principal` is a stringly-typed identity reference that the source system
-/// understands — e.g. `"user:alice@acme.com"`, `"group:engineering"`, `"*"`.
-/// `action` is typically `"read"`, `"write"`, or `"list"`.
+/// `principal` is a typed identity reference that the source system
+/// understands. `action` is typically `"read"`, `"write"`, or `"list"`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PermissionPredicate {
-    /// The identity string the source assigns access to.
-    pub principal: String,
-    /// The action the principal may perform.
+    /// Typed identity that this permission applies to.
+    pub principal: Principal,
+    /// The action the principal may perform — `"read"`, `"write"`,
+    /// `"list"`, `"delete"`. Connector-specific source roles project
+    /// down to these canonical actions at the connector boundary.
     pub action: String,
 }
 
 impl PermissionPredicate {
-    /// Predicate granting `read` access to every principal.
+    /// Predicate granting `read` access to anyone, discoverable in searches.
     ///
-    /// Used by connectors that index public content or where the source system
-    /// does not expose per-resource ACLs.
+    /// Used by connectors that index inherently public content (e.g., the
+    /// `local-files` connector, where filesystem-readable files are
+    /// considered publicly accessible to anyone with corpus access).
     #[must_use]
     pub fn public_read() -> Self {
         Self {
-            principal: "*".into(),
+            principal: Principal::Anyone,
             action: "read".into(),
         }
     }
@@ -261,13 +263,47 @@ mod tests {
     #[test]
     fn permission_public_read_round_trips() {
         let p = PermissionPredicate::public_read();
-        assert_eq!(p.principal, "*");
+        assert_eq!(p.principal, Principal::Anyone);
         assert_eq!(p.action, "read");
+        let s = serde_json::to_string(&p).unwrap();
+        assert_eq!(s, r#"{"principal":"anyone","action":"read"}"#);
     }
 
     #[test]
     fn resource_id_display() {
         let id: ResourceId = "abc".into();
         assert_eq!(id.to_string(), "abc");
+    }
+
+    #[test]
+    fn public_read_uses_principal_anyone() {
+        let p = PermissionPredicate::public_read();
+        assert_eq!(p.principal, Principal::Anyone);
+        assert_eq!(p.action, "read");
+    }
+
+    #[test]
+    fn legacy_predicate_wire_data_still_deserializes() {
+        let legacy = r#"{"principal":"*","action":"read"}"#;
+        let p: PermissionPredicate = serde_json::from_str(legacy).unwrap();
+        assert_eq!(p.principal, Principal::Anyone);
+        assert_eq!(p.action, "read");
+    }
+
+    #[test]
+    fn legacy_star_with_write_action_still_deserializes() {
+        let legacy = r#"{"principal":"*","action":"write"}"#;
+        let p: PermissionPredicate = serde_json::from_str(legacy).unwrap();
+        assert_eq!(p.principal, Principal::Anyone);
+        assert_eq!(p.action, "write");
+    }
+
+    #[test]
+    fn current_predicate_round_trips() {
+        let current = r#"{"principal":"user:alice@acme.com","action":"write"}"#;
+        let p: PermissionPredicate = serde_json::from_str(current).unwrap();
+        assert_eq!(p.principal, Principal::User("alice@acme.com".to_owned()));
+        let re = serde_json::to_string(&p).unwrap();
+        assert_eq!(re, current);
     }
 }
