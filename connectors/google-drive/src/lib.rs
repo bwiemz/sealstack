@@ -30,6 +30,7 @@
 
 mod files;
 mod permissions;
+pub mod retry_shim;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -209,6 +210,7 @@ impl Connector for DriveConnector {
 #[doc(hidden)]
 pub mod test_only {
     pub use crate::files::{DriveFileTestStub, fetch_body_for_test, list_files_for_test};
+    pub use crate::retry_shim::send_with_drive_shim;
 }
 
 #[cfg(test)]
