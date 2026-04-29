@@ -26,12 +26,12 @@ use async_trait::async_trait;
 
 pub use sealstack_common::{SealStackError, SealStackResult};
 
+#[cfg(feature = "openai")]
+pub mod openai;
 #[cfg(feature = "stub")]
 pub mod stub;
 #[cfg(feature = "voyage")]
 pub mod voyage;
-#[cfg(feature = "openai")]
-pub mod openai;
 
 /// Embedder trait.
 #[async_trait]

@@ -31,9 +31,9 @@ async fn add(ctx: &CliContext, args: ConnectorAddArgs) -> anyhow::Result<()> {
                 .root
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("local-files requires --root <path>"))?;
-            let abs = root.canonicalize().with_context(|| {
-                format!("canonicalize --root {}", root.display())
-            })?;
+            let abs = root
+                .canonicalize()
+                .with_context(|| format!("canonicalize --root {}", root.display()))?;
             cfg.as_object_mut()
                 .unwrap()
                 .insert("root".into(), Value::String(abs.display().to_string()));

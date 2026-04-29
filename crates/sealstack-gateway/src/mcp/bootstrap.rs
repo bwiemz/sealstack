@@ -135,7 +135,13 @@ pub fn register_schema_tools(
 fn slugify_for_tool_name(qualified: &str) -> String {
     qualified
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -179,7 +185,9 @@ fn list_descriptor(slug: &str, qualified: &str) -> ToolDescriptor {
     ToolDescriptor {
         name: format!("list_{slug}"),
         title: Some(format!("List {qualified}")),
-        description: format!("List {qualified} records with optional filters and cursor pagination."),
+        description: format!(
+            "List {qualified} records with optional filters and cursor pagination."
+        ),
         input_schema: json!({
             "type": "object",
             "properties": {
@@ -217,19 +225,6 @@ fn list_relation_descriptor(slug: &str, qualified: &str, relation: &str) -> Tool
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::slugify_for_tool_name;
-
-    #[test]
-    fn slug_rewrites_dots_and_preserves_legal_chars() {
-        assert_eq!(slugify_for_tool_name("acme.crm.Customer"), "acme_crm_Customer");
-        assert_eq!(slugify_for_tool_name("Doc"), "Doc");
-        assert_eq!(slugify_for_tool_name("my-schema_v2"), "my-schema_v2");
-        assert_eq!(slugify_for_tool_name("weird name!"), "weird_name_");
-    }
-}
-
 fn aggregate_descriptor(slug: &str, qualified: &str, facet: &str) -> ToolDescriptor {
     let facet_slug = slugify_for_tool_name(facet);
     ToolDescriptor {
@@ -246,5 +241,21 @@ fn aggregate_descriptor(slug: &str, qualified: &str, facet: &str) -> ToolDescrip
         }),
         output_schema: None,
         annotations: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::slugify_for_tool_name;
+
+    #[test]
+    fn slug_rewrites_dots_and_preserves_legal_chars() {
+        assert_eq!(
+            slugify_for_tool_name("acme.crm.Customer"),
+            "acme_crm_Customer"
+        );
+        assert_eq!(slugify_for_tool_name("Doc"), "Doc");
+        assert_eq!(slugify_for_tool_name("my-schema_v2"), "my-schema_v2");
+        assert_eq!(slugify_for_tool_name("weird name!"), "weird_name_");
     }
 }

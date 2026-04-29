@@ -132,7 +132,12 @@ pub enum CslError {
 impl CslError {
     /// Helper for building a plain parse error from a winnow context message.
     #[must_use]
-    pub fn parse(filename: Option<&str>, source: &str, span: Span, message: impl Into<String>) -> Self {
+    pub fn parse(
+        filename: Option<&str>,
+        source: &str,
+        span: Span,
+        message: impl Into<String>,
+    ) -> Self {
         Self::Parse {
             message: message.into(),
             src: NamedSource::new(filename.unwrap_or("<input>"), source.to_owned()),

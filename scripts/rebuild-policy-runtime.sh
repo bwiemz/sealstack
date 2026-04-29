@@ -8,12 +8,16 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
+# sealstack-policy-runtime is `[workspace] exclude`'d from the root workspace,
+# so `-p` lookup from the workspace root won't find it. Use --manifest-path
+# to invoke cargo on the standalone crate.
 cargo build \
-  -p sealstack-policy-runtime \
+  --manifest-path crates/sealstack-policy-runtime/Cargo.toml \
   --target wasm32-unknown-unknown \
   --release
 
-src="target/wasm32-unknown-unknown/release/sealstack_policy_runtime.wasm"
+# Output lives next to the standalone crate's target dir, not the workspace's.
+src="crates/sealstack-policy-runtime/target/wasm32-unknown-unknown/release/sealstack_policy_runtime.wasm"
 dst="crates/sealstack-csl/assets/policy_runtime.wasm"
 
 mkdir -p "$(dirname "${dst}")"

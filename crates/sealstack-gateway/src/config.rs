@@ -35,8 +35,9 @@ impl Config {
     pub fn from_env() -> Self {
         Self {
             bind: std::env::var("SEALSTACK_BIND").unwrap_or_else(|_| "0.0.0.0:7070".into()),
-            database_url: std::env::var("SEALSTACK_DATABASE_URL")
-                .unwrap_or_else(|_| "postgres://sealstack:sealstack@localhost:5432/sealstack".into()),
+            database_url: std::env::var("SEALSTACK_DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://sealstack:sealstack@localhost:5432/sealstack".into()
+            }),
             qdrant_url: std::env::var("SEALSTACK_QDRANT_URL")
                 .unwrap_or_else(|_| "http://localhost:6334".into()),
             redis_url: std::env::var("SEALSTACK_REDIS_URL").ok(),
@@ -51,8 +52,9 @@ impl Config {
     pub fn test() -> Self {
         Self {
             bind: "127.0.0.1:0".into(),
-            database_url: std::env::var("SEALSTACK_DATABASE_URL")
-                .unwrap_or_else(|_| "postgres://sealstack:sealstack@localhost:5432/sealstack".into()),
+            database_url: std::env::var("SEALSTACK_DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://sealstack:sealstack@localhost:5432/sealstack".into()
+            }),
             qdrant_url: std::env::var("SEALSTACK_QDRANT_URL")
                 .unwrap_or_else(|_| "http://localhost:6334".into()),
             redis_url: None,

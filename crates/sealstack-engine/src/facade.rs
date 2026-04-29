@@ -39,14 +39,14 @@ pub trait EngineFacade: Send + Sync + 'static {
 
     /// Fetch a single record by primary key. `id` is a JSON value (string for
     /// Ulid/Uuid; numeric for I32/I64).
-    async fn get(
-        &self,
-        caller: &Caller,
-        schema: &str,
-        id: &Value,
-    ) -> Result<Value, EngineError>;
+    async fn get(&self, caller: &Caller, schema: &str, id: &Value) -> Result<Value, EngineError>;
 
     /// Paginated list with facet filters. `cursor` is opaque.
+    // Eight parameters because `list` exposes the full query surface (filters,
+    // pagination, sort) the gateway needs to call. Bundling into a `ListRequest`
+    // struct would require a parallel `Builder` for ergonomics and is tracked
+    // as a separate API ergonomics task.
+    #[allow(clippy::too_many_arguments)]
     async fn list(
         &self,
         caller: &Caller,
@@ -140,12 +140,7 @@ impl<E: EngineHandle> EngineFacade for E {
         }))
     }
 
-    async fn get(
-        &self,
-        caller: &Caller,
-        schema: &str,
-        id: &Value,
-    ) -> Result<Value, EngineError> {
+    async fn get(&self, caller: &Caller, schema: &str, id: &Value) -> Result<Value, EngineError> {
         let (namespace, name) = split_qualified(schema)?;
         let id = id_to_string(id)?;
         EngineHandle::get(

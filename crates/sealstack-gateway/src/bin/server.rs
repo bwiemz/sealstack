@@ -41,34 +41,30 @@ async fn main() -> anyhow::Result<()> {
     let embedder: Arc<dyn Embedder> = dev_embedder();
     let reranker: Arc<dyn Reranker> = dev_reranker();
     let policy: Arc<dyn PolicyEngine> = dev_policy();
-    let engine = Arc::new(
-        Engine::new(engine_config, vector_store, embedder, policy, reranker).await?,
-    );
+    let engine =
+        Arc::new(Engine::new(engine_config, vector_store, embedder, policy, reranker).await?);
 
     // ---- Connector factory ------------------------------------------------
     let factory: ConnectorFactory = Arc::new(
         |kind: &str, config: &Value| -> anyhow::Result<Arc<dyn Connector>> {
             match kind {
                 "local-files" => {
-                    let root = config
-                        .get("root")
-                        .and_then(Value::as_str)
-                        .ok_or_else(|| {
-                            anyhow::anyhow!("local-files connector requires a `root` string")
-                        })?;
+                    let root = config.get("root").and_then(Value::as_str).ok_or_else(|| {
+                        anyhow::anyhow!("local-files connector requires a `root` string")
+                    })?;
                     let c = sealstack_connector_local_files::LocalFilesConnector::new(root)
                         .map_err(|e| anyhow::anyhow!(e))?;
                     Ok(Arc::new(c))
                 }
                 "github" => {
-                    let cfg = sealstack_connector_github::GithubConfig::from_json(config)
+                    let c = sealstack_connector_github::GithubConnector::from_json(config)
                         .map_err(|e| anyhow::anyhow!(e))?;
-                    Ok(Arc::new(sealstack_connector_github::GithubConnector::new(cfg)))
+                    Ok(Arc::new(c))
                 }
                 "slack" => {
-                    let cfg = sealstack_connector_slack::SlackConfig::from_json(config)
+                    let c = sealstack_connector_slack::SlackConnector::from_json(config)
                         .map_err(|e| anyhow::anyhow!(e))?;
-                    Ok(Arc::new(sealstack_connector_slack::SlackConnector::new(cfg)))
+                    Ok(Arc::new(c))
                 }
                 other => Err(anyhow::anyhow!("unknown connector kind `{other}`")),
             }
@@ -93,7 +89,9 @@ async fn dev_vector_store(
 ) -> anyhow::Result<Arc<dyn VectorStore>> {
     if config.qdrant_url.is_empty() {
         tracing::warn!("using in-process vector store; data is not persisted across restarts");
-        Ok(Arc::new(sealstack_vectorstore::memory::InMemoryStore::default()))
+        Ok(Arc::new(
+            sealstack_vectorstore::memory::InMemoryStore::default(),
+        ))
     } else {
         tracing::info!(url = %config.qdrant_url, "connecting to Qdrant");
         let qdrant =
@@ -138,8 +136,8 @@ fn fallback_stub(err: anyhow::Error) -> Arc<dyn Embedder> {
 
 fn build_openai_embedder() -> anyhow::Result<Arc<dyn Embedder>> {
     let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
-    let model =
-        std::env::var("SEALSTACK_EMBEDDER_MODEL").unwrap_or_else(|_| "text-embedding-3-small".into());
+    let model = std::env::var("SEALSTACK_EMBEDDER_MODEL")
+        .unwrap_or_else(|_| "text-embedding-3-small".into());
     let mut e = sealstack_embedders::openai::OpenAIEmbedder::with_model(api_key, &model)
         .map_err(|e| anyhow::anyhow!("openai embedder: {e}"))?;
     if let Ok(ep) = std::env::var("SEALSTACK_EMBEDDER_ENDPOINT") {
@@ -181,10 +179,7 @@ fn dev_policy() -> Arc<dyn PolicyEngine> {
     let deny_missing = std::env::var("SEALSTACK_POLICY_DEFAULT")
         .map(|v| v == "deny")
         .unwrap_or(false);
-    sealstack_gateway::policy_from_dir(
-        (!dir.is_empty()).then_some(dir.as_str()),
-        deny_missing,
-    )
+    sealstack_gateway::policy_from_dir((!dir.is_empty()).then_some(dir.as_str()), deny_missing)
 }
 
 /// Select the reranker backend at boot from `SEALSTACK_RERANKER`.
@@ -198,7 +193,9 @@ fn dev_reranker() -> Arc<dyn Reranker> {
         "http" => {
             let endpoint = std::env::var("SEALSTACK_RERANKER_URL").unwrap_or_default();
             if endpoint.is_empty() {
-                tracing::error!("SEALSTACK_RERANKER=http but SEALSTACK_RERANKER_URL unset; falling back to identity");
+                tracing::error!(
+                    "SEALSTACK_RERANKER=http but SEALSTACK_RERANKER_URL unset; falling back to identity"
+                );
                 return Arc::new(sealstack_engine::rerank::IdentityReranker);
             }
             let model = std::env::var("SEALSTACK_RERANKER_MODEL")

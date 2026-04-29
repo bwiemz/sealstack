@@ -415,7 +415,7 @@ mod base64_lite {
         if bytes.is_empty() {
             return Ok(Vec::new());
         }
-        if bytes.len() % 4 != 0 {
+        if !bytes.len().is_multiple_of(4) {
             return Err("base64: length not multiple of 4");
         }
         let mut out = Vec::with_capacity(bytes.len() / 4 * 3);

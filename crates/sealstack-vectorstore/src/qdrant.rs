@@ -29,7 +29,7 @@ use qdrant_client::qdrant::{
 };
 use serde_json::Value;
 
-use crate::{SealStackError, SealStackResult, Chunk, Distance, SearchResult, VectorStore};
+use crate::{Chunk, Distance, SealStackError, SealStackResult, SearchResult, VectorStore};
 
 /// Qdrant-backed vector store.
 pub struct QdrantStore {
@@ -48,7 +48,10 @@ impl QdrantStore {
         }
         let client = builder.build().map_err(SealStackError::backend)?;
         // Sanity-check: list collections at boot to fail fast on bad URLs.
-        client.list_collections().await.map_err(SealStackError::backend)?;
+        client
+            .list_collections()
+            .await
+            .map_err(SealStackError::backend)?;
         tracing::info!(url, "qdrant connected");
         Ok(Self { client })
     }
@@ -77,7 +80,11 @@ impl VectorStore for QdrantStore {
 
     async fn ensure_collection_spec(&self, spec: &crate::CollectionSpec) -> SealStackResult<()> {
         // Idempotent: check first.
-        let existing = self.client.collection_exists(&spec.name).await.map_err(SealStackError::backend)?;
+        let existing = self
+            .client
+            .collection_exists(&spec.name)
+            .await
+            .map_err(SealStackError::backend)?;
         if existing {
             return Ok(());
         }
@@ -110,11 +117,7 @@ impl VectorStore for QdrantStore {
                 for (k, v) in c.metadata {
                     payload.insert(k, serde_json_to_qvalue(v));
                 }
-                PointStruct::new(
-                    ulid_to_point_id(c.id),
-                    c.embedding,
-                    payload,
-                )
+                PointStruct::new(ulid_to_point_id(c.id), c.embedding, payload)
             })
             .collect();
 
@@ -133,8 +136,7 @@ impl VectorStore for QdrantStore {
         filter: Option<Value>,
     ) -> SealStackResult<Vec<SearchResult>> {
         let limit = u64::try_from(top_k).unwrap_or(16);
-        let mut builder = SearchPointsBuilder::new(collection, query_vec, limit)
-            .with_payload(true);
+        let mut builder = SearchPointsBuilder::new(collection, query_vec, limit).with_payload(true);
         if let Some(f) = filter.and_then(value_to_filter) {
             builder = builder.filter(f);
         }
@@ -148,15 +150,18 @@ impl VectorStore for QdrantStore {
             .result
             .into_iter()
             .map(|scored| {
-                let id = point_id_to_ulid(scored.id.as_ref()).unwrap_or_else(ulid::Ulid::new);
+                // `Ulid::default()` calls `Ulid::new()` (a fresh clock+RNG ULID)
+                // and is only evaluated on the None path; using
+                // `unwrap_or_default` here is equivalent to the explicit closure.
+                let id = point_id_to_ulid(scored.id.as_ref()).unwrap_or_default();
                 let mut metadata = serde_json::Map::new();
                 let mut content = String::new();
                 for (k, v) in scored.payload {
                     let json = qvalue_to_serde_json(v);
-                    if k == "content" {
-                        if let Value::String(s) = &json {
-                            content = s.clone();
-                        }
+                    if k == "content"
+                        && let Value::String(s) = &json
+                    {
+                        content = s.clone();
                     }
                     metadata.insert(k, json);
                 }
@@ -190,10 +195,7 @@ impl VectorStore for QdrantStore {
     async fn count(&self, collection: &str) -> SealStackResult<u64> {
         let resp = self
             .client
-            .count(
-                qdrant_client::qdrant::CountPointsBuilder::new(collection)
-                    .exact(true),
-            )
+            .count(qdrant_client::qdrant::CountPointsBuilder::new(collection).exact(true))
             .await
             .map_err(SealStackError::backend)?;
         Ok(resp.result.map(|r| r.count).unwrap_or(0))
@@ -241,7 +243,22 @@ fn uuid_from_ulid(id: ulid::Ulid) -> String {
     let b = bytes.to_be_bytes();
     format!(
         "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-        b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]
+        b[0],
+        b[1],
+        b[2],
+        b[3],
+        b[4],
+        b[5],
+        b[6],
+        b[7],
+        b[8],
+        b[9],
+        b[10],
+        b[11],
+        b[12],
+        b[13],
+        b[14],
+        b[15]
     )
 }
 

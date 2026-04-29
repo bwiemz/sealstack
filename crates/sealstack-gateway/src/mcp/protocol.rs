@@ -40,12 +40,8 @@ pub async fn dispatch(
     caller: &Caller,
     req: JsonRpcRequest,
 ) -> Option<JsonRpcResponse> {
-    let id = req.id.clone();
-    if id.is_none() {
-        // Notification: no response expected.
-        return None;
-    }
-    let id = id.unwrap();
+    // Notification (id absent) → no response expected.
+    let id = req.id.clone()?;
 
     let result = match req.method.as_str() {
         "initialize" => handle_initialize(req.params),
@@ -107,8 +103,8 @@ fn handle_initialize(params: Option<Value>) -> Result<Value, JsonRpcError> {
 fn handle_tools_list(server_name: &str, registry: &ToolRegistry) -> Result<Value, JsonRpcError> {
     let mut tools = registry.list_for(server_name);
     tools.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(serde_json::to_value(ToolsListResult { tools })
-        .map_err(|e| JsonRpcError::new(JsonRpcError::INTERNAL_ERROR, e.to_string()))?)
+    serde_json::to_value(ToolsListResult { tools })
+        .map_err(|e| JsonRpcError::new(JsonRpcError::INTERNAL_ERROR, e.to_string()))
 }
 
 async fn handle_tools_call(
@@ -131,14 +127,19 @@ async fn handle_tools_call(
     let Some(handler) = registry.get(server_name, &params.name) else {
         return Err(JsonRpcError::new(
             JsonRpcError::METHOD_NOT_FOUND,
-            format!("tool `{}` not found on server `{}`", params.name, server_name),
+            format!(
+                "tool `{}` not found on server `{}`",
+                params.name, server_name
+            ),
         ));
     };
 
     match handler.invoke(caller, &params.arguments).await {
         Ok(payload) => {
             let result = ToolsCallResult {
-                content: vec![ToolContent::Json { json: payload.clone() }],
+                content: vec![ToolContent::Json {
+                    json: payload.clone(),
+                }],
                 is_error: false,
                 structured_content: Some(payload),
             };
@@ -157,9 +158,7 @@ async fn handle_tools_call(
         )),
         Err(ToolError::NotFound) => Err(JsonRpcError::new(-32004, "not found")),
         Err(ToolError::Unimplemented) => Err(JsonRpcError::new(-32010, "unimplemented")),
-        Err(ToolError::Backend(msg)) => {
-            Err(JsonRpcError::new(JsonRpcError::INTERNAL_ERROR, msg))
-        }
+        Err(ToolError::Backend(msg)) => Err(JsonRpcError::new(JsonRpcError::INTERNAL_ERROR, msg)),
     }
 }
 

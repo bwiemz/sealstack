@@ -128,10 +128,7 @@ impl Store {
     // ----- Connector persistence ---------------------------------------------
 
     /// Insert or update one connector binding.
-    pub async fn put_connector(
-        &self,
-        binding: &PersistedConnector,
-    ) -> Result<(), EngineError> {
+    pub async fn put_connector(&self, binding: &PersistedConnector) -> Result<(), EngineError> {
         // `name` has a legacy NOT NULL constraint from the init migration and
         // has no reader today; we seed it with `kind` on insert but DO NOT
         // touch it on update so any future human-readable label wins.
@@ -154,7 +151,11 @@ impl Store {
         .bind(&binding.target_schema)
         .bind(&binding.tenant)
         .bind(&binding.config)
-        .bind(binding.interval_secs.map(|s| i64::try_from(s).unwrap_or(i64::MAX)))
+        .bind(
+            binding
+                .interval_secs
+                .map(|s| i64::try_from(s).unwrap_or(i64::MAX)),
+        )
         .execute(&self.pool)
         .await
         .map_err(EngineError::backend)?;

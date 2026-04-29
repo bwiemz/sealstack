@@ -124,14 +124,11 @@ impl Reranker for HttpReranker {
         }
 
         let docs: Vec<&str> = candidates.iter().map(|c| c.text.as_str()).collect();
-        let mut req = self
-            .client
-            .post(&self.endpoint)
-            .json(&Req {
-                model: &self.model,
-                query,
-                documents: docs,
-            });
+        let mut req = self.client.post(&self.endpoint).json(&Req {
+            model: &self.model,
+            query,
+            documents: docs,
+        });
         if let Some(key) = &self.api_key {
             req = req.bearer_auth(key);
         }

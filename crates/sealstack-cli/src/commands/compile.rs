@@ -12,13 +12,8 @@ use crate::output;
 use crate::project::ProjectConfig;
 
 pub(crate) async fn run(ctx: &CliContext, args: CompileArgs) -> anyhow::Result<()> {
-    let (project, project_root) =
-        ProjectConfig::discover(&ctx.project_root)?.unwrap_or_else(|| {
-            (
-                ProjectConfig::default(),
-                ctx.project_root.clone(),
-            )
-        });
+    let (project, project_root) = ProjectConfig::discover(&ctx.project_root)?
+        .unwrap_or_else(|| (ProjectConfig::default(), ctx.project_root.clone()));
     let input = args
         .input
         .unwrap_or_else(|| project_root.join(&project.paths.schemas));
@@ -35,15 +30,19 @@ pub(crate) async fn run(ctx: &CliContext, args: CompileArgs) -> anyhow::Result<(
 
     let mut compiled = Vec::new();
     for path in &sources {
-        let src = std::fs::read_to_string(path)
-            .with_context(|| format!("read {}", path.display()))?;
+        let src =
+            std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
         let out = csl_compile(&src, CompileTargets::all())?;
         write_outputs(&output_dir, path, &out)?;
         for meta in &out.schemas_meta {
             let qualified = format!(
                 "{}.{}",
-                meta.get("namespace").and_then(|v| v.as_str()).unwrap_or("default"),
-                meta.get("name").and_then(|v| v.as_str()).unwrap_or("Unnamed"),
+                meta.get("namespace")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default"),
+                meta.get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unnamed"),
             );
             compiled.push(json!({
                 "source":    path.display().to_string(),
@@ -53,7 +52,10 @@ pub(crate) async fn run(ctx: &CliContext, args: CompileArgs) -> anyhow::Result<(
         }
     }
 
-    output::print(ctx.format, &json!({ "output_dir": output_dir.display().to_string(), "compiled": compiled }));
+    output::print(
+        ctx.format,
+        &json!({ "output_dir": output_dir.display().to_string(), "compiled": compiled }),
+    );
     Ok(())
 }
 
@@ -99,20 +101,22 @@ fn write_outputs(output_dir: &Path, source: &Path, out: &CompileOutput) -> anyho
     std::fs::create_dir_all(&py_dir)?;
     std::fs::create_dir_all(&policy_dir)?;
 
-    if !out.rust.is_empty()
-        && !out.rust.starts_with("// Rust codegen not yet implemented")
-    {
+    if !out.rust.is_empty() && !out.rust.starts_with("// Rust codegen not yet implemented") {
         std::fs::write(rust_dir.join("generated.rs"), &out.rust)?;
     }
 
     if !out.typescript.is_empty()
-        && !out.typescript.starts_with("// TypeScript codegen not yet implemented")
+        && !out
+            .typescript
+            .starts_with("// TypeScript codegen not yet implemented")
     {
         std::fs::write(ts_dir.join("generated.ts"), &out.typescript)?;
     }
 
     if !out.python.is_empty()
-        && !out.python.starts_with("# Python codegen not yet implemented")
+        && !out
+            .python
+            .starts_with("# Python codegen not yet implemented")
     {
         std::fs::write(py_dir.join("generated.py"), &out.python)?;
     }
@@ -126,7 +130,10 @@ fn write_outputs(output_dir: &Path, source: &Path, out: &CompileOutput) -> anyho
         std::fs::write(sql_dir.join(format!("{stem}_up.sql")), &out.sql)?;
     }
     if !out.vector_plan.is_empty() {
-        std::fs::write(vector_dir.join(format!("{stem}.plan.yaml")), &out.vector_plan)?;
+        std::fs::write(
+            vector_dir.join(format!("{stem}.plan.yaml")),
+            &out.vector_plan,
+        )?;
     }
     if !out.mcp_tools.is_null() {
         std::fs::write(
@@ -137,8 +144,12 @@ fn write_outputs(output_dir: &Path, source: &Path, out: &CompileOutput) -> anyho
     for meta in &out.schemas_meta {
         let qualified = format!(
             "{}.{}",
-            meta.get("namespace").and_then(|v| v.as_str()).unwrap_or("default"),
-            meta.get("name").and_then(|v| v.as_str()).unwrap_or("Unnamed"),
+            meta.get("namespace")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default"),
+            meta.get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unnamed"),
         );
         std::fs::write(
             schemas_dir.join(format!("{qualified}.schema.json")),

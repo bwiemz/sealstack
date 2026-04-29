@@ -38,7 +38,6 @@ use serde_json::{Value, json};
 use crate::server::AppState;
 
 /// Assemble the REST routes.
-#[must_use]
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/healthz", get(healthz))
@@ -133,7 +132,11 @@ async fn register_schema(
         return engine_error_response(e);
     }
     state.engine.registry().insert(meta.clone());
-    crate::mcp::bootstrap::register_schema_tools(&state.registry, state.engine_facade.clone(), &meta);
+    crate::mcp::bootstrap::register_schema_tools(
+        &state.registry,
+        state.engine_facade.clone(),
+        &meta,
+    );
     ok(json!({ "qualified": qualified, "status": "registered" }))
 }
 
@@ -157,10 +160,7 @@ async fn list_schemas(State(state): State<AppState>) -> Response {
     ok(json!({ "schemas": items }))
 }
 
-async fn get_schema(
-    State(state): State<AppState>,
-    Path(qualified): Path<String>,
-) -> Response {
+async fn get_schema(State(state): State<AppState>, Path(qualified): Path<String>) -> Response {
     let (ns, name) = match split_qualified(&qualified) {
         Ok(x) => x,
         Err(m) => return bad_request(m),
@@ -184,7 +184,12 @@ async fn apply_schema_ddl(
     if let Err(m) = split_qualified(&qualified) {
         return bad_request(m);
     }
-    match state.engine.store_handle().apply_schema_ddl(&body.ddl).await {
+    match state
+        .engine
+        .store_handle()
+        .apply_schema_ddl(&body.ddl)
+        .await
+    {
         Ok(()) => ok(json!({ "status": "applied" })),
         Err(e) => engine_error_response(e),
     }
@@ -223,10 +228,7 @@ async fn register_connector(
     }
 }
 
-async fn sync_connector(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+async fn sync_connector(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     match state.sync_connector(&id).await {
         Some(outcome) => ok(json!(outcome)),
         None => not_found(format!("connector binding `{id}` not found")),
@@ -237,10 +239,7 @@ async fn sync_connector(
 // Receipts
 // ---------------------------------------------------------------------------
 
-async fn get_receipt(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+async fn get_receipt(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     match state.engine.receipts().fetch(&id).await {
         Ok(r) => ok(json!(r)),
         Err(e) => engine_error_response(e),
@@ -293,7 +292,13 @@ impl<S: Sync> axum::extract::FromRequestParts<S> for CallerExt {
             .headers
             .get("x-sealstack-roles")
             .and_then(|v| v.to_str().ok())
-            .map(|s| s.split(',').map(str::trim).filter(|s| !s.is_empty()).map(str::to_owned).collect())
+            .map(|s| {
+                s.split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+                    .collect()
+            })
             .unwrap_or_default();
         Ok(Self(Caller {
             id: user,
@@ -357,7 +362,9 @@ fn split_qualified(qualified: &str) -> Result<(String, String), String> {
         .rsplit_once('.')
         .ok_or_else(|| format!("schema `{qualified}` must be qualified as `namespace.Name`"))?;
     if ns.is_empty() || name.is_empty() {
-        return Err(format!("schema `{qualified}` has an empty namespace or name"));
+        return Err(format!(
+            "schema `{qualified}` has an empty namespace or name"
+        ));
     }
     Ok((ns.to_owned(), name.to_owned()))
 }

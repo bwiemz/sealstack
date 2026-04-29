@@ -30,6 +30,11 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
+// `CslError` carries `miette::NamedSource` + `SourceSpan` per variant for rich
+// diagnostics, so it's intentionally large (~136 bytes per variant). Boxing
+// every `CslResult` would obscure the ergonomic Diagnostic surface for the
+// entire compiler. The cost is paid only on the error path.
+#![allow(clippy::result_large_err)]
 
 pub mod ast;
 pub mod codegen;

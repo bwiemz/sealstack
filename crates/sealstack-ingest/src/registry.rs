@@ -7,8 +7,8 @@
 
 use std::sync::Arc;
 
-use sealstack_connector_sdk::Connector;
 use dashmap::DashMap;
+use sealstack_connector_sdk::Connector;
 use serde::{Deserialize, Serialize};
 
 /// One binding of a connector to a target schema.

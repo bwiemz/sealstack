@@ -16,7 +16,7 @@ anyhow          = { workspace = true }
 serde           = { workspace = true }
 serde_json      = { workspace = true }
 tracing         = { workspace = true }
-winnow          = "1.0"
+winnow          = { workspace = true }
 indexmap        = { version = "2", features = ["serde"] }
 miette          = { version = "7", features = ["fancy"] }
 bitflags        = "2"

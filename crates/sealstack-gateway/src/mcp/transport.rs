@@ -24,11 +24,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::post,
-    Json, Router,
 };
 use dashmap::DashMap;
 use serde_json::Value;
@@ -85,7 +85,6 @@ impl TransportState {
 /// Build the router fragment that mounts `/mcp/{server_name}` endpoints.
 ///
 /// The caller should nest this onto the main app router, typically under `/mcp`.
-#[must_use]
 pub fn router(state: TransportState) -> Router {
     Router::new()
         .route(
@@ -142,10 +141,9 @@ async fn handle_post(
         SESSION_HEADER,
         HeaderValue::from_str(&session_id).unwrap_or_else(|_| HeaderValue::from_static("invalid")),
     );
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("no-store"),
-    );
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response
 }
 

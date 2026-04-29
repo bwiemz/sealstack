@@ -27,7 +27,7 @@ pub const MAGIC: [u8; 4] = *b"SLIR";
 // Action masks
 // ---------------------------------------------------------------------------
 
-/// Bit position within an action_mask byte. These are the **single source of
+/// Bit position within an `action_mask` byte. These are the **single source of
 /// truth**; both the emitter and the runtime consume this module.
 pub mod action_bit {
     pub const READ: u8 = 0b0000_0001;

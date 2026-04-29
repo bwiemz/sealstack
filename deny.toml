@@ -23,12 +23,12 @@ multiple-versions = "warn"
 [advisories]
 yanked = "deny"
 # Acknowledged transitive unmaintained-crate warnings with no safe upgrade
-# path. Both are tracked by their respective upstreams; revisit on each
-# dependabot pass.
+# path. Tracked by their respective upstreams; revisit on each dependabot pass.
+#
+# Removed: RUSTSEC-2024-0384 (`instant`) — no longer in the dep graph after
+# the 2026-04 dep refresh; cargo-deny warns when an ignored advisory is no
+# longer encountered, so the entry is dropped to keep the config truthful.
 ignore = [
-    "RUSTSEC-2024-0384", # `instant` — unmaintained; transitively pulled by
-                         # tokio / parking_lot ecosystems. No drop-in
-                         # replacement exposed via our direct deps.
     "RUSTSEC-2025-0134", # `rustls-pemfile` — unmaintained but non-vulnerable.
                          # rustls is migrating the API; upgrade when our
                          # reqwest/sqlx versions land on rustls-pki-types.

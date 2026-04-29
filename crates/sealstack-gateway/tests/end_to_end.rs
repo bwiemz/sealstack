@@ -30,8 +30,8 @@ use axum::{
 };
 use sealstack_connector_sdk::Connector;
 use sealstack_embedders::Embedder;
-use sealstack_engine::{Engine, EngineConfig};
 use sealstack_engine::rerank::{IdentityReranker, Reranker};
+use sealstack_engine::{Engine, EngineConfig};
 use sealstack_gateway::server::ConnectorFactory;
 use sealstack_vectorstore::VectorStore;
 use serde_json::{Value, json};
@@ -56,7 +56,8 @@ async fn build_test_app() -> anyhow::Result<(Router, TempDir)> {
 async fn build_test_app_with_policy_dir(
     policy_dir: Option<&Path>,
 ) -> anyhow::Result<(Router, TempDir)> {
-    let database_url = pg_url().expect("SEALSTACK_DATABASE_URL must be set for ignored integration tests");
+    let database_url =
+        pg_url().expect("SEALSTACK_DATABASE_URL must be set for ignored integration tests");
     let config = sealstack_gateway::config::Config {
         bind: "127.0.0.1:0".into(),
         database_url: database_url.clone(),
@@ -79,9 +80,8 @@ async fn build_test_app_with_policy_dir(
         false,
     );
     let reranker: Arc<dyn Reranker> = Arc::new(IdentityReranker);
-    let engine = Arc::new(
-        Engine::new(engine_config, vector_store, embedder, policy, reranker).await?,
-    );
+    let engine =
+        Arc::new(Engine::new(engine_config, vector_store, embedder, policy, reranker).await?);
 
     let tmp = tempfile::tempdir()?;
     let tmp_path = tmp.path().to_path_buf();
@@ -190,7 +190,10 @@ async fn register_schema_then_connector_then_sync() {
     .await;
     assert_eq!(status, StatusCode::OK, "register connector: {body:?}");
     let id = body["data"]["id"].as_str().unwrap().to_owned();
-    assert!(id.starts_with("local-files/examples.Doc"), "unexpected id: {id}");
+    assert!(
+        id.starts_with("local-files/examples.Doc"),
+        "unexpected id: {id}"
+    );
 
     // 5. Listing should include it.
     let (status, body) = call(app.clone(), "GET", "/v1/connectors", None).await;
@@ -362,8 +365,7 @@ async fn admin_only_policy_filters_non_admin_results() {
     let policy_dir = tempfile::tempdir().expect("policy tempdir");
     for b in &out.policy_bundles {
         let name = format!("{}.{}.wasm", b.namespace, b.schema);
-        std::fs::write(policy_dir.path().join(name), &b.wasm)
-            .expect("write policy bundle");
+        std::fs::write(policy_dir.path().join(name), &b.wasm).expect("write policy bundle");
     }
 
     // 3. Build the gateway with the policy dir wired through the same
@@ -460,10 +462,7 @@ async fn admin_only_policy_filters_non_admin_results() {
             "query":  "admin runbook",
             "top_k":  5,
         })),
-        &[
-            ("x-sealstack-user", "bob"),
-            ("x-sealstack-roles", "user"),
-        ],
+        &[("x-sealstack-user", "bob"), ("x-sealstack-roles", "user")],
     )
     .await;
     assert_eq!(user_status, StatusCode::OK, "user query: {user_body:?}");

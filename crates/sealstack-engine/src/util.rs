@@ -8,8 +8,7 @@
 #[must_use]
 pub(crate) fn is_safe_ident(s: &str) -> bool {
     !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
         && !s.starts_with(|c: char| c.is_ascii_digit())
 }
 

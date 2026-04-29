@@ -219,7 +219,11 @@ fn emit_schema_class_form(out: &mut String, decl: &crate::ast::SchemaDecl) -> Cs
 
         let optional = matches!(field.ty, crate::ast::TypeExpr::Optional(_, _));
         let ty_str = render_field_type(&field.ty, optional)?;
-        out.push_str(&format!("    {name}: {ty}\n", name = field.name, ty = ty_str));
+        out.push_str(&format!(
+            "    {name}: {ty}\n",
+            name = field.name,
+            ty = ty_str
+        ));
         emitted_any_field = true;
     }
 
@@ -235,7 +239,7 @@ fn emit_schema_class_form(out: &mut String, decl: &crate::ast::SchemaDecl) -> Cs
         out.push_str("    pass\n");
     }
 
-    out.push_str("\n");
+    out.push('\n');
     Ok(())
 }
 
@@ -249,15 +253,28 @@ fn emit_schema_meta(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: 
 
     let version = decl.version.unwrap_or(1);
     let table = super::to_snake(&decl.name);
-    let ns_literal = if namespace.is_empty() { "default" } else { namespace };
+    let ns_literal = if namespace.is_empty() {
+        "default"
+    } else {
+        namespace
+    };
     let const_name = schema_meta_name(&decl.name);
 
     out.push_str(&format!("{const_name}: Final = {{\n"));
-    out.push_str(&format!("    \"NAMESPACE\": \"{}\",\n", escape_wire(ns_literal)));
-    out.push_str(&format!("    \"SCHEMA\": \"{}\",\n", escape_wire(&decl.name)));
+    out.push_str(&format!(
+        "    \"NAMESPACE\": \"{}\",\n",
+        escape_wire(ns_literal)
+    ));
+    out.push_str(&format!(
+        "    \"SCHEMA\": \"{}\",\n",
+        escape_wire(&decl.name)
+    ));
     out.push_str(&format!("    \"TABLE\": \"{}\",\n", escape_wire(&table)));
     out.push_str(&format!("    \"VERSION\": {version},\n"));
-    out.push_str(&format!("    \"PRIMARY_KEY\": \"{}\",\n", escape_wire(&primary_key)));
+    out.push_str(&format!(
+        "    \"PRIMARY_KEY\": \"{}\",\n",
+        escape_wire(&primary_key)
+    ));
 
     if decl.relations.is_empty() {
         out.push_str("    \"RELATIONS\": {},\n");
@@ -316,41 +333,89 @@ mod type_mapper_tests {
 
     #[test]
     fn primitives_map_to_default_types() {
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::String, s()), false).unwrap(), "str");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Text, s()), false).unwrap(), "str");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Ulid, s()), false).unwrap(), "str");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Uuid, s()), false).unwrap(), "str");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I32, s()), false).unwrap(), "int");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I64, s()), false).unwrap(), "int");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::F32, s()), false).unwrap(), "float");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::F64, s()), false).unwrap(), "float");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Bool, s()), false).unwrap(), "bool");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Instant, s()), false).unwrap(), "str");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Duration, s()), false).unwrap(), "str");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Json, s()), false).unwrap(), "Any");
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::String, s()), false).unwrap(),
+            "str"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Text, s()), false).unwrap(),
+            "str"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Ulid, s()), false).unwrap(),
+            "str"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Uuid, s()), false).unwrap(),
+            "str"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::I32, s()), false).unwrap(),
+            "int"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::I64, s()), false).unwrap(),
+            "int"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::F32, s()), false).unwrap(),
+            "float"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::F64, s()), false).unwrap(),
+            "float"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Bool, s()), false).unwrap(),
+            "bool"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Instant, s()), false).unwrap(),
+            "str"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Duration, s()), false).unwrap(),
+            "str"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Json, s()), false).unwrap(),
+            "Any"
+        );
     }
 
     #[test]
     fn ref_and_named_schema_render_as_str() {
-        assert_eq!(render_field_type(&TypeExpr::Ref("User".into(), s()), false).unwrap(), "str");
+        assert_eq!(
+            render_field_type(&TypeExpr::Ref("User".into(), s()), false).unwrap(),
+            "str"
+        );
     }
 
     #[test]
     fn named_enum_renders_as_identifier() {
-        assert_eq!(render_field_type(&TypeExpr::Named("Tier".into(), s()), false).unwrap(), "Tier");
+        assert_eq!(
+            render_field_type(&TypeExpr::Named("Tier".into(), s()), false).unwrap(),
+            "Tier"
+        );
     }
 
     #[test]
     fn list_renders_lowercase_generic() {
         let inner = Box::new(TypeExpr::Primitive(PrimitiveType::String, s()));
-        assert_eq!(render_field_type(&TypeExpr::List(inner, s()), false).unwrap(), "list[str]");
+        assert_eq!(
+            render_field_type(&TypeExpr::List(inner, s()), false).unwrap(),
+            "list[str]"
+        );
     }
 
     #[test]
     fn nested_list_renders_correctly() {
         let inner = Box::new(TypeExpr::Primitive(PrimitiveType::I32, s()));
         let outer = Box::new(TypeExpr::List(inner, s()));
-        assert_eq!(render_field_type(&TypeExpr::List(outer, s()), false).unwrap(), "list[list[int]]");
+        assert_eq!(
+            render_field_type(&TypeExpr::List(outer, s()), false).unwrap(),
+            "list[list[int]]"
+        );
     }
 
     #[test]
@@ -412,9 +477,21 @@ mod enum_and_keyword_tests {
         let en = EnumDecl {
             name: "Tier".into(),
             variants: vec![
-                EnumVariant { name: "Free".into(), wire: Some("free".into()), span: s() },
-                EnumVariant { name: "Pro".into(), wire: Some("pro".into()), span: s() },
-                EnumVariant { name: "Enterprise".into(), wire: Some("enterprise".into()), span: s() },
+                EnumVariant {
+                    name: "Free".into(),
+                    wire: Some("free".into()),
+                    span: s(),
+                },
+                EnumVariant {
+                    name: "Pro".into(),
+                    wire: Some("pro".into()),
+                    span: s(),
+                },
+                EnumVariant {
+                    name: "Enterprise".into(),
+                    wire: Some("enterprise".into()),
+                    span: s(),
+                },
             ],
             span: s(),
         };
@@ -428,8 +505,16 @@ mod enum_and_keyword_tests {
         let en = EnumDecl {
             name: "Status".into(),
             variants: vec![
-                EnumVariant { name: "Active".into(), wire: None, span: s() },
-                EnumVariant { name: "Archived".into(), wire: None, span: s() },
+                EnumVariant {
+                    name: "Active".into(),
+                    wire: None,
+                    span: s(),
+                },
+                EnumVariant {
+                    name: "Archived".into(),
+                    wire: None,
+                    span: s(),
+                },
             ],
             span: s(),
         };
@@ -447,7 +532,9 @@ mod enum_and_keyword_tests {
 
     #[test]
     fn is_python_keyword_hard_keywords() {
-        for kw in ["class", "from", "import", "yield", "lambda", "async", "await", "return"] {
+        for kw in [
+            "class", "from", "import", "yield", "lambda", "async", "await", "return",
+        ] {
             assert!(is_python_keyword(kw), "expected {kw} to be a keyword");
         }
     }
@@ -461,7 +548,10 @@ mod enum_and_keyword_tests {
     #[test]
     fn is_python_keyword_normal_names_are_not_keywords() {
         for name in ["id", "tenant", "name", "email", "customer_id", "user_roles"] {
-            assert!(!is_python_keyword(name), "expected {name} to NOT be a keyword");
+            assert!(
+                !is_python_keyword(name),
+                "expected {name} to NOT be a keyword"
+            );
         }
     }
 

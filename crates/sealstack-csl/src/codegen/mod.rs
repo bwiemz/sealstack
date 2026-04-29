@@ -79,19 +79,17 @@ fn emit_vector_plan(typed: &TypedFile) -> String {
             // Infer dims from the context block, default 1024.
             if let Some(ctx) = &schema.decl.context {
                 for stmt in &ctx.stmts {
-                    if stmt.key == "vector_dims" {
-                        if let crate::ast::Expr::Literal(crate::ast::Literal::Integer(n), _) =
+                    if stmt.key == "vector_dims"
+                        && let crate::ast::Expr::Literal(crate::ast::Literal::Integer(n), _) =
                             &stmt.value
-                        {
-                            yaml.push_str(&format!("    dims: {n}\n"));
-                        }
+                    {
+                        yaml.push_str(&format!("    dims: {n}\n"));
                     }
-                    if stmt.key == "embedder" {
-                        if let crate::ast::Expr::Literal(crate::ast::Literal::String(s), _) =
+                    if stmt.key == "embedder"
+                        && let crate::ast::Expr::Literal(crate::ast::Literal::String(s), _) =
                             &stmt.value
-                        {
-                            yaml.push_str(&format!("    embedder: {s}\n"));
-                        }
+                    {
+                        yaml.push_str(&format!("    embedder: {s}\n"));
                     }
                 }
             }
@@ -164,13 +162,10 @@ fn emit_schemas_meta(typed: &TypedFile) -> Vec<serde_json::Value> {
         // Relations.
         let mut relations = Map::new();
         for rel in &decl.relations {
-            let (target_namespace, target_schema) = rel
-                .target
-                .split_once('.')
-                .map_or_else(
-                    || (namespace.clone(), rel.target.clone()),
-                    |(a, b)| (a.to_owned(), b.to_owned()),
-                );
+            let (target_namespace, target_schema) = rel.target.split_once('.').map_or_else(
+                || (namespace.clone(), rel.target.clone()),
+                |(a, b)| (a.to_owned(), b.to_owned()),
+            );
             let kind = match rel.cardinality {
                 crate::ast::Cardinality::One => "one",
                 crate::ast::Cardinality::Many => "many",
@@ -295,9 +290,7 @@ fn decay_to_json(expr: &crate::ast::Expr) -> Option<serde_json::Value> {
         match joined.as_str() {
             "exponential" => {
                 let half_life_secs = nth_duration(args, 0).unwrap_or(30 * 24 * 3600);
-                return Some(
-                    json!({ "kind": "exponential", "half_life_secs": half_life_secs }),
-                );
+                return Some(json!({ "kind": "exponential", "half_life_secs": half_life_secs }));
             }
             "linear" => {
                 let window_secs = nth_duration(args, 0).unwrap_or(30 * 24 * 3600);
@@ -328,9 +321,7 @@ fn nth_duration(args: &[crate::ast::Expr], n: usize) -> Option<u64> {
             crate::ast::Expr::Literal(crate::ast::Literal::Duration(v, unit), _) => {
                 Some(duration_to_secs(*v, *unit))
             }
-            crate::ast::Expr::Literal(crate::ast::Literal::Integer(i), _) => {
-                u64::try_from(*i).ok()
-            }
+            crate::ast::Expr::Literal(crate::ast::Literal::Integer(i), _) => u64::try_from(*i).ok(),
             _ => None,
         })
         .nth(n)
@@ -375,10 +366,10 @@ fn boost_value(field: &crate::ast::FieldDecl) -> Option<f64> {
 fn pii_value(field: &crate::ast::FieldDecl) -> Option<String> {
     for d in &field.decorators {
         if d.is("pii") {
-            if let Some(a) = d.args.first() {
-                if let crate::ast::Expr::Literal(crate::ast::Literal::String(s), _) = a {
-                    return Some(s.clone());
-                }
+            if let Some(crate::ast::Expr::Literal(crate::ast::Literal::String(s), _)) =
+                d.args.first()
+            {
+                return Some(s.clone());
             }
             return Some("unspecified".to_string());
         }
@@ -389,10 +380,10 @@ fn pii_value(field: &crate::ast::FieldDecl) -> Option<String> {
 fn schema_level_hybrid_alpha(decl: &crate::ast::SchemaDecl) -> Option<f64> {
     if let Some(ctx) = &decl.context {
         for stmt in &ctx.stmts {
-            if stmt.key == "hybrid_alpha" {
-                if let crate::ast::Expr::Literal(crate::ast::Literal::Float(f), _) = &stmt.value {
-                    return Some(*f);
-                }
+            if stmt.key == "hybrid_alpha"
+                && let crate::ast::Expr::Literal(crate::ast::Literal::Float(f), _) = &stmt.value
+            {
+                return Some(*f);
             }
         }
     }
