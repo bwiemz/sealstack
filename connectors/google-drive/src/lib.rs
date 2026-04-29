@@ -30,16 +30,19 @@
 
 mod files;
 mod permissions;
+mod resource;
 pub mod retry_shim;
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use secrecy::SecretString;
 
 use sealstack_common::{SealStackError, SealStackResult};
 use sealstack_connector_sdk::auth::OAuth2Credential;
+use sealstack_connector_sdk::change_streams;
 use sealstack_connector_sdk::http::HttpClient;
 use sealstack_connector_sdk::retry::RetryPolicy;
 use sealstack_connector_sdk::{ChangeStream, Connector, Resource, ResourceId, ResourceStream};
@@ -92,9 +95,9 @@ impl DriveConfig {
 /// The Google Drive connector.
 #[derive(Debug)]
 pub struct DriveConnector {
-    #[allow(dead_code)] // wired in Task 12 for list/fetch/healthcheck
     http: Arc<HttpClient>,
     config: DriveConfig,
+    skip_log: Arc<crate::files::SkipLog>,
 }
 
 impl DriveConnector {
@@ -145,7 +148,11 @@ impl DriveConnector {
         );
 
         let config = DriveConfig::from_json(v);
-        Ok(Self { http, config })
+        Ok(Self {
+            http,
+            config,
+            skip_log: Arc::new(crate::files::SkipLog::default()),
+        })
     }
 
     /// Sync cadence. Engine consumes this in a separate per-connector-interval
@@ -187,13 +194,60 @@ impl Connector for DriveConnector {
     }
 
     async fn list(&self) -> SealStackResult<ResourceStream> {
-        // Fully wired in Task 12.
-        unimplemented!("DriveConnector::list lands in Task 12")
+        use crate::files::{fetch_body, files_stream};
+        use crate::resource::drive_file_to_resource;
+
+        let mut stream = files_stream(self.http.clone(), &self.config.api_base);
+        let mut out: Vec<Resource> = Vec::new();
+        while let Some(file_result) = stream.next().await {
+            let file = file_result?;
+            if let Some(body) = fetch_body(
+                &self.http,
+                &self.config.api_base,
+                &file,
+                self.config.max_file_bytes,
+                &self.skip_log,
+            )
+            .await?
+            {
+                out.push(drive_file_to_resource(&file, body)?);
+            }
+            // None → skipped (oversized, non-allowlist MIME, or non-UTF-8)
+        }
+        Ok(change_streams::resource_stream(out))
     }
 
-    async fn fetch(&self, _id: &ResourceId) -> SealStackResult<Resource> {
-        // Fully wired in Task 12.
-        unimplemented!("DriveConnector::fetch lands in Task 12")
+    async fn fetch(&self, id: &ResourceId) -> SealStackResult<Resource> {
+        use crate::files::{DriveFile, fetch_body};
+        use crate::resource::drive_file_to_resource;
+        use crate::retry_shim::send_with_drive_shim;
+
+        let url = format!("{}/drive/v3/files/{}", self.config.api_base, id);
+        let make = || {
+            self.http.get(&url).query(&[(
+                "fields",
+                "id,name,mimeType,modifiedTime,driveId,size,\
+                 permissions(type,emailAddress,domain,role,allowFileDiscovery)",
+            )])
+        };
+        let resp = send_with_drive_shim(&self.http, make).await?;
+        let file: DriveFile = resp.json().await?;
+        fetch_body(
+            &self.http,
+            &self.config.api_base,
+            &file,
+            self.config.max_file_bytes,
+            &self.skip_log,
+        )
+        .await?
+        .map_or_else(
+            || {
+                Err(SealStackError::backend(format!(
+                    "drive: file {id} skipped (oversized, non-allowlist MIME, or non-UTF-8 body)"
+                )))
+            },
+            |body| drive_file_to_resource(&file, body),
+        )
     }
 
     async fn subscribe(&self) -> SealStackResult<Option<ChangeStream>> {
@@ -202,8 +256,14 @@ impl Connector for DriveConnector {
     }
 
     async fn healthcheck(&self) -> SealStackResult<()> {
-        // Fully wired in Task 12.
-        unimplemented!("DriveConnector::healthcheck lands in Task 12")
+        // files.list (NOT files/about) because files.list exercises drive.readonly
+        // scope. A refresh token granted with only userinfo.email scope would pass
+        // /about but fail every subsequent /files.list with 403 insufficientPermissions.
+        // Healthcheck must surface scope mismatches at boot, not at first sync.
+        let url = format!("{}/drive/v3/files", self.config.api_base);
+        let make = || self.http.get(&url).query(&[("pageSize", "1")]);
+        let _ = crate::retry_shim::send_with_drive_shim(&self.http, make).await?;
+        Ok(())
     }
 }
 
