@@ -151,3 +151,130 @@ pub fn list_files_for_test(
 ) -> std::pin::Pin<Box<dyn futures::Stream<Item = SealStackResult<DriveFile>> + Send>> {
     files_stream(http, api_base)
 }
+
+/// Fetch a file's body, respecting MIME allowlist + per-file size cap.
+///
+/// Returns `Ok(None)` for files that should be skipped (oversized, non-allowlist
+/// MIME, non-UTF-8 text claim). Returns `Err` only for genuine failures
+/// (Google's docs export contract violated, network error after retries).
+pub(crate) async fn fetch_body(
+    http: &Arc<HttpClient>,
+    api_base: &str,
+    file: &DriveFile,
+    max_file_bytes: u64,
+    skip_log: &SkipLog,
+) -> SealStackResult<Option<String>> {
+    let id = ResourceId::new(file.id.clone());
+
+    // Per-file size cap (separate from SDK's HTTP body cap).
+    let size: Option<u64> = file.size.as_ref().and_then(|s| s.parse().ok());
+    if let Some(s) = size
+        && s > max_file_bytes
+    {
+        skip_log
+            .note_once(&id, || {
+                tracing::info!(
+                    file_id = %file.id,
+                    size = s,
+                    cap = max_file_bytes,
+                    "drive: skipping file exceeding per-file size cap"
+                );
+            })
+            .await;
+        return Ok(None);
+    }
+
+    match file.mime_type.as_str() {
+        "application/vnd.google-apps.document" => {
+            // Google Docs: export as text/plain.
+            let url = format!(
+                "{}/drive/v3/files/{}/export",
+                api_base.trim_end_matches('/'),
+                file.id
+            );
+            let rb = http.get(&url).query(&[("mimeType", "text/plain")]);
+            let resp = http.send(rb).await?;
+            let bytes = resp.bytes().await?;
+            // Strict UTF-8 — Docs export contract guarantees UTF-8; a violation
+            // is a Google-side bug, not a user-side mistake, so error rather
+            // than silently dropping.
+            String::from_utf8(bytes.to_vec())
+                .map(Some)
+                .map_err(|_| SealStackError::backend("drive: docs export returned non-UTF-8"))
+        }
+        "text/plain" | "text/markdown" => {
+            // Direct binary fetch.
+            let url = format!(
+                "{}/drive/v3/files/{}",
+                api_base.trim_end_matches('/'),
+                file.id
+            );
+            let rb = http.get(&url).query(&[("alt", "media")]);
+            let resp = http.send(rb).await?;
+            let bytes = resp.bytes().await?;
+            // Strict UTF-8 — text MIME is a user-supplied claim Drive doesn't
+            // validate. A non-UTF-8 file claimed as text/plain is a config
+            // error or a deliberate skip case (binary mislabeled as text).
+            // Skip without erroring; from_utf8_lossy would silently embed
+            // U+FFFD pollution into the index.
+            if let Ok(s) = String::from_utf8(bytes.to_vec()) {
+                Ok(Some(s))
+            } else {
+                skip_log
+                    .note_once(&id, || {
+                        tracing::info!(
+                            file_id = %file.id,
+                            mime_type = %file.mime_type,
+                            "drive: skipping file with non-UTF-8 body (claimed text MIME)"
+                        );
+                    })
+                    .await;
+                Ok(None)
+            }
+        }
+        other => {
+            skip_log
+                .note_once(&id, || {
+                    tracing::info!(
+                        file_id = %file.id,
+                        mime_type = %other,
+                        "drive: skipping unsupported MIME type \
+                         (v1 allowlist: docs, text, markdown)"
+                    );
+                })
+                .await;
+            Ok(None)
+        }
+    }
+}
+
+/// Test-only stub of [`DriveFile`] carrying just the fields [`fetch_body`] needs.
+#[doc(hidden)]
+pub struct DriveFileTestStub {
+    /// Drive file ID.
+    pub id: String,
+    /// MIME type.
+    pub mime_type: String,
+    /// Reported file size in bytes, as a string (mirrors the Drive API field).
+    pub size: Option<String>,
+}
+
+/// Test-only entry point for [`fetch_body`] that bypasses the full [`DriveConnector`].
+#[doc(hidden)]
+pub async fn fetch_body_for_test(
+    http: Arc<HttpClient>,
+    api_base: &str,
+    file: &DriveFileTestStub,
+    max_file_bytes: u64,
+) -> SealStackResult<Option<String>> {
+    let f = DriveFile {
+        id: file.id.clone(),
+        name: String::new(),
+        mime_type: file.mime_type.clone(),
+        modified_time: String::new(),
+        drive_id: None,
+        size: file.size.clone(),
+        permissions: Vec::new(),
+    };
+    fetch_body(&http, api_base, &f, max_file_bytes, &SkipLog::default()).await
+}

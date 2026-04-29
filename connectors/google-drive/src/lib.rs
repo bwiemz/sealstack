@@ -208,7 +208,7 @@ impl Connector for DriveConnector {
 
 #[doc(hidden)]
 pub mod test_only {
-    pub use crate::files::list_files_for_test;
+    pub use crate::files::{DriveFileTestStub, fetch_body_for_test, list_files_for_test};
 }
 
 #[cfg(test)]
