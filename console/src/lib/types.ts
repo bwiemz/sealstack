@@ -19,7 +19,7 @@ export type Envelope<T> =
 // --- Health ----------------------------------------------------------------
 
 export interface Healthz {
-  status: 'ok';
+  status: "ok";
 }
 
 // --- Schemas ---------------------------------------------------------------
@@ -50,7 +50,7 @@ export interface FieldMeta {
 
 export interface RelationMeta {
   name: string;
-  kind: 'one' | 'many' | string;
+  kind: "one" | "many" | string;
   target_namespace: string;
   target_schema: string;
   foreign_key: string | null;
@@ -90,7 +90,11 @@ export interface ConnectorBinding {
   interval_secs: number | null;
 }
 
-export type SyncOutcomeKind = 'completed' | 'failed_list' | 'cancelled' | 'not_found';
+export type SyncOutcomeKind =
+  | "completed"
+  | "failed_list"
+  | "cancelled"
+  | "not_found";
 
 export interface SyncOutcome {
   binding_id: string;
@@ -143,7 +147,7 @@ export interface ReceiptSource {
 
 export interface ReceiptPolicyVerdict {
   rule: string;
-  decision: 'allow' | 'deny';
+  decision: "allow" | "deny";
   message?: string;
 }
 

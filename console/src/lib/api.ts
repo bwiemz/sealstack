@@ -11,17 +11,17 @@ import type {
   SchemaMeta,
   SchemaSummary,
   SearchResponse,
-  SyncOutcome
-} from './types';
+  SyncOutcome,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
     public code: string,
     message: string,
-    public status?: number
+    public status?: number,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
@@ -39,37 +39,42 @@ export class Client {
   constructor(opts: ClientOptions = {}) {
     const raw =
       opts.gatewayUrl ??
-      (typeof window !== 'undefined' && (window as any).__SEALSTACK_GATEWAY_URL__) ??
-      'http://localhost:7070';
-    this.base = raw.replace(/\/+$/, '');
-    this.user = opts.user ?? 'console';
+      (typeof window !== "undefined" &&
+        (window as any).__SEALSTACK_GATEWAY_URL__) ??
+      "http://localhost:7070";
+    this.base = raw.replace(/\/+$/, "");
+    this.user = opts.user ?? "console";
     this.fetchImpl = opts.fetch ?? fetch;
   }
 
   // --- Raw ----------------------------------------------------------------
 
   private async req<T>(
-    method: 'GET' | 'POST',
+    method: "GET" | "POST",
     path: string,
-    body?: unknown
+    body?: unknown,
   ): Promise<T> {
     const headers: Record<string, string> = {
-      Accept: 'application/json',
-      'X-Sealstack-User': this.user
+      Accept: "application/json",
+      "X-Sealstack-User": this.user,
     };
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (body !== undefined) headers["Content-Type"] = "application/json";
 
     const resp = await this.fetchImpl(`${this.base}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body)
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
 
     let parsed: Envelope<T>;
     try {
       parsed = (await resp.json()) as Envelope<T>;
     } catch {
-      throw new ApiError('bad_response', `non-JSON body from ${path}`, resp.status);
+      throw new ApiError(
+        "bad_response",
+        `non-JSON body from ${path}`,
+        resp.status,
+      );
     }
 
     if (parsed.error) {
@@ -82,7 +87,9 @@ export class Client {
 
   async healthz(): Promise<boolean> {
     try {
-      const resp = await this.fetchImpl(`${this.base}/healthz`, { method: 'GET' });
+      const resp = await this.fetchImpl(`${this.base}/healthz`, {
+        method: "GET",
+      });
       return resp.ok;
     } catch {
       return false;
@@ -90,18 +97,24 @@ export class Client {
   }
 
   async listSchemas(): Promise<SchemaSummary[]> {
-    const data = await this.req<{ schemas: SchemaSummary[] }>('GET', '/v1/schemas');
+    const data = await this.req<{ schemas: SchemaSummary[] }>(
+      "GET",
+      "/v1/schemas",
+    );
     return data.schemas ?? [];
   }
 
   async getSchema(qualified: string): Promise<SchemaMeta> {
-    return this.req<SchemaMeta>('GET', `/v1/schemas/${encodeURIComponent(qualified)}`);
+    return this.req<SchemaMeta>(
+      "GET",
+      `/v1/schemas/${encodeURIComponent(qualified)}`,
+    );
   }
 
   async listConnectors(): Promise<ConnectorBinding[]> {
     const data = await this.req<{ connectors: ConnectorBinding[] }>(
-      'GET',
-      '/v1/connectors'
+      "GET",
+      "/v1/connectors",
     );
     return data.connectors ?? [];
   }
@@ -111,11 +124,15 @@ export class Client {
     schema: string;
     config: Record<string, unknown>;
   }): Promise<{ id: string; status: string }> {
-    return this.req('POST', '/v1/connectors', input);
+    return this.req("POST", "/v1/connectors", input);
   }
 
   async syncConnector(id: string): Promise<SyncOutcome> {
-    return this.req('POST', `/v1/connectors/${encodeURIComponent(id)}/sync`, {});
+    return this.req(
+      "POST",
+      `/v1/connectors/${encodeURIComponent(id)}/sync`,
+      {},
+    );
   }
 
   async query(input: {
@@ -124,11 +141,11 @@ export class Client {
     top_k?: number;
     filters?: Record<string, unknown>;
   }): Promise<SearchResponse> {
-    return this.req('POST', '/v1/query', input);
+    return this.req("POST", "/v1/query", input);
   }
 
   async getReceipt(id: string): Promise<Receipt> {
-    return this.req('GET', `/v1/receipts/${encodeURIComponent(id)}`);
+    return this.req("GET", `/v1/receipts/${encodeURIComponent(id)}`);
   }
 }
 
