@@ -28,6 +28,8 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
 
+mod permissions;
+
 use std::sync::Arc;
 use std::time::Duration;
 
