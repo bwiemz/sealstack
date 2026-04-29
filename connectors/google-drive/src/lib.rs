@@ -28,6 +28,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
 
+mod files;
 mod permissions;
 
 use std::sync::Arc;
@@ -203,6 +204,11 @@ impl Connector for DriveConnector {
         // Fully wired in Task 12.
         unimplemented!("DriveConnector::healthcheck lands in Task 12")
     }
+}
+
+#[doc(hidden)]
+pub mod test_only {
+    pub use crate::files::list_files_for_test;
 }
 
 #[cfg(test)]
