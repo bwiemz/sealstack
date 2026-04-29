@@ -28,7 +28,7 @@ use sealstack_connector_sdk::http::HttpClient;
 use sealstack_connector_sdk::paginate::{BodyCursorPaginator, paginate};
 use sealstack_connector_sdk::retry::RetryPolicy;
 use sealstack_connector_sdk::{
-    Connector, PermissionPredicate, Resource, ResourceId, ResourceStream, change_streams,
+    Connector, PermissionPredicate, Principal, Resource, ResourceId, ResourceStream, change_streams,
 };
 use serde::Deserialize;
 use time::OffsetDateTime;
@@ -292,7 +292,7 @@ impl Connector for SlackConnector {
                         ),
                     ]),
                     permissions: vec![PermissionPredicate {
-                        principal: format!("slack:{}", channel.id),
+                        principal: Principal::Group(format!("slack:{}", channel.id)),
                         action: "read".into(),
                     }],
                     source_updated_at: updated_at,
