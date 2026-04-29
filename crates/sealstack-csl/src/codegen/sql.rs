@@ -47,12 +47,19 @@ fn emit_schema(schema: &SchemaDecl, out: &mut String) -> CslResult<()> {
         }
         let sql_type = map_type(&f.ty);
         let nullable = if f.ty.is_optional() { "" } else { " NOT NULL" };
-        let mut line = format!("  {name} {ty}{null}", name = f.name, ty = sql_type, null = nullable);
+        let mut line = format!(
+            "  {name} {ty}{null}",
+            name = f.name,
+            ty = sql_type,
+            null = nullable
+        );
 
         if f.decorators.iter().any(|d| d.is("primary")) {
             line.push_str(" PRIMARY KEY");
         }
-        if f.decorators.iter().any(|d| d.is("unique")) && !f.decorators.iter().any(|d| d.is("primary")) {
+        if f.decorators.iter().any(|d| d.is("unique"))
+            && !f.decorators.iter().any(|d| d.is("primary"))
+        {
             line.push_str(" UNIQUE");
         }
         column_lines.push(line);
@@ -88,17 +95,15 @@ fn emit_schema(schema: &SchemaDecl, out: &mut String) -> CslResult<()> {
     // Indexes.
     for f in &schema.fields {
         if f.decorators.iter().any(|d| d.is("indexed")) {
+            let col = &f.name;
             out.push_str(&format!(
-                "CREATE INDEX IF NOT EXISTS {idx} ON {table} ({col});\n",
-                idx = format!("{table}_{col}_idx", table = table, col = f.name),
-                col = f.name,
+                "CREATE INDEX IF NOT EXISTS {table}_{col}_idx ON {table} ({col});\n",
             ));
         }
         if f.decorators.iter().any(|d| d.is("searchable")) {
+            let col = &f.name;
             out.push_str(&format!(
-                "CREATE INDEX IF NOT EXISTS {idx} ON {table} USING gin (to_tsvector('english', {col}));\n",
-                idx = format!("{table}_{col}_fts_idx", table = table, col = f.name),
-                col = f.name,
+                "CREATE INDEX IF NOT EXISTS {table}_{col}_fts_idx ON {table} USING gin (to_tsvector('english', {col}));\n",
             ));
         }
     }

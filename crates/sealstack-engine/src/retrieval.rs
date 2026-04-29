@@ -181,7 +181,11 @@ impl Retriever {
                 excerpt: raw.content,
             })
             .collect();
-        final_hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        final_hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         final_hits.truncate(top_k);
 
         Ok(final_hits)
@@ -315,7 +319,9 @@ fn vec_hit_to_raw(h: VecHit) -> RawCandidate {
         .metadata
         .get("created_at")
         .and_then(Value::as_str)
-        .and_then(|s| OffsetDateTime::parse(s, &time::format_description::well_known::Rfc3339).ok());
+        .and_then(|s| {
+            OffsetDateTime::parse(s, &time::format_description::well_known::Rfc3339).ok()
+        });
     RawCandidate {
         id: h.id.to_string(),
         score: h.score,
@@ -331,7 +337,11 @@ fn vec_hit_to_raw(h: VecHit) -> RawCandidate {
 ///
 /// References: Cormack et al. 2009 ("Reciprocal Rank Fusion Outperforms
 /// Condorcet and Individual Rank Learning Methods", SIGIR 2009).
-fn rrf_fuse(vec_hits: &[RawCandidate], bm25_hits: &[RawCandidate], alpha: f32) -> Vec<RawCandidate> {
+fn rrf_fuse(
+    vec_hits: &[RawCandidate],
+    bm25_hits: &[RawCandidate],
+    alpha: f32,
+) -> Vec<RawCandidate> {
     const K: f32 = 60.0;
     use std::collections::HashMap;
     let mut map: HashMap<String, RawCandidate> = HashMap::new();
@@ -355,7 +365,11 @@ fn rrf_fuse(vec_hits: &[RawCandidate], bm25_hits: &[RawCandidate], alpha: f32) -
             c
         })
         .collect();
-    fused.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    fused.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     fused
 }
 

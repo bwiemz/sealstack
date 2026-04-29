@@ -11,7 +11,7 @@
 
 use async_trait::async_trait;
 
-use crate::{SealStackResult, Embedder};
+use crate::{Embedder, SealStackResult};
 
 /// The stub embedder.
 pub struct StubEmbedder {
@@ -38,7 +38,10 @@ impl Embedder for StubEmbedder {
     }
 
     async fn embed(&self, texts: Vec<String>) -> SealStackResult<Vec<Vec<f32>>> {
-        Ok(texts.into_iter().map(|t| hash_to_vec(&t, self.dims)).collect())
+        Ok(texts
+            .into_iter()
+            .map(|t| hash_to_vec(&t, self.dims))
+            .collect())
     }
 }
 

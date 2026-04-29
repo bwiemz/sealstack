@@ -24,10 +24,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::StreamExt;
 use sealstack_common::{SealStackError, SealStackResult};
 use sealstack_connector_sdk::ChangeEvent;
 use sealstack_engine::{Engine, api::EngineError};
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
@@ -172,9 +172,11 @@ impl IngestRuntime {
             .registry()
             .get(&binding.target_namespace, &binding.target_schema)
             .map_err(|e| match e {
-                EngineError::UnknownSchema { namespace, schema } => SealStackError::Config(format!(
-                    "target schema `{namespace}.{schema}` is not registered with the engine"
-                )),
+                EngineError::UnknownSchema { namespace, schema } => {
+                    SealStackError::Config(format!(
+                        "target schema `{namespace}.{schema}` is not registered with the engine"
+                    ))
+                }
                 other => SealStackError::backend(other),
             })?;
 
@@ -251,7 +253,11 @@ impl IngestRuntime {
         binding: ConnectorBinding,
         mut stream: sealstack_connector_sdk::ChangeStream,
     ) {
-        let meta = match self.engine.registry().get(&binding.target_namespace, &binding.target_schema) {
+        let meta = match self
+            .engine
+            .registry()
+            .get(&binding.target_namespace, &binding.target_schema)
+        {
             Ok(m) => m,
             Err(e) => {
                 tracing::error!(error = %e, binding = %binding.id(), "subscribe aborted — schema missing");
@@ -305,7 +311,10 @@ mod tests {
         async fn list(&self) -> SealStackResult<ResourceStream> {
             Ok(change_streams::resource_stream(vec![]))
         }
-        async fn fetch(&self, _id: &sealstack_connector_sdk::ResourceId) -> SealStackResult<Resource> {
+        async fn fetch(
+            &self,
+            _id: &sealstack_connector_sdk::ResourceId,
+        ) -> SealStackResult<Resource> {
             Err(SealStackError::NotFound("no such resource".into()))
         }
     }

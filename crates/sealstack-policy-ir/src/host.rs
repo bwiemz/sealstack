@@ -1,7 +1,8 @@
-//! Host-side native Rust interpreter for the same IR that the wasm runtime
-//! executes. Used by the CSL emitter's self-pass validation (Task C5.5)
-//! and available to host-side tests that want to avoid spinning wasmtime
-//! for every assertion.
+//! Host-side native Rust interpreter for the predicate IR.
+//!
+//! Mirrors the wasm runtime semantics so the CSL emitter's self-pass
+//! validation (Task C5.5) and host-side tests can exercise the IR
+//! without spinning wasmtime for every assertion.
 
 use serde_json::Value;
 
@@ -117,6 +118,11 @@ pub fn action_from_wire(name: &str) -> Result<u8, IrError> {
     action_bit_for(name.as_bytes()).ok_or(IrError::UnknownAction)
 }
 
+// Single-letter names (a, b, x, y, r) are deliberate in this stack-machine
+// dispatch loop: they match the IR opcode reference's pseudo-code and the wasm
+// runtime's interp.rs. Renaming would obscure the parallel structure, not
+// improve clarity.
+#[allow(clippy::many_single_char_names, clippy::too_many_lines)]
 fn run<'a>(
     ir: &'a [u8],
     mut ip: usize,
@@ -149,7 +155,11 @@ fn run<'a>(
                 ip += 1;
                 push!(NativeVal::Bool(b != 0));
             }
-            op::LIT_I64 => {
+            // LIT_DURATION_SECS shares its body with LIT_I64 by design: both push
+            // an i64 onto the native stack. The wire-level distinction (duration
+            // vs. plain integer) is preserved at the opcode level for tooling but
+            // does not require a different runtime representation.
+            op::LIT_I64 | op::LIT_DURATION_SECS => {
                 let v = read_i64(ir, &mut ip)?;
                 push!(NativeVal::I64(v));
             }
@@ -165,10 +175,6 @@ fn run<'a>(
                 let s = core::str::from_utf8(bytes).map_err(|_| IrError::TypeMismatch)?;
                 push!(NativeVal::Str(s));
             }
-            op::LIT_DURATION_SECS => {
-                let v = read_i64(ir, &mut ip)?;
-                push!(NativeVal::I64(v));
-            }
             op::LOAD_CALLER => push!(load_path(ir, &mut ip, caller)?),
             op::LOAD_SELF => push!(load_path(ir, &mut ip, record)?),
             op::EQ | op::NE => {
@@ -180,6 +186,12 @@ fn run<'a>(
             op::LT | op::LE | op::GT | op::GE => {
                 let b = pop!();
                 let a = pop!();
+                // Cross-type numeric ordering deliberately widens i64 to f64.
+                // CSL semantics treat the numeric tower as a single ordered set;
+                // precision loss above 2^53 is accepted and matches the wasm
+                // runtime's behavior (interp.rs uses the same widening). Policy
+                // values that exceed 2^53 are out of spec.
+                #[allow(clippy::cast_precision_loss)]
                 let (x, y) = match (&a, &b) {
                     (NativeVal::I64(x), NativeVal::I64(y)) => (*x as f64, *y as f64),
                     (NativeVal::F64(x), NativeVal::F64(y)) => (*x, *y),
@@ -224,9 +236,8 @@ fn run<'a>(
             op::CALL_HAS_ROLE => {
                 let role = pop!();
                 let _caller_val = pop!();
-                let role_str = match role {
-                    NativeVal::Str(s) => s,
-                    _ => return Err(IrError::TypeMismatch),
+                let NativeVal::Str(role_str) = role else {
+                    return Err(IrError::TypeMismatch);
                 };
                 let matched = caller
                     .pointer("/roles")
@@ -278,7 +289,7 @@ fn read_f64(ir: &[u8], ip: &mut usize) -> Result<f64, IrError> {
     Ok(f64::from_le_bytes(buf))
 }
 
-fn pop_bool<'a>(stack: &mut Vec<NativeVal<'a>>) -> Result<bool, IrError> {
+fn pop_bool(stack: &mut Vec<NativeVal<'_>>) -> Result<bool, IrError> {
     match stack.pop().ok_or(IrError::StackUnderflow)? {
         NativeVal::Bool(b) => Ok(b),
         _ => Err(IrError::TypeMismatch),
@@ -305,7 +316,12 @@ fn load_path<'a>(ir: &'a [u8], ip: &mut usize, root: &'a Value) -> Result<Native
 
 fn native_of(v: &Value) -> NativeVal<'_> {
     match v {
-        Value::Null => NativeVal::Null,
+        // Object collapses to Null because the IR has no object type — only the
+        // primitive tower + arrays. Conflating with Null lets predicates that
+        // reach into a missing/object-shaped path fall through to type-mismatch
+        // at the comparison site rather than introducing a fourth "container"
+        // value.
+        Value::Null | Value::Object(_) => NativeVal::Null,
         Value::Bool(b) => NativeVal::Bool(*b),
         Value::Number(n) => n
             .as_i64()
@@ -314,7 +330,6 @@ fn native_of(v: &Value) -> NativeVal<'_> {
             .unwrap_or(NativeVal::Null),
         Value::String(s) => NativeVal::Str(s.as_str()),
         Value::Array(a) => NativeVal::Array(a),
-        Value::Object(_) => NativeVal::Null,
     }
 }
 
@@ -324,6 +339,9 @@ fn eq_native(a: &NativeVal<'_>, b: &NativeVal<'_>) -> bool {
         (NativeVal::Bool(x), NativeVal::Bool(y)) => x == y,
         (NativeVal::I64(x), NativeVal::I64(y)) => x == y,
         (NativeVal::F64(x), NativeVal::F64(y)) => x == y,
+        // Same numeric-tower widening rationale as in `run`'s LT/LE/GT/GE
+        // arm: precision loss above 2^53 is accepted.
+        #[allow(clippy::cast_precision_loss)]
         (NativeVal::I64(x), NativeVal::F64(y)) | (NativeVal::F64(y), NativeVal::I64(x)) => {
             (*x as f64) == *y
         }

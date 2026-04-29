@@ -153,7 +153,11 @@ fn emit_schema_impl(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: 
 
     let version = decl.version.unwrap_or(1);
     let table = to_snake(&decl.name);
-    let namespace_literal = if namespace.is_empty() { "default" } else { namespace };
+    let namespace_literal = if namespace.is_empty() {
+        "default"
+    } else {
+        namespace
+    };
 
     out.push_str(&format!("    impl {} {{\n", decl.name));
     out.push_str(&format!(
@@ -235,29 +239,56 @@ mod type_mapper_tests {
 
     #[test]
     fn primitives_map_to_default_types() {
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::String, s())), "String");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I32, s())), "i32");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Bool, s())), "bool");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Ulid, s())), "String");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Instant, s())), "String");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Json, s())), "serde_json::Value");
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::String, s())),
+            "String"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::I32, s())),
+            "i32"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Bool, s())),
+            "bool"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Ulid, s())),
+            "String"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Instant, s())),
+            "String"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Json, s())),
+            "serde_json::Value"
+        );
     }
 
     #[test]
     fn optional_wraps_in_option() {
         let inner = Box::new(TypeExpr::Primitive(PrimitiveType::F32, s()));
-        assert_eq!(render_field_type(&TypeExpr::Optional(inner, s())), "Option<f32>");
+        assert_eq!(
+            render_field_type(&TypeExpr::Optional(inner, s())),
+            "Option<f32>"
+        );
     }
 
     #[test]
     fn ref_and_named_schema_are_strings() {
-        assert_eq!(render_field_type(&TypeExpr::Ref("User".into(), s())), "String");
+        assert_eq!(
+            render_field_type(&TypeExpr::Ref("User".into(), s())),
+            "String"
+        );
     }
 
     #[test]
     fn list_renders_vec() {
         let inner = Box::new(TypeExpr::Primitive(PrimitiveType::String, s()));
-        assert_eq!(render_field_type(&TypeExpr::List(inner, s())), "Vec<String>");
+        assert_eq!(
+            render_field_type(&TypeExpr::List(inner, s())),
+            "Vec<String>"
+        );
     }
 }
 

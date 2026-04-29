@@ -19,12 +19,7 @@
 //! them from environment variables in your deployment; in dev, `::dev_default`
 //! gives you a self-signed local setup.
 
-use axum::{
-    Json, Router,
-    extract::State,
-    response::IntoResponse,
-    routing::get,
-};
+use axum::{Json, Router, extract::State, response::IntoResponse, routing::get};
 use serde::{Deserialize, Serialize};
 
 /// Values advertised on the two well-known endpoints.
@@ -105,7 +100,6 @@ struct AuthorizationServerMetadata {
 }
 
 /// Build the well-known routes.
-#[must_use]
 pub fn router(config: OAuthMetadataConfig) -> Router {
     Router::new()
         .route(

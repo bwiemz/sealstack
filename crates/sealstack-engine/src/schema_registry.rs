@@ -150,10 +150,11 @@ impl Default for ChunkingStrategy {
 }
 
 /// Freshness-decay strategy.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FreshnessDecay {
     /// No decay.
+    #[default]
     None,
     /// Exponential decay with configurable half-life in seconds.
     Exponential {
@@ -172,12 +173,6 @@ pub enum FreshnessDecay {
         /// Corresponding multiplicative factors; must be same length as `cliffs`.
         factors: Vec<f32>,
     },
-}
-
-impl Default for FreshnessDecay {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 // ---------------------------------------------------------------------------

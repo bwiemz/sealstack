@@ -84,11 +84,16 @@ impl Client {
 
     /// `POST /v1/schemas` — register compiled schema metadata.
     pub(crate) async fn register_schema(&self, meta: Value) -> anyhow::Result<Value> {
-        self.post_inner("/v1/schemas", json!({ "meta": meta })).await
+        self.post_inner("/v1/schemas", json!({ "meta": meta }))
+            .await
     }
 
     /// `POST /v1/schemas/:qualified/ddl`.
-    pub(crate) async fn apply_schema_ddl(&self, qualified: &str, ddl: &str) -> anyhow::Result<Value> {
+    pub(crate) async fn apply_schema_ddl(
+        &self,
+        qualified: &str,
+        ddl: &str,
+    ) -> anyhow::Result<Value> {
         self.post_inner(
             &format!("/v1/schemas/{qualified}/ddl"),
             json!({ "ddl": ddl }),
@@ -156,10 +161,7 @@ async fn unwrap_envelope(resp: reqwest::Response) -> anyhow::Result<Value> {
         .unwrap_or_else(|_| json!({ "data": null, "error": { "code": "bad_response", "message": "non-JSON body" } }));
 
     if let Some(err) = body.get("error").filter(|v| !v.is_null()) {
-        let code = err
-            .get("code")
-            .and_then(Value::as_str)
-            .unwrap_or("unknown");
+        let code = err.get("code").and_then(Value::as_str).unwrap_or("unknown");
         let message = err
             .get("message")
             .and_then(Value::as_str)

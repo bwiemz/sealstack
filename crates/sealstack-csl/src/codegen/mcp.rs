@@ -47,7 +47,11 @@ pub fn emit_mcp_descriptors(typed: &TypedFile) -> CslResult<Value> {
             if typed.namespace.is_empty() {
                 schema.decl.name.to_ascii_lowercase()
             } else {
-                format!("{}.{}", typed.namespace, schema.decl.name.to_ascii_lowercase())
+                format!(
+                    "{}.{}",
+                    typed.namespace,
+                    schema.decl.name.to_ascii_lowercase()
+                )
             }
         );
 
@@ -224,7 +228,12 @@ fn tool_list(schema: &TypedSchema, snake_name: &str) -> Value {
     })
 }
 
-fn tool_list_relation(schema: &TypedSchema, owner_snake: &str, relation: &str, target: &str) -> Value {
+fn tool_list_relation(
+    schema: &TypedSchema,
+    owner_snake: &str,
+    relation: &str,
+    target: &str,
+) -> Value {
     let pk = schema.primary_field();
     let pk_json_type = json_type_for(&pk.ty);
 
@@ -261,9 +270,9 @@ fn tool_list_relation(schema: &TypedSchema, owner_snake: &str, relation: &str, t
 fn tool_aggregate(snake_name: &str, f: &FieldDecl) -> Value {
     let facet_type = json_type_for(&f.ty);
     let agg_kind = match facet_type {
-        Value::String(ref t) if t == "string"  => "histogram",
+        Value::String(ref t) if t == "string" => "histogram",
         Value::String(ref t) if t == "integer" => "histogram",
-        Value::String(ref t) if t == "number"  => "bucket_histogram",
+        Value::String(ref t) if t == "number" => "bucket_histogram",
         _ => "histogram",
     };
     json!({
@@ -331,7 +340,9 @@ pub fn json_type_for(ty: &TypeExpr) -> Value {
         TypeExpr::List(_, _) => Value::String("array".into()),
         TypeExpr::Map(_, _, _) => Value::String("object".into()),
         TypeExpr::Named(_, _) => Value::String("string".into()),
-        TypeExpr::Vector(n, _) => json!({ "type": "array", "items": { "type": "number" }, "minItems": n, "maxItems": n }),
+        TypeExpr::Vector(n, _) => {
+            json!({ "type": "array", "items": { "type": "number" }, "minItems": n, "maxItems": n })
+        }
     }
 }
 
@@ -398,10 +409,10 @@ fn field_schema(f: &FieldDecl) -> Value {
 fn field_description(f: &FieldDecl) -> Option<String> {
     // Pull a best-effort description from @description or first string arg of @doc.
     for d in &f.decorators {
-        if d.is("description") || d.is("doc") {
-            if let Some(Expr::Literal(Literal::String(s), _)) = d.args.first() {
-                return Some(s.clone());
-            }
+        if (d.is("description") || d.is("doc"))
+            && let Some(Expr::Literal(Literal::String(s), _)) = d.args.first()
+        {
+            return Some(s.clone());
         }
     }
     None
@@ -449,10 +460,10 @@ fn paged_result_schema(schema: &TypedSchema) -> Value {
 fn default_top_k(schema: &TypedSchema) -> Option<u64> {
     let ctx = schema.decl.context.as_ref()?;
     for stmt in &ctx.stmts {
-        if stmt.key == "default_top_k" {
-            if let Expr::Literal(Literal::Integer(n), _) = &stmt.value {
-                return u64::try_from(*n).ok();
-            }
+        if stmt.key == "default_top_k"
+            && let Expr::Literal(Literal::Integer(n), _) = &stmt.value
+        {
+            return u64::try_from(*n).ok();
         }
     }
     None

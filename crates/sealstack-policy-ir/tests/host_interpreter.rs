@@ -127,13 +127,14 @@ fn has_role_allows_admin() {
 #[test]
 fn tenant_match_allows_matching_tenants() {
     // rule bytes: LOAD_CALLER [], LOAD_SELF [], CALL_TENANT_MATCH, RESULT
-    let mut rule: Vec<u8> = Vec::new();
-    rule.push(op::LOAD_CALLER);
-    rule.push(0);
-    rule.push(op::LOAD_SELF);
-    rule.push(0);
-    rule.push(op::CALL_TENANT_MATCH);
-    rule.push(op::RESULT);
+    let rule: Vec<u8> = vec![
+        op::LOAD_CALLER,
+        0,
+        op::LOAD_SELF,
+        0,
+        op::CALL_TENANT_MATCH,
+        op::RESULT,
+    ];
     let ir = build_ir(&[(action_bit::READ, &rule)]);
 
     let caller = serde_json::json!({

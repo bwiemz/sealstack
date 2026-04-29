@@ -220,9 +220,7 @@ impl WasmPolicy {
     }
 
     /// Fail-closed variant: missing bundles deny.
-    pub fn load_from_dir_deny_missing(
-        dir: impl AsRef<std::path::Path>,
-    ) -> anyhow::Result<Self> {
+    pub fn load_from_dir_deny_missing(dir: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
         Self::load_impl(
             dir.as_ref(),
             PolicyVerdict::Deny {
@@ -286,7 +284,6 @@ impl WasmPolicy {
             default_verdict,
         })
     }
-
 }
 
 /// Wire shape for policy input passed to each WASM bundle. Kept separate from

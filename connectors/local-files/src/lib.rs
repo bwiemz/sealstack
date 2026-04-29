@@ -406,8 +406,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("a.md"), "# Hello\n\nworld").unwrap();
         std::fs::write(dir.path().join("b.txt"), "plain text").unwrap();
-        std::fs::write(dir.path().join("c.bin"), &[0u8, 1, 2]).unwrap();
-        std::fs::write(dir.path().join("d.png"), &[0u8; 10]).unwrap();
+        std::fs::write(dir.path().join("c.bin"), [0u8, 1, 2]).unwrap();
+        std::fs::write(dir.path().join("d.png"), [0u8; 10]).unwrap();
 
         let c = LocalFilesConnector::new(dir.path()).unwrap();
         let mut stream = c.list().await.unwrap();

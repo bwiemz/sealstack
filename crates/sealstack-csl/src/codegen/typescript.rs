@@ -1,8 +1,12 @@
 //! TypeScript record-type codegen.
 //!
-//! Emits a single `generated.ts` file containing one `export interface <Schema>`
-//! + one `export const <Schema>Meta` + one `export type <Enum>` per declaration.
-//! See `docs/superpowers/specs/2026-04-21-csl-codegen-typescript-design.md`
+//! Emits a single `generated.ts` file containing
+//!   - one `export interface <Schema>`
+//!   - one `export const <Schema>Meta`
+//!   - one `export type <Enum>`
+//!
+//! per declaration. See
+//! `docs/superpowers/specs/2026-04-21-csl-codegen-typescript-design.md`
 //! for the shape decisions.
 
 use crate::error::CslResult;
@@ -72,7 +76,9 @@ fn render_primitive(p: PrimitiveType) -> &'static str {
     match p {
         PrimitiveType::String | PrimitiveType::Text => "string",
         PrimitiveType::Ulid | PrimitiveType::Uuid => "string",
-        PrimitiveType::I32 | PrimitiveType::I64 | PrimitiveType::F32 | PrimitiveType::F64 => "number",
+        PrimitiveType::I32 | PrimitiveType::I64 | PrimitiveType::F32 | PrimitiveType::F64 => {
+            "number"
+        }
         PrimitiveType::Bool => "boolean",
         PrimitiveType::Instant | PrimitiveType::Duration => "string",
         PrimitiveType::Json => "unknown",
@@ -122,14 +128,21 @@ fn emit_schema_meta(out: &mut String, decl: &crate::ast::SchemaDecl, namespace: 
 
     let version = decl.version.unwrap_or(1);
     let table = super::to_snake(&decl.name);
-    let ns_literal = if namespace.is_empty() { "default" } else { namespace };
+    let ns_literal = if namespace.is_empty() {
+        "default"
+    } else {
+        namespace
+    };
 
     out.push_str(&format!("export const {}Meta = {{\n", decl.name));
     out.push_str(&format!("  NAMESPACE: '{}',\n", escape_wire(ns_literal)));
     out.push_str(&format!("  SCHEMA: '{}',\n", escape_wire(&decl.name)));
     out.push_str(&format!("  TABLE: '{}',\n", escape_wire(&table)));
     out.push_str(&format!("  VERSION: {version},\n"));
-    out.push_str(&format!("  PRIMARY_KEY: '{}',\n", escape_wire(&primary_key)));
+    out.push_str(&format!(
+        "  PRIMARY_KEY: '{}',\n",
+        escape_wire(&primary_key)
+    ));
 
     out.push_str("  RELATIONS: {");
     if decl.relations.is_empty() {
@@ -206,7 +219,11 @@ fn emit_schema(out: &mut String, decl: &crate::ast::SchemaDecl) -> CslResult<()>
         let ty_str = render_field_type(&field.ty)?;
         let optional = matches!(field.ty, crate::ast::TypeExpr::Optional(_, _));
         let mark = if optional { "?" } else { "" };
-        out.push_str(&format!("  {name}{mark}: {ty};\n", name = field.name, ty = ty_str));
+        out.push_str(&format!(
+            "  {name}{mark}: {ty};\n",
+            name = field.name,
+            ty = ty_str
+        ));
     }
 
     if !emitted_tenant {
@@ -229,36 +246,81 @@ mod type_mapper_tests {
 
     #[test]
     fn primitives_map_to_default_types() {
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::String, s())).unwrap(), "string");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Text, s())).unwrap(), "string");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Ulid, s())).unwrap(), "string");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Uuid, s())).unwrap(), "string");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I32, s())).unwrap(), "number");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::I64, s())).unwrap(), "number");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::F32, s())).unwrap(), "number");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::F64, s())).unwrap(), "number");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Bool, s())).unwrap(), "boolean");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Instant, s())).unwrap(), "string");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Duration, s())).unwrap(), "string");
-        assert_eq!(render_field_type(&TypeExpr::Primitive(PrimitiveType::Json, s())).unwrap(), "unknown");
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::String, s())).unwrap(),
+            "string"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Text, s())).unwrap(),
+            "string"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Ulid, s())).unwrap(),
+            "string"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Uuid, s())).unwrap(),
+            "string"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::I32, s())).unwrap(),
+            "number"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::I64, s())).unwrap(),
+            "number"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::F32, s())).unwrap(),
+            "number"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::F64, s())).unwrap(),
+            "number"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Bool, s())).unwrap(),
+            "boolean"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Instant, s())).unwrap(),
+            "string"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Duration, s())).unwrap(),
+            "string"
+        );
+        assert_eq!(
+            render_field_type(&TypeExpr::Primitive(PrimitiveType::Json, s())).unwrap(),
+            "unknown"
+        );
     }
 
     #[test]
     fn ref_and_named_schema_render_as_string() {
-        assert_eq!(render_field_type(&TypeExpr::Ref("User".into(), s())).unwrap(), "string");
+        assert_eq!(
+            render_field_type(&TypeExpr::Ref("User".into(), s())).unwrap(),
+            "string"
+        );
     }
 
     #[test]
     fn list_renders_array_suffix() {
         let inner = Box::new(TypeExpr::Primitive(PrimitiveType::String, s()));
-        assert_eq!(render_field_type(&TypeExpr::List(inner, s())).unwrap(), "string[]");
+        assert_eq!(
+            render_field_type(&TypeExpr::List(inner, s())).unwrap(),
+            "string[]"
+        );
     }
 
     #[test]
     fn nested_list_renders_nested_array() {
         let inner = Box::new(TypeExpr::Primitive(PrimitiveType::I32, s()));
         let outer = Box::new(TypeExpr::List(inner, s()));
-        assert_eq!(render_field_type(&TypeExpr::List(outer, s())).unwrap(), "number[][]");
+        assert_eq!(
+            render_field_type(&TypeExpr::List(outer, s())).unwrap(),
+            "number[][]"
+        );
     }
 
     #[test]
@@ -267,7 +329,10 @@ mod type_mapper_tests {
         // on the field handles optionality at the field level. This test
         // asserts the renderer returns the inner type unchanged.
         let inner = Box::new(TypeExpr::Primitive(PrimitiveType::F32, s()));
-        assert_eq!(render_field_type(&TypeExpr::Optional(inner, s())).unwrap(), "number");
+        assert_eq!(
+            render_field_type(&TypeExpr::Optional(inner, s())).unwrap(),
+            "number"
+        );
     }
 
     #[test]
@@ -304,18 +369,27 @@ mod enum_emit_tests {
         let en = EnumDecl {
             name: "Tier".into(),
             variants: vec![
-                EnumVariant { name: "Free".into(), wire: Some("free".into()), span: s() },
-                EnumVariant { name: "Pro".into(), wire: Some("pro".into()), span: s() },
-                EnumVariant { name: "Enterprise".into(), wire: Some("enterprise".into()), span: s() },
+                EnumVariant {
+                    name: "Free".into(),
+                    wire: Some("free".into()),
+                    span: s(),
+                },
+                EnumVariant {
+                    name: "Pro".into(),
+                    wire: Some("pro".into()),
+                    span: s(),
+                },
+                EnumVariant {
+                    name: "Enterprise".into(),
+                    wire: Some("enterprise".into()),
+                    span: s(),
+                },
             ],
             span: s(),
         };
         let mut out = String::new();
         emit_enum(&mut out, &en);
-        assert_eq!(
-            out,
-            "export type Tier = 'free' | 'pro' | 'enterprise';\n"
-        );
+        assert_eq!(out, "export type Tier = 'free' | 'pro' | 'enterprise';\n");
     }
 
     #[test]
@@ -323,8 +397,16 @@ mod enum_emit_tests {
         let en = EnumDecl {
             name: "Status".into(),
             variants: vec![
-                EnumVariant { name: "Active".into(), wire: None, span: s() },
-                EnumVariant { name: "Archived".into(), wire: None, span: s() },
+                EnumVariant {
+                    name: "Active".into(),
+                    wire: None,
+                    span: s(),
+                },
+                EnumVariant {
+                    name: "Archived".into(),
+                    wire: None,
+                    span: s(),
+                },
             ],
             span: s(),
         };
@@ -337,16 +419,18 @@ mod enum_emit_tests {
     fn escapes_backslash_and_single_quote_in_wire_form() {
         let en = EnumDecl {
             name: "Weird".into(),
-            variants: vec![
-                EnumVariant { name: "Q".into(), wire: Some(r#"val'ue\n"#.into()), span: s() },
-            ],
+            variants: vec![EnumVariant {
+                name: "Q".into(),
+                wire: Some(r#"val'ue\n"#.into()),
+                span: s(),
+            }],
             span: s(),
         };
         let mut out = String::new();
         emit_enum(&mut out, &en);
         // The wire string contains a literal `'` and a literal `\` followed by `n`.
         // Both must be escaped: `'` → `\'`, `\` → `\\`.
-        assert_eq!(out, r"export type Weird = 'val\'ue\\n';" .to_string() + "\n");
+        assert_eq!(out, r"export type Weird = 'val\'ue\\n';".to_string() + "\n");
     }
 }
 

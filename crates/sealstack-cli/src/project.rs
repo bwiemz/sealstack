@@ -95,7 +95,11 @@ impl ProjectConfig {
     }
 
     /// Write a minimal default `cfg.toml` at `root`.
-    pub(crate) fn write_default(root: &Path, name: &str, overwrite: bool) -> anyhow::Result<PathBuf> {
+    pub(crate) fn write_default(
+        root: &Path,
+        name: &str,
+        overwrite: bool,
+    ) -> anyhow::Result<PathBuf> {
         let path = root.join("cfg.toml");
         if path.exists() && !overwrite {
             bail!(
@@ -129,11 +133,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let nested = dir.path().join("a/b/c");
         std::fs::create_dir_all(&nested).unwrap();
-        std::fs::write(
-            dir.path().join("cfg.toml"),
-            "[project]\nname = \"demo\"\n",
-        )
-        .unwrap();
+        std::fs::write(dir.path().join("cfg.toml"), "[project]\nname = \"demo\"\n").unwrap();
         let (cfg, root) = ProjectConfig::discover(&nested).unwrap().unwrap();
         assert_eq!(cfg.project.name.as_deref(), Some("demo"));
         assert_eq!(root, dir.path().canonicalize().unwrap());

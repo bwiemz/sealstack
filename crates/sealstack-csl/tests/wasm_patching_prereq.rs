@@ -68,8 +68,7 @@ fn byte_level_surgery_preserves_all_other_bytes() {
             for item in reader {
                 let data = item.expect("parse data segment");
                 if let Some(idx) = find_slot_in_segment(data.data) {
-                    start =
-                        Some(data.data.as_ptr() as usize - ASSET.as_ptr() as usize + idx);
+                    start = Some(data.data.as_ptr() as usize - ASSET.as_ptr() as usize + idx);
                 }
             }
         }
@@ -79,10 +78,17 @@ fn byte_level_surgery_preserves_all_other_bytes() {
     // Overwrite the slot with a recognizable pattern, verify every other byte
     // is untouched.
     let mut patched = ASSET.to_vec();
-    for (i, b) in patched[start..start + IR_SECTION_BYTES].iter_mut().enumerate() {
+    for (i, b) in patched[start..start + IR_SECTION_BYTES]
+        .iter_mut()
+        .enumerate()
+    {
         *b = (i as u8).wrapping_add(1);
     }
-    assert_eq!(patched.len(), ASSET.len(), "patching must not change length");
+    assert_eq!(
+        patched.len(),
+        ASSET.len(),
+        "patching must not change length"
+    );
     assert_eq!(
         &patched[..start],
         &ASSET[..start],

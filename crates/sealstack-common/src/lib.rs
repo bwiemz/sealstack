@@ -1,4 +1,4 @@
-//! Shared types, errors, and identifiers used across every SealStack crate.
+//! Shared types, errors, and identifiers used across every `SealStack` crate.
 //!
 //! Nothing in this crate depends on a runtime (no tokio, no sqlx, no reqwest).
 //! It is deliberately dependency-light so the full workspace builds in tiers:
@@ -257,7 +257,7 @@ mod tests {
             last_error: Box::new(SealStackError::Backend("502 bad gateway".into())),
         };
         let msg = e.to_string();
-        assert!(msg.contains("5"), "missing attempts: {msg}");
+        assert!(msg.contains('5'), "missing attempts: {msg}");
         assert!(msg.contains("502"), "missing last_error detail: {msg}");
     }
 

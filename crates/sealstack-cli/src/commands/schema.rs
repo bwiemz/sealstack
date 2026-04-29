@@ -33,8 +33,12 @@ async fn apply(ctx: &CliContext, args: SchemaApplyArgs) -> anyhow::Result<()> {
     for meta in &out.schemas_meta {
         let qualified = format!(
             "{}.{}",
-            meta.get("namespace").and_then(|v| v.as_str()).unwrap_or("default"),
-            meta.get("name").and_then(|v| v.as_str()).unwrap_or("Unnamed"),
+            meta.get("namespace")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default"),
+            meta.get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unnamed"),
         );
         tracing::info!(qualified = %qualified, "registering schema");
         client.register_schema(meta.clone()).await?;

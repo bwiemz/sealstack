@@ -113,11 +113,7 @@ fn tampered_magic_returns_negative() {
     let typed = types::check(&file).unwrap();
     let mut bundle = policy::emit_policy_bundles(&typed).unwrap().remove(0);
     // Find the SLIR magic and flip one byte.
-    let pos = bundle
-        .wasm
-        .windows(4)
-        .position(|w| w == b"SLIR")
-        .unwrap();
+    let pos = bundle.wasm.windows(4).position(|w| w == b"SLIR").unwrap();
     bundle.wasm[pos + 1] = b'X';
 
     let engine = Engine::default();
@@ -169,5 +165,9 @@ fn missing_caller_attribute_compared_to_string_returns_false() {
     let module = Module::new(&engine, &bundle.wasm).unwrap();
     // Caller has no `region` field.
     let input = r#"{"namespace":"default","schema":"Doc","action":"read","caller":{"id":"u","email":"","groups":[],"team":"","tenant":"","roles":[],"attrs":{}},"record":{"id":"r","tenant":""}}"#;
-    assert_eq!(evaluate(&engine, &module, input), 0, "expected deny, got non-zero");
+    assert_eq!(
+        evaluate(&engine, &module, input),
+        0,
+        "expected deny, got non-zero"
+    );
 }

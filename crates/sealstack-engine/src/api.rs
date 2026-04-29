@@ -265,14 +265,8 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn list(&self, req: ListRequest) -> Result<ListResponse, EngineError>;
 
     /// List records on the far side of a named relation.
-    async fn list_relation(
-        &self,
-        req: ListRelationRequest,
-    ) -> Result<ListResponse, EngineError>;
+    async fn list_relation(&self, req: ListRelationRequest) -> Result<ListResponse, EngineError>;
 
     /// Grouped aggregate over one facet.
-    async fn aggregate(
-        &self,
-        req: AggregateRequest,
-    ) -> Result<AggregateResponse, EngineError>;
+    async fn aggregate(&self, req: AggregateRequest) -> Result<AggregateResponse, EngineError>;
 }

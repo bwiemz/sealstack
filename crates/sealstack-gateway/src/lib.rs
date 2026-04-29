@@ -5,6 +5,10 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
+// HTTP-error returns carry `axum::Response` (~128 bytes) and our own
+// `auth::AuthError` flavor in their `Err` variant. Boxing every Result on
+// the request hot path is ergonomic noise; the cost is paid only on errors.
+#![allow(clippy::result_large_err)]
 
 pub mod auth;
 pub mod config;

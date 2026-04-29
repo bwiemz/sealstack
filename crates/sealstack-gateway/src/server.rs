@@ -39,14 +39,17 @@ use tower_http::{
 
 use crate::{
     config::Config,
-    mcp::{oauth, registry::ToolRegistry, transport::{self, TransportState}},
+    mcp::{
+        oauth,
+        registry::ToolRegistry,
+        transport::{self, TransportState},
+    },
     rest,
 };
 
 /// Factory closure that constructs concrete connectors from a `(kind, config)` pair.
-pub type ConnectorFactory = Arc<
-    dyn Fn(&str, &Value) -> anyhow::Result<Arc<dyn Connector>> + Send + Sync + 'static,
->;
+pub type ConnectorFactory =
+    Arc<dyn Fn(&str, &Value) -> anyhow::Result<Arc<dyn Connector>> + Send + Sync + 'static>;
 
 /// Shared application state.
 #[derive(Clone)]
@@ -141,11 +144,7 @@ pub async fn build_app(
     // Covers both on-disk compiled schemas (via Engine::new's load_from_dir)
     // and anything previously persisted via POST /v1/schemas.
     let schemas = state.engine.registry().iter();
-    crate::mcp::bootstrap::register_all(
-        &state.registry,
-        state.engine_facade.clone(),
-        &schemas,
-    );
+    crate::mcp::bootstrap::register_all(&state.registry, state.engine_facade.clone(), &schemas);
 
     hydrate_connectors(&state).await;
 

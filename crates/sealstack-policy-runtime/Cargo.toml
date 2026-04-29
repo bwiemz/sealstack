@@ -1,10 +1,15 @@
 [package]
+# This crate is intentionally `[workspace] exclude`'d from the root workspace.
+# Reason: it's `#![no_std]` `#![no_main]` and only compiles for
+# wasm32-unknown-unknown. Workspace inheritance (`{ workspace = true }`) is
+# unavailable for excluded crates, so values are inlined here. Keep these
+# in sync with the root [workspace.package] table if it changes.
 name         = "sealstack-policy-runtime"
-version      = { workspace = true }
-edition      = { workspace = true }
-rust-version = { workspace = true }
-license      = { workspace = true }
-repository   = { workspace = true }
+version      = "0.1.0"
+edition      = "2024"
+rust-version = "1.88"
+license      = "Apache-2.0"
+repository   = "https://github.com/bwiemz/sealstack"
 description  = "WASM runtime that interprets CSL policy-predicate IR. Built with `cargo build --target wasm32-unknown-unknown --release` and committed as an asset in sealstack-csl."
 publish      = false
 
@@ -22,3 +27,12 @@ pedantic                 = { level = "warn", priority = -1 }
 nursery                  = { level = "warn", priority = -1 }
 module_name_repetitions  = "allow"
 missing_errors_doc       = "allow"
+
+# Release profile mirrors what was previously declared in the workspace root
+# as `[profile.release.package.sealstack-policy-runtime]`. Workspace-level
+# package overrides don't apply to excluded crates, so the settings live here.
+[profile.release]
+opt-level     = "z"
+codegen-units = 1
+strip         = "debuginfo"
+lto           = "thin"

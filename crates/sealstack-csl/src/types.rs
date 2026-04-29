@@ -61,7 +61,7 @@ impl TypedSchema {
 /// # Errors
 /// Returns the first fatal type error encountered.
 pub fn check(file: &File) -> CslResult<TypedFile> {
-    check_project(&[file.clone()])
+    check_project(std::slice::from_ref(file))
 }
 
 /// Check a multi-file project. Imports are resolved across all supplied files.
@@ -137,7 +137,11 @@ pub fn check_project(files: &[File]) -> CslResult<TypedFile> {
         let schema = ts.decl.clone();
         let (src_name, src_text) = files
             .iter()
-            .find(|f| f.decls.iter().any(|d| matches!(d, TopDecl::Schema(s) if s.name == schema.name)))
+            .find(|f| {
+                f.decls
+                    .iter()
+                    .any(|d| matches!(d, TopDecl::Schema(s) if s.name == schema.name))
+            })
             .map(|f| (f.filename.clone(), f.source.clone()))
             .unwrap_or_default();
         let _ = file_src.get(&src_name);
@@ -194,12 +198,20 @@ pub fn check_project(files: &[File]) -> CslResult<TypedFile> {
                     src: miette::NamedSource::new(
                         files
                             .iter()
-                            .find(|f| f.decls.iter().any(|d| matches!(d, TopDecl::Schema(s) if s.name == schema.name)))
+                            .find(|f| {
+                                f.decls.iter().any(
+                                    |d| matches!(d, TopDecl::Schema(s) if s.name == schema.name),
+                                )
+                            })
                             .and_then(|f| f.filename.clone())
                             .unwrap_or_else(|| "<input>".into()),
                         files
                             .iter()
-                            .find(|f| f.decls.iter().any(|d| matches!(d, TopDecl::Schema(s) if s.name == schema.name)))
+                            .find(|f| {
+                                f.decls.iter().any(
+                                    |d| matches!(d, TopDecl::Schema(s) if s.name == schema.name),
+                                )
+                            })
                             .map(|f| f.source.clone())
                             .unwrap_or_default(),
                     ),

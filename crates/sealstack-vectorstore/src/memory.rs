@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use serde_json::Value;
 
-use crate::{SealStackError, SealStackResult, Chunk, Distance, SearchResult, VectorStore};
+use crate::{Chunk, Distance, SealStackError, SealStackResult, SearchResult, VectorStore};
 
 /// An in-process vector store.
 #[derive(Default)]
@@ -238,7 +238,7 @@ mod tests {
         meta.insert("tag".into(), Value::String(tag.into()));
         Chunk {
             id: ulid::Ulid::from_string(
-                &format!("{id:0>26}").to_uppercase().replace('I', "J").replace('L', "J"),
+                &format!("{id:0>26}").to_uppercase().replace(['I', 'L'], "J"),
             )
             .unwrap_or_else(|_| ulid::Ulid::new()),
             content: format!("content-{id}"),
@@ -261,10 +261,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let hits = s
-            .search("c", vec![0.9, 0.1, 0.0], 2, None)
-            .await
-            .unwrap();
+        let hits = s.search("c", vec![0.9, 0.1, 0.0], 2, None).await.unwrap();
         assert_eq!(hits.len(), 2);
         assert!(hits[0].score > hits[1].score);
     }

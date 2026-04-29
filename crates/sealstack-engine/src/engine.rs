@@ -197,11 +197,7 @@ impl Engine {
     // Shared helpers
     // ---------------------------------------------------------------------
 
-    async fn fetch_row_raw(
-        &self,
-        meta: &SchemaMeta,
-        id: &str,
-    ) -> Result<Value, EngineError> {
+    async fn fetch_row_raw(&self, meta: &SchemaMeta, id: &str) -> Result<Value, EngineError> {
         if !is_safe_ident(&meta.table) {
             return Err(EngineError::InvalidArgument(format!(
                 "unsafe table identifier `{}`",
@@ -217,13 +213,14 @@ impl Engine {
              FROM {} WHERE id = $1",
             meta.table
         );
-        let row: Option<(
+        type FetchRow = (
             String,
             Option<String>,
             Option<String>,
             Option<time::OffsetDateTime>,
             Option<Value>,
-        )> = sqlx::query_as(&sql)
+        );
+        let row: Option<FetchRow> = sqlx::query_as(&sql)
             .bind(id)
             .fetch_optional(self.store.pool())
             .await
@@ -368,7 +365,8 @@ impl EngineHandle for Engine {
         }
 
         // Fetch full records for the surviving IDs (cheap for v0.1; batch later).
-        let mut records: Vec<(crate::retrieval::RetrievedHit, Value)> = Vec::with_capacity(hits.len());
+        let mut records: Vec<(crate::retrieval::RetrievedHit, Value)> =
+            Vec::with_capacity(hits.len());
         for hit in hits {
             match self.fetch_row_raw(&meta, &hit.id).await {
                 Ok(row) => records.push((hit, row)),
@@ -400,11 +398,15 @@ impl EngineHandle for Engine {
         let mut sources = Vec::new();
         let mut verdicts = Vec::new();
         let qualified = format!("{}.{}", meta.namespace, meta.name);
-        for ((hit, record), allowed) in records.into_iter().zip(mask.into_iter()) {
+        for ((hit, record), allowed) in records.into_iter().zip(mask) {
             verdicts.push(PolicyRef {
                 schema: qualified.clone(),
                 predicate: "read".into(),
-                verdict: if allowed { "allow".into() } else { "deny".into() },
+                verdict: if allowed {
+                    "allow".into()
+                } else {
+                    "deny".into()
+                },
             });
             if !allowed {
                 continue;
@@ -468,7 +470,11 @@ impl EngineHandle for Engine {
         .with_policies(vec![PolicyRef {
             schema: qualified,
             predicate: "read".into(),
-            verdict: if verdict.is_allow() { "allow".into() } else { "deny".into() },
+            verdict: if verdict.is_allow() {
+                "allow".into()
+            } else {
+                "deny".into()
+            },
         }])
         .build();
         self.log_receipt(receipt).await;
@@ -485,7 +491,13 @@ impl EngineHandle for Engine {
         let meta = self.registry.get(&req.namespace, &req.schema)?;
         let (where_clause, binds) = build_facet_where(&meta, &req.filters);
         let (items, next_cursor) = self
-            .fetch_many(&meta, &where_clause, binds, req.cursor.as_deref(), req.limit)
+            .fetch_many(
+                &meta,
+                &where_clause,
+                binds,
+                req.cursor.as_deref(),
+                req.limit,
+            )
             .await?;
 
         let mask = self
@@ -500,17 +512,14 @@ impl EngineHandle for Engine {
             .await?;
         let items: Vec<Value> = items
             .into_iter()
-            .zip(mask.into_iter())
+            .zip(mask)
             .filter_map(|(v, ok)| ok.then_some(v))
             .collect();
 
         Ok(ListResponse { items, next_cursor })
     }
 
-    async fn list_relation(
-        &self,
-        req: ListRelationRequest,
-    ) -> Result<ListResponse, EngineError> {
+    async fn list_relation(&self, req: ListRelationRequest) -> Result<ListResponse, EngineError> {
         let (parent_meta, relation) =
             self.registry
                 .resolve_relation(&req.namespace, &req.schema, &req.relation)?;
@@ -557,7 +566,7 @@ impl EngineHandle for Engine {
             .await?;
         let items: Vec<Value> = items
             .into_iter()
-            .zip(mask.into_iter())
+            .zip(mask)
             .filter_map(|(v, ok)| ok.then_some(v))
             .collect();
 
@@ -567,10 +576,7 @@ impl EngineHandle for Engine {
         Ok(ListResponse { items, next_cursor })
     }
 
-    async fn aggregate(
-        &self,
-        req: AggregateRequest,
-    ) -> Result<AggregateResponse, EngineError> {
+    async fn aggregate(&self, req: AggregateRequest) -> Result<AggregateResponse, EngineError> {
         let meta = self.registry.get(&req.namespace, &req.schema)?;
 
         if !meta.facets.contains(&req.facet) {

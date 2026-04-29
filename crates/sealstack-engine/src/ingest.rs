@@ -129,7 +129,7 @@ impl Ingestor {
         // ---- Vector-store upsert -------------------------------------------
         let vec_chunks: Vec<Chunk> = chunks
             .into_iter()
-            .zip(embeddings.into_iter())
+            .zip(embeddings)
             .enumerate()
             .map(|(seq, (chunk, embedding))| Chunk {
                 id: Ulid::new(),
@@ -215,11 +215,7 @@ impl Ingestor {
     }
 
     /// Remove a record and its chunks from the indexes.
-    pub async fn delete(
-        &self,
-        meta: &SchemaMeta,
-        record_id: &str,
-    ) -> Result<(), EngineError> {
+    pub async fn delete(&self, meta: &SchemaMeta, record_id: &str) -> Result<(), EngineError> {
         if !crate::util::is_safe_ident(&meta.table) {
             return Err(EngineError::InvalidArgument(format!(
                 "unsafe table identifier `{}`",
@@ -292,7 +288,10 @@ fn semantic_chunks(body: &str, max_tokens: usize, overlap: usize) -> Vec<ChunkRa
     let max_chars = max_tokens.saturating_mul(4).max(200);
     let overlap_chars = overlap.saturating_mul(4);
 
-    let paragraphs: Vec<&str> = body.split("\n\n").filter(|p| !p.trim().is_empty()).collect();
+    let paragraphs: Vec<&str> = body
+        .split("\n\n")
+        .filter(|p| !p.trim().is_empty())
+        .collect();
     let mut chunks: Vec<String> = Vec::new();
     let mut current = String::new();
     for p in paragraphs {
@@ -323,10 +322,7 @@ fn semantic_chunks(body: &str, max_tokens: usize, overlap: usize) -> Vec<ChunkRa
         // Fallback: one chunk from the whole body.
         chunks.push(body.to_string());
     }
-    chunks
-        .into_iter()
-        .map(|text| ChunkRaw { text })
-        .collect()
+    chunks.into_iter().map(|text| ChunkRaw { text }).collect()
 }
 
 fn recursive_chunks(body: &str, separators: &[String], max_tokens: usize) -> Vec<ChunkRaw> {
@@ -376,7 +372,11 @@ mod tests {
         let chunks = semantic_chunks(&body, 40, 0);
         assert!(chunks.len() > 1, "expected multiple chunks");
         for c in &chunks {
-            assert!(c.text.len() <= 40 * 4 + 200, "chunk too large: {}", c.text.len());
+            assert!(
+                c.text.len() <= 40 * 4 + 200,
+                "chunk too large: {}",
+                c.text.len()
+            );
         }
     }
 

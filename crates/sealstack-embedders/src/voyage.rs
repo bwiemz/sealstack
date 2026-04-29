@@ -17,7 +17,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::{SealStackError, SealStackResult, Embedder};
+use crate::{Embedder, SealStackError, SealStackResult};
 
 const DEFAULT_ENDPOINT: &str = "https://api.voyageai.com/v1/embeddings";
 
@@ -63,7 +63,10 @@ impl VoyageEmbedder {
     }
 
     /// Construct with a specific model.
-    pub fn with_model(api_key: impl Into<String>, model: impl Into<String>) -> SealStackResult<Self> {
+    pub fn with_model(
+        api_key: impl Into<String>,
+        model: impl Into<String>,
+    ) -> SealStackResult<Self> {
         let model = model.into();
         let dims = dims_for_model(&model).ok_or_else(|| {
             SealStackError::Config(format!(
@@ -203,9 +206,7 @@ impl Embedder for VoyageEmbedder {
         }
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            return Err(SealStackError::Backend(format!(
-                "voyage {status}: {body}"
-            )));
+            return Err(SealStackError::Backend(format!("voyage {status}: {body}")));
         }
 
         let parsed: EmbedResp = resp.json().await.map_err(SealStackError::backend)?;

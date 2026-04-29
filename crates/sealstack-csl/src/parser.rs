@@ -28,9 +28,10 @@ use winnow::{
 };
 
 use crate::ast::{
-    Action, BinaryOp, Cardinality, ContextBlock, ContextStmt, Decorator, DeletePolicy, DurationUnit,
-    EnumDecl, EnumVariant, Expr, FieldDecl, File, ImportStmt, Literal, NamespaceDecl, Path,
-    PolicyBlock, PolicyRule, PrimitiveType, RelationDecl, SchemaDecl, TopDecl, TypeExpr, UnaryOp,
+    Action, BinaryOp, Cardinality, ContextBlock, ContextStmt, Decorator, DeletePolicy,
+    DurationUnit, EnumDecl, EnumVariant, Expr, FieldDecl, File, ImportStmt, Literal, NamespaceDecl,
+    Path, PolicyBlock, PolicyRule, PrimitiveType, RelationDecl, SchemaDecl, TopDecl, TypeExpr,
+    UnaryOp,
 };
 use crate::error::{CslError, CslResult};
 use crate::span::Span;
@@ -70,9 +71,12 @@ pub fn parse_file_named(filename: &str, source: &str) -> CslResult<File> {
             let message = format_context_error(&e);
             Err(CslError::parse(Some(filename), source, span, message))
         }
-        Err(winnow::error::ErrMode::Incomplete(_)) => {
-            Err(CslError::parse(Some(filename), source, Span::point(source.len()), "unexpected end of input"))
-        }
+        Err(winnow::error::ErrMode::Incomplete(_)) => Err(CslError::parse(
+            Some(filename),
+            source,
+            Span::point(source.len()),
+            "unexpected end of input",
+        )),
     }
 }
 
@@ -89,7 +93,9 @@ fn format_context_error(e: &ContextError) -> String {
 // === Whitespace and comments =========================================================
 
 fn line_comment<'s>(i: &mut Input<'s>) -> PR<()> {
-    ("//", take_while(0.., |c: char| c != '\n')).void().parse_next(i)
+    ("//", take_while(0.., |c: char| c != '\n'))
+        .void()
+        .parse_next(i)
 }
 
 fn block_comment<'s>(i: &mut Input<'s>) -> PR<()> {
@@ -98,11 +104,8 @@ fn block_comment<'s>(i: &mut Input<'s>) -> PR<()> {
 
 /// Skip any amount of whitespace or comment.
 fn skip_ws<'s>(i: &mut Input<'s>) -> PR<()> {
-    let _: Vec<()> = repeat(
-        0..,
-        alt((multispace1.void(), line_comment, block_comment)),
-    )
-    .parse_next(i)?;
+    let _: Vec<()> =
+        repeat(0.., alt((multispace1.void(), line_comment, block_comment))).parse_next(i)?;
     Ok(())
 }
 
@@ -311,12 +314,9 @@ fn type_ref<'s>(i: &mut Input<'s>) -> PR<TypeExpr> {
 }
 
 fn type_list<'s>(i: &mut Input<'s>) -> PR<TypeExpr> {
-    let (inner, span) = preceded(
-        kw("List"),
-        cut_err(delimited(kw("<"), type_expr, kw(">"))),
-    )
-    .with_span()
-    .parse_next(i)?;
+    let (inner, span) = preceded(kw("List"), cut_err(delimited(kw("<"), type_expr, kw(">"))))
+        .with_span()
+        .parse_next(i)?;
     Ok(TypeExpr::List(Box::new(inner), span.into()))
 }
 
@@ -461,13 +461,7 @@ fn expr_atom<'s>(i: &mut Input<'s>) -> PR<Expr> {
     // like `true`, `false`, and `null` bind as boolean / null literals rather
     // than being eagerly consumed by `path_parser` (which uses the
     // permissive `ident_recognized` that doesn't reject reserved words).
-    alt((
-        parenthesized_expr,
-        list_literal,
-        expr_literal,
-        call_or_path,
-    ))
-    .parse_next(i)
+    alt((parenthesized_expr, list_literal, expr_literal, call_or_path)).parse_next(i)
 }
 
 fn parenthesized_expr<'s>(i: &mut Input<'s>) -> PR<Expr> {
@@ -522,7 +516,9 @@ fn expr_literal<'s>(i: &mut Input<'s>) -> PR<Expr> {
         integer_literal.map(|(n, span)| Expr::Literal(Literal::Integer(n), span)),
         string_literal.map(|(s, span)| Expr::Literal(Literal::String(s), span)),
         bool_literal.map(|(b, span)| Expr::Literal(Literal::Bool(b), span)),
-        kw("null").with_span().map(|(_, span)| Expr::Literal(Literal::Null, span.into())),
+        kw("null")
+            .with_span()
+            .map(|(_, span)| Expr::Literal(Literal::Null, span.into())),
     ))
     .parse_next(i)
 }
@@ -569,10 +565,7 @@ fn field_decl<'s>(i: &mut Input<'s>) -> PR<FieldDecl> {
     )
         .parse_next(i)?;
     let _ = opt(kw(";")).parse_next(i)?;
-    let span_end = decorators
-        .last()
-        .map(|d| d.span)
-        .unwrap_or(ty.span());
+    let span_end = decorators.last().map(|d| d.span).unwrap_or(ty.span());
     Ok(FieldDecl {
         name,
         ty,
@@ -763,11 +756,8 @@ fn schema_decl<'s>(i: &mut Input<'s>) -> PR<SchemaDecl> {
 // === Enum ===========================================================================
 
 fn enum_variant<'s>(i: &mut Input<'s>) -> PR<EnumVariant> {
-    let ((name, name_span), wire) = (
-        type_ident,
-        opt(delimited(kw("("), string_literal, kw(")"))),
-    )
-        .parse_next(i)?;
+    let ((name, name_span), wire) =
+        (type_ident, opt(delimited(kw("("), string_literal, kw(")")))).parse_next(i)?;
     let wire_val = wire.map(|(s, _)| s);
     Ok(EnumVariant {
         name,

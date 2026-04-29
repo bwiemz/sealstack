@@ -11,7 +11,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::{SealStackError, SealStackResult, Embedder};
+use crate::{Embedder, SealStackError, SealStackResult};
 
 const DEFAULT_ENDPOINT: &str = "https://api.openai.com/v1/embeddings";
 
@@ -35,7 +35,10 @@ impl OpenAIEmbedder {
     }
 
     /// Construct with a specific model.
-    pub fn with_model(api_key: impl Into<String>, model: impl Into<String>) -> SealStackResult<Self> {
+    pub fn with_model(
+        api_key: impl Into<String>,
+        model: impl Into<String>,
+    ) -> SealStackResult<Self> {
         let model = model.into();
         let dims = dims_for_model(&model).ok_or_else(|| {
             SealStackError::Config(format!(

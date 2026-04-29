@@ -34,8 +34,9 @@ impl EngineConfig {
     #[must_use]
     pub fn test() -> Self {
         Self {
-            database_url: std::env::var("SEALSTACK_DATABASE_URL")
-                .unwrap_or_else(|_| "postgres://sealstack:sealstack@localhost:5432/sealstack".into()),
+            database_url: std::env::var("SEALSTACK_DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://sealstack:sealstack@localhost:5432/sealstack".into()
+            }),
             pg_pool_size: 4,
             compile_dir: "./out".into(),
             retrieval: RetrievalConfig::default(),

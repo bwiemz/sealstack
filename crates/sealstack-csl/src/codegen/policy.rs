@@ -152,8 +152,7 @@ fn locate_predicate_section(wasm: &[u8]) -> CslResult<ScanResult> {
                     if hay[i..i + 4] == MAGIC
                         && hay[i + 4..i + IR_SECTION_BYTES].iter().all(|b| *b == 0)
                     {
-                        let start =
-                            hay.as_ptr() as usize - wasm.as_ptr() as usize + i;
+                        let start = hay.as_ptr() as usize - wasm.as_ptr() as usize + i;
                         return Ok(ScanResult { start });
                     }
                 }

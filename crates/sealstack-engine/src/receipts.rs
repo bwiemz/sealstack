@@ -102,7 +102,11 @@ impl TimingRecorder {
 
     /// Record the stage that just completed and begin the next one.
     pub fn split(&mut self, stage: Stage) {
-        let ms = self.stage_start.elapsed().as_millis().min(u128::from(u32::MAX)) as u32;
+        let ms = self
+            .stage_start
+            .elapsed()
+            .as_millis()
+            .min(u128::from(u32::MAX)) as u32;
         match stage {
             Stage::Embed => self.current.embed = ms,
             Stage::Retrieval => self.current.retrieval = ms,
@@ -259,21 +263,31 @@ mod tests {
     #[test]
     fn builder_assembles_a_valid_receipt() {
         let caller = Caller::test("u_42");
-        let r = ReceiptBuilder::new(caller, "acme.crm.Customer", "search_customer",
-            serde_json::json!({ "query": "acme" }))
-            .with_sources(vec![SourceRef {
-                schema: "acme.crm.Customer".into(),
-                record_id: "c_1".into(),
-                chunk_id: Some("k_1".into()),
-                score: 0.8,
-            }])
-            .with_policies(vec![PolicyRef {
-                schema: "acme.crm.Customer".into(),
-                predicate: "read".into(),
-                verdict: "allow".into(),
-            }])
-            .with_timings(Timings { embed: 5, retrieval: 30, rerank: 10, policy: 2, total: 50 })
-            .build();
+        let r = ReceiptBuilder::new(
+            caller,
+            "acme.crm.Customer",
+            "search_customer",
+            serde_json::json!({ "query": "acme" }),
+        )
+        .with_sources(vec![SourceRef {
+            schema: "acme.crm.Customer".into(),
+            record_id: "c_1".into(),
+            chunk_id: Some("k_1".into()),
+            score: 0.8,
+        }])
+        .with_policies(vec![PolicyRef {
+            schema: "acme.crm.Customer".into(),
+            predicate: "read".into(),
+            verdict: "allow".into(),
+        }])
+        .with_timings(Timings {
+            embed: 5,
+            retrieval: 30,
+            rerank: 10,
+            policy: 2,
+            total: 50,
+        })
+        .build();
         assert!(!r.id.is_empty());
         assert_eq!(r.sources.len(), 1);
         assert_eq!(r.policies_applied.len(), 1);

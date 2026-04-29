@@ -194,7 +194,11 @@ pub struct ToolDescriptor {
     #[serde(rename = "inputSchema")]
     pub input_schema: Value,
     /// Optional JSON Schema for the result payload.
-    #[serde(default, rename = "outputSchema", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "outputSchema",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub output_schema: Option<Value>,
     /// Optional free-form annotations; not interpreted by the protocol but surfaced to clients.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -227,7 +231,11 @@ pub struct ToolsCallResult {
     #[serde(rename = "isError", default)]
     pub is_error: bool,
     /// Optional structured payload for clients that prefer typed results.
-    #[serde(default, rename = "structuredContent", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "structuredContent",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub structured_content: Option<Value>,
 }
 

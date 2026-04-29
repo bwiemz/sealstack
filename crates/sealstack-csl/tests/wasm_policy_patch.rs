@@ -30,12 +30,9 @@ fn bundle_contains_expected_patched_ir_bytes() {
     let expected_header_and_rule: &[u8] = &[
         b'S', b'L', b'I', b'R',
         // ir_len: u32 LE = 7 (count byte + 3-byte entry + 3-byte rule)
-        0x07, 0x00, 0x00, 0x00,
-        // action_table_count
-        0x01,
-        // entry: mask=READ(0x01), offset=0 LE
-        0x01, 0x00, 0x00,
-        // rule: LIT_BOOL(0x02), 1, RESULT(0xFD)
+        0x07, 0x00, 0x00, 0x00, // action_table_count
+        0x01, // entry: mask=READ(0x01), offset=0 LE
+        0x01, 0x00, 0x00, // rule: LIT_BOOL(0x02), 1, RESULT(0xFD)
         0x02, 0x01, 0xFD,
     ];
 

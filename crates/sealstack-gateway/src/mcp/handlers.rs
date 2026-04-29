@@ -112,10 +112,9 @@ impl ToolHandler for GeneratedHandler {
                     .await
             }
             HandlerKind::ListRelation => {
-                let relation = self
-                    .relation
-                    .as_deref()
-                    .ok_or_else(|| ToolError::Backend("relation handler missing rel name".into()))?;
+                let relation = self.relation.as_deref().ok_or_else(|| {
+                    ToolError::Backend("relation handler missing rel name".into())
+                })?;
                 let parent_id = args
                     .get("parent_id")
                     .ok_or_else(|| ToolError::InvalidArgs("missing `parent_id`".into()))?;

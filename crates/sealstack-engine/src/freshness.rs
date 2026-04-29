@@ -33,7 +33,11 @@ pub fn decay_factor(strategy: &FreshnessDecay, age_secs: i64) -> f32 {
             (1.0 - (age / window)).max(0.0)
         }
         FreshnessDecay::Step { cliffs, factors } => {
-            debug_assert_eq!(cliffs.len(), factors.len(), "cliffs/factors length mismatch");
+            debug_assert_eq!(
+                cliffs.len(),
+                factors.len(),
+                "cliffs/factors length mismatch"
+            );
             // Descending scan — apply the strictest (first crossed) factor.
             let mut factor = 1.0;
             for (cliff, fac) in cliffs.iter().zip(factors.iter()) {
@@ -58,7 +62,9 @@ mod tests {
 
     #[test]
     fn exponential_halves_at_half_life() {
-        let s = FreshnessDecay::Exponential { half_life_secs: 100 };
+        let s = FreshnessDecay::Exponential {
+            half_life_secs: 100,
+        };
         let f = decay_factor(&s, 100);
         assert!((f - 0.5).abs() < 1e-6, "got {f}");
     }
