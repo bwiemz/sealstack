@@ -10,7 +10,7 @@
 //! | `body`                 | Full file contents (UTF-8)                     |
 //! | `metadata.path`        | Canonical path                                 |
 //! | `metadata.size_bytes`  | File size in bytes                             |
-//! | `permissions`          | `[{ principal: "*", action: "read" }]`         |
+//! | `permissions`          | `[{ principal: "anyone", action: "read" }]`    |
 //! | `source_updated_at`    | File's `mtime`                                 |
 //!
 //! # Supported extensions
@@ -124,7 +124,9 @@ impl LocalFilesConnector {
     }
 
     async fn read_resource(&self, path: &Path) -> SealStackResult<Resource> {
-        let metadata = tokio::fs::metadata(path).await.map_err(SealStackError::backend)?;
+        let metadata = tokio::fs::metadata(path)
+            .await
+            .map_err(SealStackError::backend)?;
         if metadata.len() > self.max_file_bytes {
             return Err(SealStackError::Validation(format!(
                 "file `{}` is {} bytes, exceeds max_file_bytes {}",
@@ -134,10 +136,7 @@ impl LocalFilesConnector {
             )));
         }
         let body = tokio::fs::read_to_string(path).await.map_err(|e| {
-            SealStackError::Backend(format!(
-                "failed to read `{}` as utf-8: {e}",
-                path.display()
-            ))
+            SealStackError::Backend(format!("failed to read `{}` as utf-8: {e}", path.display()))
         })?;
 
         let filename = path
@@ -145,10 +144,7 @@ impl LocalFilesConnector {
             .and_then(|n| n.to_str())
             .unwrap_or("unnamed")
             .to_owned();
-        let title = path
-            .file_stem()
-            .and_then(|n| n.to_str())
-            .map(str::to_owned);
+        let title = path.file_stem().and_then(|n| n.to_str()).map(str::to_owned);
         let kind = path
             .extension()
             .and_then(|e| e.to_str())
@@ -292,10 +288,10 @@ mod watch {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
-    use sealstack_common::{SealStackError, SealStackResult};
-    use sealstack_connector_sdk::{ChangeEvent, ChangeStream, ResourceId};
     use futures::{Stream, StreamExt, stream};
     use notify::{Event, EventKind, RecursiveMode, Watcher};
+    use sealstack_common::{SealStackError, SealStackResult};
+    use sealstack_connector_sdk::{ChangeEvent, ChangeStream, ResourceId};
     use tokio::sync::mpsc::{self, UnboundedReceiver};
 
     use super::LocalFilesConnector;
@@ -308,10 +304,7 @@ mod watch {
 
     impl<T> Stream for ReceiverStream<T> {
         type Item = T;
-        fn poll_next(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-        ) -> Poll<Option<Self::Item>> {
+        fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
             self.inner.poll_recv(cx)
         }
     }
@@ -406,6 +399,7 @@ mod watch {
 mod tests {
     use super::*;
     use futures::StreamExt;
+    use sealstack_connector_sdk::Principal;
 
     #[tokio::test]
     async fn lists_only_supported_extensions() {
@@ -429,10 +423,7 @@ mod tests {
     async fn fetch_rejects_path_outside_root() {
         let dir = tempfile::tempdir().unwrap();
         let c = LocalFilesConnector::new(dir.path()).unwrap();
-        let err = c
-            .fetch(&ResourceId::new("/etc/passwd"))
-            .await
-            .unwrap_err();
+        let err = c.fetch(&ResourceId::new("/etc/passwd")).await.unwrap_err();
         assert!(matches!(err, SealStackError::Unauthorized(_)));
     }
 
@@ -456,7 +447,7 @@ mod tests {
         let mut s = c.list().await.unwrap();
         let r = s.next().await.unwrap();
         assert_eq!(r.permissions.len(), 1);
-        assert_eq!(r.permissions[0].principal, "*");
+        assert_eq!(r.permissions[0].principal, Principal::Anyone);
     }
 
     #[tokio::test]

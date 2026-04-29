@@ -1,0 +1,30 @@
+[package]
+name         = "sealstack-connector-google-drive"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "SealStack connector for Google Drive (My Drive, OAuth 2.0 refresh-token grant)."
+
+[lints]
+workspace = true
+
+[dependencies]
+sealstack-common        = { path = "../../crates/sealstack-common" }
+sealstack-connector-sdk = { path = "../../crates/sealstack-connector-sdk" }
+
+async-trait = { workspace = true }
+futures     = "0.3"
+secrecy     = "0.10"
+serde       = { workspace = true, features = ["derive"] }
+serde_json  = { workspace = true }
+thiserror   = { workspace = true }
+time        = { workspace = true }
+tokio       = { workspace = true, features = ["sync", "time"] }
+tracing     = { workspace = true }
+reqwest     = { workspace = true }
+
+[dev-dependencies]
+tokio    = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
+wiremock = "0.6"

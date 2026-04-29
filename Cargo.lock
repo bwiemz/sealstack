@@ -2976,6 +2976,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "sealstack-connector-google-drive"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "reqwest",
+ "sealstack-common",
+ "sealstack-connector-sdk",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tracing",
+ "wiremock",
+]
+
+[[package]]
 name = "sealstack-connector-local-files"
 version = "0.1.0"
 dependencies = [

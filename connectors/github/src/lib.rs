@@ -35,7 +35,7 @@ use sealstack_connector_sdk::http::{HttpClient, HttpResponse};
 use sealstack_connector_sdk::paginate::{LinkHeaderPaginator, next_link, paginate};
 use sealstack_connector_sdk::retry::RetryPolicy;
 use sealstack_connector_sdk::{
-    Connector, PermissionPredicate, Resource, ResourceId, ResourceStream, change_streams,
+    Connector, PermissionPredicate, Principal, Resource, ResourceId, ResourceStream, change_streams,
 };
 use serde::Deserialize;
 use time::OffsetDateTime;
@@ -289,7 +289,7 @@ impl Connector for GithubConnector {
             let owner = repo.owner.login.clone();
             let updated = parse_time(&repo.updated_at).unwrap_or_else(OffsetDateTime::now_utc);
             let perms = vec![PermissionPredicate {
-                principal: format!("github:{}", owner),
+                principal: Principal::Group(format!("github:{}", owner)),
                 action: "read".into(),
             }];
 
