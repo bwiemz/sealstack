@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/ErrorCode.json",
+  "title": "ErrorCode",
+  "description": "Closed-set error code emitted by the gateway. SDKs map each variant to a typed exception class (see SDK contract spec §8).",
+  "oneOf": [
+    {
+      "description": "Resource does not exist.",
+      "type": "string",
+      "enum": [
+        "not_found"
+      ]
+    },
+    {
+      "description": "Schema does not exist; subclass of `NotFound` in SDKs.",
+      "type": "string",
+      "enum": [
+        "unknown_schema"
+      ]
+    },
+    {
+      "description": "Authentication required or invalid.",
+      "type": "string",
+      "enum": [
+        "unauthorized"
+      ]
+    },
+    {
+      "description": "Policy denied the operation; carries predicate name in message.",
+      "type": "string",
+      "enum": [
+        "policy_denied"
+      ]
+    },
+    {
+      "description": "Request shape was malformed; carries field name in message.",
+      "type": "string",
+      "enum": [
+        "invalid_argument"
+      ]
+    },
+    {
+      "description": "Rate limit exceeded; reserved for v0.4 (gateway does not yet emit).",
+      "type": "string",
+      "enum": [
+        "rate_limited"
+      ]
+    },
+    {
+      "description": "Generic server error; carries `request_id` for diagnostics.",
+      "type": "string",
+      "enum": [
+        "backend"
+      ]
+    }
+  ]
+}

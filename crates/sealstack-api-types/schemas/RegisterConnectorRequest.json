@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/RegisterConnectorRequest.json",
+  "title": "RegisterConnectorRequest",
+  "description": "Request body for `POST /v1/connectors`.",
+  "type": "object",
+  "required": [
+    "config",
+    "kind",
+    "schema"
+  ],
+  "properties": {
+    "kind": {
+      "description": "Connector kind (`\"local-files\"`, `\"github\"`, `\"slack\"`, `\"google-drive\"`).",
+      "type": "string"
+    },
+    "schema": {
+      "description": "Qualified schema name this connector binds to.",
+      "type": "string"
+    },
+    "config": {
+      "description": "Free-shaped connector-specific config (root path, OAuth token, etc.)."
+    }
+  }
+}

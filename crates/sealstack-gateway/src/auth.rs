@@ -307,11 +307,14 @@ mod tests {
         let resp = unauthorized("missing Authorization header");
         let status = resp.status();
         let bytes = to_bytes(resp.into_body(), 1024).await.unwrap();
-        let parsed: serde_json::Value = serde_json::from_slice(&bytes)
-            .expect("response body must be valid JSON envelope");
+        let parsed: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("response body must be valid JSON envelope");
 
         assert_eq!(status, axum::http::StatusCode::UNAUTHORIZED);
-        assert!(parsed["data"].is_null(), "envelope must have null data: {parsed}");
+        assert!(
+            parsed["data"].is_null(),
+            "envelope must have null data: {parsed}"
+        );
         assert_eq!(parsed["error"]["code"], "unauthorized");
         assert_eq!(parsed["error"]["message"], "missing Authorization header");
     }

@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/Envelope_QueryResponse.json",
+  "title": "Envelope_for_QueryResponse",
+  "description": "Discriminated-union response envelope. On success, `data` is `T` and `error` is `null`. On failure, `data` is `null` and `error` carries a code from [`ErrorCode`] and a human-readable message.",
+  "type": "object",
+  "properties": {
+    "data": {
+      "description": "Success payload, or `null` on failure.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/QueryResponse"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "error": {
+      "description": "Error payload, or `null` on success.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ErrorDetail"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "QueryResponse": {
+      "description": "Response data for `POST /v1/query`.\n\nField order and names mirror `sealstack_engine::api::SearchResponse` exactly so the gateway can pass the engine's response through unchanged. SDK contract spec §7 documents this as the canonical wire shape.",
+      "type": "object",
+      "required": [
+        "receipt_id",
+        "results"
+      ],
+      "properties": {
+        "receipt_id": {
+          "description": "Receipt ID; resolves via `GET /v1/receipts/{id}`.",
+          "type": "string"
+        },
+        "results": {
+          "description": "Ranked hits.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/QueryHit"
+          }
+        }
+      }
+    },
+    "QueryHit": {
+      "description": "One ranked hit in a [`QueryResponse`].\n\nField shape mirrors `sealstack_engine::api::SearchHit` exactly so the gateway can pass engine hits through without per-field conversion.",
+      "type": "object",
+      "required": [
+        "excerpt",
+        "id",
+        "record",
+        "score"
+      ],
+      "properties": {
+        "id": {
+          "description": "Primary key of the matched record.",
+          "type": "string"
+        },
+        "score": {
+          "description": "Combined hybrid score.",
+          "type": "number",
+          "format": "float"
+        },
+        "excerpt": {
+          "description": "Snippet of text likely to have matched.",
+          "type": "string"
+        },
+        "record": {
+          "description": "The full record as a JSON object."
+        }
+      }
+    },
+    "ErrorDetail": {
+      "description": "Error detail returned in [`Envelope::error`].\n\nv0.3 wire shape is `{ code, message }` only. SDK contract spec §8 lists per-class typed attributes (`PolicyDeniedError.predicate`, `InvalidArgumentError.field`/`reason`, etc.) — those are populated by the SDK from response headers (`X-Request-Id` → `BackendError.request_id`; `Retry-After` → `RateLimitedError.retry_after`) or are deferred to a v0.4 envelope addition that adds an `Option<Value> details` field. The `message` field is human-readable and SDKs must not parse it.",
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "description": "Closed-set error code; see [`ErrorCode`].",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ErrorCode"
+            }
+          ]
+        },
+        "message": {
+          "description": "Human-readable message. Not part of the contract; do not parse.",
+          "type": "string"
+        }
+      }
+    },
+    "ErrorCode": {
+      "description": "Closed-set error code emitted by the gateway. SDKs map each variant to a typed exception class (see SDK contract spec §8).",
+      "oneOf": [
+        {
+          "description": "Resource does not exist.",
+          "type": "string",
+          "enum": [
+            "not_found"
+          ]
+        },
+        {
+          "description": "Schema does not exist; subclass of `NotFound` in SDKs.",
+          "type": "string",
+          "enum": [
+            "unknown_schema"
+          ]
+        },
+        {
+          "description": "Authentication required or invalid.",
+          "type": "string",
+          "enum": [
+            "unauthorized"
+          ]
+        },
+        {
+          "description": "Policy denied the operation; carries predicate name in message.",
+          "type": "string",
+          "enum": [
+            "policy_denied"
+          ]
+        },
+        {
+          "description": "Request shape was malformed; carries field name in message.",
+          "type": "string",
+          "enum": [
+            "invalid_argument"
+          ]
+        },
+        {
+          "description": "Rate limit exceeded; reserved for v0.4 (gateway does not yet emit).",
+          "type": "string",
+          "enum": [
+            "rate_limited"
+          ]
+        },
+        {
+          "description": "Generic server error; carries `request_id` for diagnostics.",
+          "type": "string",
+          "enum": [
+            "backend"
+          ]
+        }
+      ]
+    }
+  }
+}

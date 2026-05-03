@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/QueryHit.json",
+  "title": "QueryHit",
+  "description": "One ranked hit in a [`QueryResponse`].\n\nField shape mirrors `sealstack_engine::api::SearchHit` exactly so the gateway can pass engine hits through without per-field conversion.",
+  "type": "object",
+  "required": [
+    "excerpt",
+    "id",
+    "record",
+    "score"
+  ],
+  "properties": {
+    "id": {
+      "description": "Primary key of the matched record.",
+      "type": "string"
+    },
+    "score": {
+      "description": "Combined hybrid score.",
+      "type": "number",
+      "format": "float"
+    },
+    "excerpt": {
+      "description": "Snippet of text likely to have matched.",
+      "type": "string"
+    },
+    "record": {
+      "description": "The full record as a JSON object."
+    }
+  }
+}

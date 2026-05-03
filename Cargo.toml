@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/sealstack-api-types",
     "crates/sealstack-common",
     "crates/sealstack-csl",
     "crates/sealstack-engine",

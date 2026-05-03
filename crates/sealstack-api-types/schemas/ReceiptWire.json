@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/ReceiptWire.json",
+  "title": "ReceiptWire",
+  "description": "Public projection of `sealstack_engine::Receipt` for the REST surface. Intentionally narrower than the engine's internal Receipt: drops `qualified_schema`, `tool`, `arguments`, `policies_applied`, and `timings_ms`; renames `created_at` → `issued_at`; and surfaces `tenant` at the top level (engine has it nested in `caller`). The gateway maps fields at the response boundary.",
+  "type": "object",
+  "required": [
+    "caller_id",
+    "id",
+    "issued_at",
+    "sources",
+    "tenant"
+  ],
+  "properties": {
+    "id": {
+      "description": "Receipt ID (ULID).",
+      "type": "string"
+    },
+    "caller_id": {
+      "description": "Caller identity at query time.",
+      "type": "string"
+    },
+    "tenant": {
+      "description": "Tenant the query ran against.",
+      "type": "string"
+    },
+    "sources": {
+      "description": "Source records that contributed to the answer.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ReceiptSource"
+      }
+    },
+    "issued_at": {
+      "description": "Issue timestamp (RFC 3339).",
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "ReceiptSource": {
+      "description": "One contributing source row in a [`ReceiptWire`].",
+      "type": "object",
+      "required": [
+        "chunk_id",
+        "score",
+        "source_uri"
+      ],
+      "properties": {
+        "chunk_id": {
+          "description": "Chunk ID this source resolves to.",
+          "type": "string"
+        },
+        "source_uri": {
+          "description": "Source URI for the human reader.",
+          "type": "string"
+        },
+        "score": {
+          "description": "Hybrid score for this contribution.",
+          "type": "number",
+          "format": "float"
+        }
+      }
+    }
+  }
+}

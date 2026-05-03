@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/ApplyDdlRequest.json",
+  "title": "ApplyDdlRequest",
+  "description": "Request body for `POST /v1/schemas/{qualified}/ddl`.",
+  "type": "object",
+  "required": [
+    "ddl"
+  ],
+  "properties": {
+    "ddl": {
+      "description": "Postgres DDL text (CREATE TABLE / CREATE INDEX / ...).",
+      "type": "string"
+    }
+  }
+}

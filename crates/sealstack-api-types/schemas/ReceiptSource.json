@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/ReceiptSource.json",
+  "title": "ReceiptSource",
+  "description": "One contributing source row in a [`ReceiptWire`].",
+  "type": "object",
+  "required": [
+    "chunk_id",
+    "score",
+    "source_uri"
+  ],
+  "properties": {
+    "chunk_id": {
+      "description": "Chunk ID this source resolves to.",
+      "type": "string"
+    },
+    "source_uri": {
+      "description": "Source URI for the human reader.",
+      "type": "string"
+    },
+    "score": {
+      "description": "Hybrid score for this contribution.",
+      "type": "number",
+      "format": "float"
+    }
+  }
+}

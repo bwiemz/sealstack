@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/HealthStatus.json",
+  "title": "HealthStatus",
+  "description": "Body shape for health endpoints.",
+  "type": "object",
+  "required": [
+    "status"
+  ],
+  "properties": {
+    "status": {
+      "description": "Status discriminator.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/HealthStatusKind"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "HealthStatusKind": {
+      "description": "Response data for `GET /healthz` and `GET /readyz`.",
+      "oneOf": [
+        {
+          "description": "Service is fully ready.",
+          "type": "string",
+          "enum": [
+            "ok"
+          ]
+        },
+        {
+          "description": "Service is starting; not ready to take traffic.",
+          "type": "string",
+          "enum": [
+            "starting"
+          ]
+        }
+      ]
+    }
+  }
+}
