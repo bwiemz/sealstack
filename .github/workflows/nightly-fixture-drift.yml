@@ -1,0 +1,35 @@
+name: nightly-fixture-drift
+on:
+  schedule:
+    # 06:00 UTC daily — well after most US working-hours commits.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sealstack
+          POSTGRES_PASSWORD: sealstack
+          POSTGRES_DB: sealstack
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sealstack -d sealstack"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.95
+      - uses: Swatinem/rust-cache@v2
+      - name: Re-emit fixtures against live gateway
+        run: cargo run --bin emit-fixtures -p sealstack-api-types
+        env:
+          SEALSTACK_DATABASE_URL: postgres://sealstack:sealstack@localhost:5432/sealstack
+      - name: Verify no drift in checked-in fixtures
+        run: |
+          if ! git diff --exit-code contracts/fixtures/; then
+            echo "::error::Checked-in fixtures drifted from live-gateway capture. Re-run \`cargo run --bin emit-fixtures -p sealstack-api-types\` locally and commit." >&2
+            exit 1
+          fi
