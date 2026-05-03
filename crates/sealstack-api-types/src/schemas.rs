@@ -36,9 +36,14 @@ pub struct ApplyDdlResponse {
 
 /// Response data for `GET /v1/schemas` and `GET /v1/schemas/{q}`.
 ///
-/// Wire-shape mirror of `sealstack_engine::SchemaMeta`. The duplication
-/// keeps `sealstack-api-types` free of engine deps; the gateway converts
-/// at the response boundary.
+/// Public projection of `sealstack_engine::SchemaMeta`. Intentionally
+/// narrower than the engine's struct: drops `fields`, `relations`,
+/// `facets`, `chunked_fields`, and `context` (the SDK surface exposes
+/// schema identity + storage targets, not the full schema body). Also
+/// flattens `Option<f32> hybrid_alpha` → `f32`; the gateway substitutes
+/// the global default when the engine's value is `None`. Keeping
+/// `sealstack-api-types` free of engine deps requires the duplication;
+/// the gateway maps fields at the response boundary.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SchemaMetaWire {
     /// Namespace, e.g. `"examples"`.

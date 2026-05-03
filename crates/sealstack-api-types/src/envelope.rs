@@ -15,6 +15,14 @@ pub struct Envelope<T> {
 }
 
 /// Error detail returned in [`Envelope::error`].
+///
+/// v0.3 wire shape is `{ code, message }` only. SDK contract spec §8 lists
+/// per-class typed attributes (`PolicyDeniedError.predicate`,
+/// `InvalidArgumentError.field`/`reason`, etc.) — those are populated by
+/// the SDK from response headers (`X-Request-Id` → `BackendError.request_id`;
+/// `Retry-After` → `RateLimitedError.retry_after`) or are deferred to a
+/// v0.4 envelope addition that adds an `Option<Value> details` field. The
+/// `message` field is human-readable and SDKs must not parse it.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 pub struct ErrorDetail {
     /// Closed-set error code; see [`ErrorCode`].
