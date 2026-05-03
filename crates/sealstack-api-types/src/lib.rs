@@ -11,11 +11,11 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
 
-pub mod envelope;
-pub mod query;
-pub mod schemas;
 pub mod connectors;
-pub mod receipts;
+pub mod envelope;
 pub mod health;
+pub mod query;
+pub mod receipts;
+pub mod schemas;
 
-pub use envelope::{Envelope, ErrorDetail, ErrorCode};
+pub use envelope::{Envelope, ErrorCode, ErrorDetail};

@@ -6,7 +6,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use schemars::{schema_for, JsonSchema};
+use schemars::{JsonSchema, schema_for};
 use sealstack_api_types::{
     connectors::{
         ConnectorBindingWire, ListConnectorsResponse, RegisterConnectorRequest,
@@ -55,7 +55,10 @@ fn main() -> anyhow::Result<()> {
     write::<Envelope<RegisterSchemaResponse>>(&dir, "Envelope_RegisterSchemaResponse")?;
 
     let count = fs::read_dir(&dir)?
-        .filter(|e| e.as_ref().is_ok_and(|d| d.path().extension().and_then(|s| s.to_str()) == Some("json")))
+        .filter(|e| {
+            e.as_ref()
+                .is_ok_and(|d| d.path().extension().and_then(|s| s.to_str()) == Some("json"))
+        })
         .count();
     println!("emitted {count} schemas");
     Ok(())
@@ -64,8 +67,9 @@ fn main() -> anyhow::Result<()> {
 fn write<T: JsonSchema>(dir: &Path, name: &str) -> anyhow::Result<()> {
     let mut schema = schema_for!(T);
     // Stamp the $id with our SemVer so consumers can introspect compat.
-    schema.schema.metadata().id =
-        Some(format!("https://contracts.sealstack.dev/api-types/{VERSION}/{name}.json"));
+    schema.schema.metadata().id = Some(format!(
+        "https://contracts.sealstack.dev/api-types/{VERSION}/{name}.json"
+    ));
     let json = serde_json::to_string_pretty(&schema)?;
     let path = dir.join(format!("{name}.json"));
     fs::write(&path, format!("{json}\n"))?;
