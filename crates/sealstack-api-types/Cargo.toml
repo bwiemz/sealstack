@@ -1,0 +1,22 @@
+[package]
+name         = "sealstack-api-types"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "Wire types for the SealStack gateway REST API. Source of truth for JSON Schema emission."
+
+[lints]
+workspace = true
+
+[dependencies]
+serde      = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+schemars   = { version = "0.8", features = ["preserve_order"] }
+time       = { workspace = true, features = ["serde"] }
+ulid       = { workspace = true, features = ["serde"] }
+
+[[bin]]
+name = "emit-schemas"
+path = "bin/emit-schemas.rs"
