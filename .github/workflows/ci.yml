@@ -70,6 +70,8 @@ jobs:
       - run: pnpm -C console build
       - run: pnpm -C sdks/typescript build
       - run: pnpm -C sdks/typescript test
+      - name: Verify SDK README quickstarts match examples byte-for-byte
+        run: ./scripts/verify-readme-quickstart.sh
 
   integration:
     runs-on: ubuntu-latest
