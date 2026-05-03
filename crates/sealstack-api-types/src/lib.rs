@@ -18,4 +18,4 @@ pub mod connectors;
 pub mod receipts;
 pub mod health;
 
-// pub use re-exports populated by Task 1.2 once envelope.rs has the types.
+pub use envelope::{Envelope, ErrorDetail, ErrorCode};
