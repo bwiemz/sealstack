@@ -64,17 +64,18 @@ What's **deliberately stubbed** — scaffolding only, not functional:
 
 ## Known gaps before v0.2
 
-- **Postgres-backed CI integration tests** (lift the `#[ignore]`).
-- **Compiled policy bundles** emitted by `cfg-csl` so users don't hand-write
-  WAT against the policy ABI.
+- **Postgres-backed CI integration tests** (lift the `#[ignore]`) — in flight
+  in #45.
 - **Semantic-chunking improvements** — current chunker is a dependency-free
   approximation; needs a real tokenizer (e.g. `tiktoken-rs`) for token-
   budget fidelity.
 - **Vector-store filter DSL** — retrieval currently threads only the
   `tenant` key; generic facet filters need mapping into each backend's
   native filter language.
-- **Connector breadth** — Google Drive, Notion, Linear, Confluence are
-  design-partner priorities but not yet scaffolded.
+- **Connector breadth** — Google Drive landed in #40; Notion, Linear,
+  Confluence remain design-partner priorities but not yet scaffolded.
+- **SDK client implementations** — TypeScript and Python SDKs are build
+  skeletons only (`dependencies: {}`); needed for "SDK GA" in Phase 1.
 
 If something listed above as "works" does not appear to work on your
 install, that's a bug. Please file it at
