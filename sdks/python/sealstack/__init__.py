@@ -1,18 +1,3 @@
-"""SealStack Python SDK."""
+"""SealStack Python SDK. Public API populated in Task 3.4."""
 
-from .client import (
-    Connector,
-    SealStackClient,
-    ContextQuery,
-    ContextResponse,
-    Schema,
-)
-
-__all__ = [
-    "Connector",
-    "SealStackClient",
-    "ContextQuery",
-    "ContextResponse",
-    "Schema",
-]
-__version__ = "0.1.0"
+__version__ = "0.3.0"

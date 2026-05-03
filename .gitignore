@@ -10,3 +10,6 @@ out/
 .cargo-cache/
 coverage/
 .dist/
+__pycache__/
+*.egg-info/
+.ruff_cache/
