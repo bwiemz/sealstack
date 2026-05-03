@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/ErrorDetail.json",
+  "title": "ErrorDetail",
+  "description": "Error detail returned in [`Envelope::error`].\n\nv0.3 wire shape is `{ code, message }` only. SDK contract spec §8 lists per-class typed attributes (`PolicyDeniedError.predicate`, `InvalidArgumentError.field`/`reason`, etc.) — those are populated by the SDK from response headers (`X-Request-Id` → `BackendError.request_id`; `Retry-After` → `RateLimitedError.retry_after`) or are deferred to a v0.4 envelope addition that adds an `Option<Value> details` field. The `message` field is human-readable and SDKs must not parse it.",
+  "type": "object",
+  "required": [
+    "code",
+    "message"
+  ],
+  "properties": {
+    "code": {
+      "description": "Closed-set error code; see [`ErrorCode`].",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ErrorCode"
+        }
+      ]
+    },
+    "message": {
+      "description": "Human-readable message. Not part of the contract; do not parse.",
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "ErrorCode": {
+      "description": "Closed-set error code emitted by the gateway. SDKs map each variant to a typed exception class (see SDK contract spec §8).",
+      "oneOf": [
+        {
+          "description": "Resource does not exist.",
+          "type": "string",
+          "enum": [
+            "not_found"
+          ]
+        },
+        {
+          "description": "Schema does not exist; subclass of `NotFound` in SDKs.",
+          "type": "string",
+          "enum": [
+            "unknown_schema"
+          ]
+        },
+        {
+          "description": "Authentication required or invalid.",
+          "type": "string",
+          "enum": [
+            "unauthorized"
+          ]
+        },
+        {
+          "description": "Policy denied the operation; carries predicate name in message.",
+          "type": "string",
+          "enum": [
+            "policy_denied"
+          ]
+        },
+        {
+          "description": "Request shape was malformed; carries field name in message.",
+          "type": "string",
+          "enum": [
+            "invalid_argument"
+          ]
+        },
+        {
+          "description": "Rate limit exceeded; reserved for v0.4 (gateway does not yet emit).",
+          "type": "string",
+          "enum": [
+            "rate_limited"
+          ]
+        },
+        {
+          "description": "Generic server error; carries `request_id` for diagnostics.",
+          "type": "string",
+          "enum": [
+            "backend"
+          ]
+        }
+      ]
+    }
+  }
+}

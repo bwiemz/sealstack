@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/QueryResponse.json",
+  "title": "QueryResponse",
+  "description": "Response data for `POST /v1/query`.",
+  "type": "object",
+  "required": [
+    "hits",
+    "receipt_id"
+  ],
+  "properties": {
+    "hits": {
+      "description": "Ranked hits.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/QueryHit"
+      }
+    },
+    "receipt_id": {
+      "description": "Receipt ID; resolves via `GET /v1/receipts/{id}`.",
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "QueryHit": {
+      "description": "One ranked hit in a [`QueryResponse`].",
+      "type": "object",
+      "required": [
+        "id",
+        "score"
+      ],
+      "properties": {
+        "id": {
+          "description": "Resource identifier.",
+          "type": "string"
+        },
+        "title": {
+          "description": "Display title or subject line.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "snippet": {
+          "description": "Snippet to render in UI.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "score": {
+          "description": "Combined hybrid score.",
+          "type": "number",
+          "format": "float"
+        }
+      }
+    }
+  }
+}

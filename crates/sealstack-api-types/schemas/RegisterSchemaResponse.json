@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/RegisterSchemaResponse.json",
+  "title": "RegisterSchemaResponse",
+  "description": "Response data for `POST /v1/schemas`.",
+  "type": "object",
+  "required": [
+    "qualified"
+  ],
+  "properties": {
+    "qualified": {
+      "description": "Qualified schema name (`<namespace>.<name>`).",
+      "type": "string"
+    }
+  }
+}

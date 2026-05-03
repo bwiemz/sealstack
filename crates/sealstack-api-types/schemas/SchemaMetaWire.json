@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/SchemaMetaWire.json",
+  "title": "SchemaMetaWire",
+  "description": "Response data for `GET /v1/schemas` and `GET /v1/schemas/{q}`.\n\nPublic projection of `sealstack_engine::SchemaMeta`. Intentionally narrower than the engine's struct: drops `fields`, `relations`, `facets`, `chunked_fields`, and `context` (the SDK surface exposes schema identity + storage targets, not the full schema body). Also flattens `Option<f32> hybrid_alpha` → `f32`; the gateway substitutes the global default when the engine's value is `None`. Keeping `sealstack-api-types` free of engine deps requires the duplication; the gateway maps fields at the response boundary.",
+  "type": "object",
+  "required": [
+    "collection",
+    "hybrid_alpha",
+    "name",
+    "namespace",
+    "primary_key",
+    "table",
+    "version"
+  ],
+  "properties": {
+    "namespace": {
+      "description": "Namespace, e.g. `\"examples\"`.",
+      "type": "string"
+    },
+    "name": {
+      "description": "Schema name, e.g. `\"Doc\"`.",
+      "type": "string"
+    },
+    "version": {
+      "description": "Schema-version integer.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "primary_key": {
+      "description": "Field name used as primary key.",
+      "type": "string"
+    },
+    "table": {
+      "description": "Postgres table name.",
+      "type": "string"
+    },
+    "collection": {
+      "description": "Vector store collection name.",
+      "type": "string"
+    },
+    "hybrid_alpha": {
+      "description": "Hybrid score blend factor.",
+      "type": "number",
+      "format": "float"
+    }
+  }
+}

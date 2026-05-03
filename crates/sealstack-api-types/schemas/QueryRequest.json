@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/QueryRequest.json",
+  "title": "QueryRequest",
+  "description": "Request body for `POST /v1/query`.",
+  "type": "object",
+  "required": [
+    "query",
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "description": "Qualified schema name, e.g. `\"examples.Doc\"`.",
+      "type": "string"
+    },
+    "query": {
+      "description": "Query string (natural-language or keywords).",
+      "type": "string"
+    },
+    "top_k": {
+      "description": "Cap on results; `None` defaults server-side.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "filters": {
+      "description": "Filter expression; structure depends on schema's facet declarations."
+    }
+  }
+}

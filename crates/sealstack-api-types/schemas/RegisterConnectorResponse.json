@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.sealstack.dev/api-types/v0.3.0/RegisterConnectorResponse.json",
+  "title": "RegisterConnectorResponse",
+  "description": "Response data for `POST /v1/connectors`.",
+  "type": "object",
+  "required": [
+    "id"
+  ],
+  "properties": {
+    "id": {
+      "description": "Connector binding ID (`<kind>/<qualified>`).",
+      "type": "string"
+    }
+  }
+}
