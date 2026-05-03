@@ -1,32 +1,30 @@
 {
-  "name": "@sealstack/sdk",
-  "version": "0.1.0",
+  "name": "@sealstack/client",
+  "version": "0.3.0",
   "description": "SealStack TypeScript SDK",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
   },
-  "files": ["dist"],
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "eslint src",
     "test": "vitest run",
-    "prepublishOnly": "pnpm run build"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "lint": "eslint src tests",
+    "codegen": "json2ts -i ../../crates/sealstack-api-types/schemas -o src/generated/ --no-bannerComment",
+    "codegen:check": "pnpm codegen && git diff --exit-code src/generated/"
   },
-  "dependencies": {},
   "devDependencies": {
-    "@types/node": "^25.6.0",
-    "eslint": "^10.2.1",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.4"
+    "@types/node": "^22.8.0",
+    "eslint": "^9.0.0",
+    "json-schema-to-typescript": "^15.0.0",
+    "msw": "^2.6.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
   },
   "engines": { "node": ">=20" }
 }

@@ -1,0 +1,21 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "data": {
+      "results": [
+        {
+          "id": "01JD0SZWAH5TYQT5WB8PNEC2VQ",
+          "score": 0.84,
+          "excerpt": "Use Postgres 16.",
+          "record": {
+            "title": "Setup",
+            "body": "Use Postgres 16."
+          }
+        }
+      ],
+      "receipt_id": "01JD0T03JR4XK0F0R3JX72YE5N"
+    },
+    "error": null
+  }
+}
