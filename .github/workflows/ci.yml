@@ -26,6 +26,8 @@ jobs:
             echo "::error::JSON Schemas are out of date. Run \`cargo run --bin emit-schemas -p sealstack-api-types\` and commit." >&2
             exit 1
           fi
+      - name: Validate contract fixtures
+        run: cargo run --bin emit-fixtures -p sealstack-api-types
 
   rust-audit:
     runs-on: ubuntu-latest
@@ -68,6 +70,8 @@ jobs:
       - run: pnpm -C console build
       - run: pnpm -C sdks/typescript build
       - run: pnpm -C sdks/typescript test
+      - name: Verify SDK README quickstarts match examples byte-for-byte
+        run: ./scripts/verify-readme-quickstart.sh
 
   integration:
     runs-on: ubuntu-latest
@@ -80,19 +84,59 @@ jobs:
           POSTGRES_DB: sealstack
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U cfg"
+          --health-cmd "pg_isready -U sealstack"
           --health-interval 2s --health-timeout 5s --health-retries 10
       qdrant:
         image: qdrant/qdrant:latest
         ports: ["6333:6333", "6334:6334"]
+    env:
+      SEALSTACK_DATABASE_URL: postgres://sealstack:sealstack@localhost:5432/sealstack
+      SEALSTACK_QDRANT_URL: http://localhost:6334
+      SEALSTACK_GATEWAY_URL: http://localhost:7070
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
-      # The e2e test target is added in Phase 12. Until then this job is a
-      # no-op placeholder; once `tests/e2e.rs` lands in sealstack-gateway, swap
-      # back to `cargo test --test e2e --locked`.
-      - run: cargo check --workspace --locked
-        env:
-          SEALSTACK_DATABASE_URL: postgres://sealstack:sealstack@localhost:5432/sealstack
-          SEALSTACK_QDRANT_URL:   http://localhost:6334
+      - name: Build gateway
+        run: cargo build -p sealstack-gateway --bin sealstack-gateway --locked
+      - name: Start gateway
+        run: |
+          ./target/debug/sealstack-gateway > gateway.log 2>&1 &
+          echo "GATEWAY_PID=$!" >> "$GITHUB_ENV"
+      - name: Wait for gateway ready
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:7070/healthz > /dev/null; then
+              echo "Gateway ready after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::gateway didn't come up in 60s"
+          cat gateway.log
+          exit 1
+      - uses: pnpm/action-setup@v6
+        with: { version: 9 }
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: TS SDK build (smoke prerequisite)
+        run: pnpm -C sdks/typescript build
+      - name: TS SDK smoke
+        run: pnpm -C sdks/typescript test:integration
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install Python SDK
+        run: pip install -e "sdks/python[dev]"
+      - name: Python SDK smoke
+        run: pytest sdks/python/tests/integration -v
+      - name: Stop gateway
+        if: always()
+        run: |
+          if [ -n "${GATEWAY_PID:-}" ]; then
+            kill "$GATEWAY_PID" 2>/dev/null || true
+          fi
+      - name: Show gateway log on failure
+        if: failure()
+        run: cat gateway.log

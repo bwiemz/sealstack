@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/v1/query",
+  "headers": {
+    "authorization": "Bearer test-token",
+    "content-type": "application/json"
+  },
+  "body": { "schema": "examples.Doc", "query": "secret payroll details" }
+}

@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/v1/schemas/examples.Doc/ddl",
+  "headers": {
+    "authorization": "Bearer test-token",
+    "content-type": "application/json"
+  },
+  "body": {
+    "ddl": "DROP DATABASE production;"
+  }
+}

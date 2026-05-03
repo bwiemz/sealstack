@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "path": "/v1/schemas",
+  "headers": {
+    "authorization": "Bearer test-token"
+  },
+  "body": null
+}

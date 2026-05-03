@@ -4,6 +4,7 @@ Per spec §9.2, admin operations do not auto-retry in v0.3.
 """
 
 from typing import Any
+from urllib.parse import quote
 
 from .._http import HttpClient
 
@@ -20,7 +21,7 @@ class _AdminSchemas:
 
     async def apply_ddl(self, qualified: str, *, ddl: str) -> Any:
         return await self._http.request(
-            "POST", f"/v1/schemas/{qualified}/ddl",
+            "POST", f"/v1/schemas/{quote(qualified, safe='')}/ddl",
             body={"ddl": ddl}, no_retry=True, timeout_s=60.0,
         )
 
@@ -40,7 +41,7 @@ class _AdminConnectors:
 
     async def sync(self, id: str) -> Any:
         return await self._http.request(
-            "POST", f"/v1/connectors/{id}/sync", no_retry=True,
+            "POST", f"/v1/connectors/{quote(id, safe='')}/sync", no_retry=True,
         )
 
 

@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/v1/schemas/examples.Doc/ddl",
+  "headers": {
+    "authorization": "Bearer test-token",
+    "content-type": "application/json"
+  },
+  "body": {
+    "ddl": "CREATE TABLE examples_doc_v1 (id text PRIMARY KEY, title text NOT NULL, body text NOT NULL);\nCREATE INDEX examples_doc_v1_body_fts ON examples_doc_v1 USING gin (to_tsvector('english', body));"
+  }
+}

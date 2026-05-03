@@ -1,6 +1,7 @@
 """Schemas namespace (read-only)."""
 
 from typing import Any
+from urllib.parse import quote
 
 from .._http import HttpClient
 
@@ -14,4 +15,4 @@ class SchemasNamespace:
         return out["schemas"]
 
     async def get(self, qualified: str) -> Any:
-        return await self._http.request("GET", f"/v1/schemas/{qualified}")
+        return await self._http.request("GET", f"/v1/schemas/{quote(qualified, safe='')}")

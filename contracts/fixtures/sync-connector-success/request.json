@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/v1/connectors/local-files%2Fexamples.Doc/sync",
+  "headers": {
+    "authorization": "Bearer test-token",
+    "content-type": "application/json"
+  },
+  "body": null
+}

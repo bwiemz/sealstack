@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "data": null,
+    "error": {
+      "code": "invalid_argument",
+      "message": "field `ddl`: only CREATE TABLE / CREATE INDEX statements are accepted; got DROP"
+    }
+  }
+}

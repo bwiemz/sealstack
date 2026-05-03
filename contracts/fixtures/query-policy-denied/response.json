@@ -1,0 +1,11 @@
+{
+  "status": 403,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "data": null,
+    "error": {
+      "code": "policy_denied",
+      "message": "policy `examples.Doc/read` denied access to records of type `payroll`"
+    }
+  }
+}

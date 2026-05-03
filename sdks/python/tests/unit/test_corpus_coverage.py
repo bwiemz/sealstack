@@ -2,7 +2,17 @@ from pathlib import Path
 
 # Fixtures consumed by the Python SDK's tests. Update as you add tests.
 PY_CONSUMED_FIXTURES = {
+    "apply-ddl-success",
+    "apply-ddl-validation-error",
+    "get-receipt-not-found",
+    "healthz-success",
+    "list-connectors-success",
+    "list-schemas-success",
+    "query-policy-denied",
     "query-success",
+    "register-connector-success",
+    "register-schema-success",
+    "sync-connector-success",
 }
 
 

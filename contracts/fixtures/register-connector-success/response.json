@@ -1,0 +1,8 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "data": { "id": "local-files/examples.Doc" },
+    "error": null
+  }
+}
