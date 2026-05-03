@@ -18,7 +18,10 @@ import pytest
 
 from sealstack import NotFoundError, SealStack
 
-URL = os.environ.get("SEALSTACK_GATEWAY_URL")
+# A `str` value when the env var is set; the empty string when unset.
+# We never read it without first asserting truthiness via the module-level
+# skipif marker, so type-checkers see a `str` everywhere it is consumed.
+URL: str = os.environ.get("SEALSTACK_GATEWAY_URL", "")
 
 pytestmark = pytest.mark.skipif(
     not URL, reason="SEALSTACK_GATEWAY_URL not set; skipping live-gateway smoke",

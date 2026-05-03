@@ -11,20 +11,25 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
-# Print the lines between the first pair of triple-backtick fences in $1.
-# Excludes the fences themselves.
-extract_first_code_block() {
-    local path="$1"
-    awk '/^```/{n+=1} n==1 && !/^```/' "$path"
+tmp_extracted="$(mktemp)"
+trap 'rm -f "${tmp_extracted}"' EXIT
+
+# Write the lines between the first pair of triple-backtick fences in
+# $1 to $2 (excluding the fences themselves). Routing through a temp
+# file avoids `$()` command-substitution stripping trailing blank lines,
+# which would break byte-equality silently if either file ever picked
+# up trailing whitespace.
+extract_first_code_block_to() {
+    local path="$1" out="$2"
+    awk '/^```/{n+=1; next} n==1 {print}' "$path" > "$out"
 }
 
 check() {
     local readme="$1" example="$2"
-    local extracted
-    extracted="$(extract_first_code_block "${readme}")"
-    if ! diff <(printf '%s\n' "${extracted}") "${example}" > /dev/null; then
+    extract_first_code_block_to "${readme}" "${tmp_extracted}"
+    if ! diff -u "${tmp_extracted}" "${example}" > /dev/null; then
         echo "::error::${readme} Quickstart code block does not match ${example}" >&2
-        diff <(printf '%s\n' "${extracted}") "${example}" || true
+        diff -u "${tmp_extracted}" "${example}" || true
         exit 1
     fi
 }
