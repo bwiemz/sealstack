@@ -19,4 +19,4 @@ ulid       = { workspace = true, features = ["serde"] }
 
 [[bin]]
 name = "emit-schemas"
-path = "bin/emit-schemas.rs"
+path = "src/bin/emit-schemas.rs"
