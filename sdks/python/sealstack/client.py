@@ -92,10 +92,15 @@ class SealStack:
         top_k: int | None = None,
         filters: Any = None,
     ) -> Any:
-        return await self._http.request(
-            "POST", "/v1/query",
-            body={"schema": schema, "query": query, "top_k": top_k, "filters": filters},
-        )
+        # Drop None-valued keys to match the TS SDK, where `undefined`
+        # entries are stripped by JSON.stringify. Keeps the on-wire body
+        # byte-equal to the recorded contract fixtures.
+        body: dict[str, Any] = {"schema": schema, "query": query}
+        if top_k is not None:
+            body["top_k"] = top_k
+        if filters is not None:
+            body["filters"] = filters
+        return await self._http.request("POST", "/v1/query", body=body)
 
     async def healthz(self) -> Any:
         return await self._http.request("GET", "/healthz")
