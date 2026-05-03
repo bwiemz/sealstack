@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "data": {
+      "schemas": [
+        {
+          "namespace": "examples",
+          "name": "Doc",
+          "version": 1,
+          "primary_key": "id",
+          "table": "examples_doc_v1",
+          "collection": "examples_doc_v1",
+          "hybrid_alpha": 0.6
+        },
+        {
+          "namespace": "examples",
+          "name": "Note",
+          "version": 1,
+          "primary_key": "id",
+          "table": "examples_note_v1",
+          "collection": "examples_note_v1",
+          "hybrid_alpha": 0.5
+        }
+      ]
+    },
+    "error": null
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "method": "POST",
+  "path": "/v1/schemas",
+  "headers": {
+    "authorization": "Bearer test-token",
+    "content-type": "application/json"
+  },
+  "body": {
+    "meta": {
+      "namespace": "examples",
+      "name": "Doc",
+      "version": 1,
+      "primary_key": "id",
+      "fields": [
+        { "name": "id",    "ty": "string", "nullable": false },
+        { "name": "title", "ty": "string", "nullable": false },
+        { "name": "body",  "ty": "string", "nullable": false }
+      ],
+      "table": "examples_doc_v1",
+      "collection": "examples_doc_v1",
+      "hybrid_alpha": 0.6
+    }
+  }
+}

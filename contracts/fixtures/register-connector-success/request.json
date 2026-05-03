@@ -1,0 +1,13 @@
+{
+  "method": "POST",
+  "path": "/v1/connectors",
+  "headers": {
+    "authorization": "Bearer test-token",
+    "content-type": "application/json"
+  },
+  "body": {
+    "kind": "local-files",
+    "schema": "examples.Doc",
+    "config": { "root": "./docs" }
+  }
+}

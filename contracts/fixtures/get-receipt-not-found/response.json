@@ -1,0 +1,11 @@
+{
+  "status": 404,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "data": null,
+    "error": {
+      "code": "not_found",
+      "message": "no receipt with id 01JD0BOGUS00000000000000000"
+    }
+  }
+}

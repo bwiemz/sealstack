@@ -1,0 +1,6 @@
+{
+  "method": "GET",
+  "path": "/healthz",
+  "headers": {},
+  "body": null
+}

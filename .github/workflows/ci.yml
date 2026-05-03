@@ -26,6 +26,8 @@ jobs:
             echo "::error::JSON Schemas are out of date. Run \`cargo run --bin emit-schemas -p sealstack-api-types\` and commit." >&2
             exit 1
           fi
+      - name: Validate contract fixtures
+        run: cargo run --bin emit-fixtures -p sealstack-api-types
 
   rust-audit:
     runs-on: ubuntu-latest

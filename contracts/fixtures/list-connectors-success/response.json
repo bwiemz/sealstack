@@ -1,0 +1,23 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "data": {
+      "connectors": [
+        {
+          "id": "local-files/examples.Doc",
+          "kind": "local-files",
+          "schema": "examples.Doc",
+          "enabled": true
+        },
+        {
+          "id": "github/examples.Doc",
+          "kind": "github",
+          "schema": "examples.Doc",
+          "enabled": false
+        }
+      ]
+    },
+    "error": null
+  }
+}
