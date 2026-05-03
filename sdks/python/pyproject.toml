@@ -1,31 +1,40 @@
 [project]
 name = "sealstack"
-version = "0.1.0"
+version = "0.3.0"
 description = "SealStack Python SDK"
 license = { text = "Apache-2.0" }
-requires-python = ">=3.10"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "SealStack Contributors" }]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: Apache Software License",
+]
 dependencies = [
     "httpx>=0.27",
-    "pydantic>=2.8",
+    "pydantic>=2.7",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.7"]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "ruff>=0.6",
+    "datamodel-code-generator>=0.26",
+]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatch.build.targets.wheel]
-packages = ["sealstack"]
+[tool.hatch.build]
+include = ["sealstack"]
 
-[tool.basedpyright]
-# Dependencies (httpx, pydantic) are declared above and installed via
-# `pip install -e .` before the SDK is used. Until then, suppress the
-# missing-import and unknown-type noise so the scaffold stays clean.
-reportMissingImports            = "none"
-reportUnknownVariableType       = "none"
-reportUnknownMemberType         = "none"
-reportUntypedBaseClass          = "none"
-reportUnannotatedClassAttribute = "none"
-reportExplicitAny               = "none"
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
