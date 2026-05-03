@@ -1,6 +1,7 @@
 """Receipts namespace (read-only)."""
 
 from typing import Any
+from urllib.parse import quote
 
 from .._http import HttpClient
 
@@ -10,4 +11,4 @@ class ReceiptsNamespace:
         self._http = http
 
     async def get(self, id: str) -> Any:
-        return await self._http.request("GET", f"/v1/receipts/{id}")
+        return await self._http.request("GET", f"/v1/receipts/{quote(id, safe='')}")

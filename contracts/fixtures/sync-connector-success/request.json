@@ -5,5 +5,5 @@
     "authorization": "Bearer test-token",
     "content-type": "application/json"
   },
-  "body": {}
+  "body": null
 }

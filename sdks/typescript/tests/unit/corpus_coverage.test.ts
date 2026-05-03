@@ -10,7 +10,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *  fail if a fixture is added to contracts/fixtures/ without being
  *  consumed here. */
 export const TS_CONSUMED_FIXTURES = new Set<string>([
+  "apply-ddl-success",
+  "apply-ddl-validation-error",
+  "get-receipt-not-found",
+  "healthz-success",
+  "list-connectors-success",
+  "list-schemas-success",
+  "query-policy-denied",
   "query-success",
+  "register-connector-success",
+  "register-schema-success",
+  "sync-connector-success",
 ]);
 
 describe("corpus coverage", () => {
