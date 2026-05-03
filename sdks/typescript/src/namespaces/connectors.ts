@@ -1,2 +1,12 @@
-// Read namespace for `/v1/connectors`. Populated in Task 2.5.
-export {};
+import type { HttpClient } from "../http.js";
+
+export class ConnectorsNamespace {
+  constructor(private http: HttpClient) {}
+
+  async list(): Promise<unknown[]> {
+    const data = await this.http.request<{ connectors: unknown[] }>({
+      method: "GET", path: "/v1/connectors",
+    });
+    return data.connectors;
+  }
+}
