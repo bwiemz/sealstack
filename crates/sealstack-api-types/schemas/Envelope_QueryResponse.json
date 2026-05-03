@@ -30,56 +30,51 @@
   },
   "definitions": {
     "QueryResponse": {
-      "description": "Response data for `POST /v1/query`.",
+      "description": "Response data for `POST /v1/query`.\n\nField order and names mirror `sealstack_engine::api::SearchResponse` exactly so the gateway can pass the engine's response through unchanged. SDK contract spec §7 documents this as the canonical wire shape.",
       "type": "object",
       "required": [
-        "hits",
-        "receipt_id"
+        "receipt_id",
+        "results"
       ],
       "properties": {
-        "hits": {
+        "receipt_id": {
+          "description": "Receipt ID; resolves via `GET /v1/receipts/{id}`.",
+          "type": "string"
+        },
+        "results": {
           "description": "Ranked hits.",
           "type": "array",
           "items": {
             "$ref": "#/definitions/QueryHit"
           }
-        },
-        "receipt_id": {
-          "description": "Receipt ID; resolves via `GET /v1/receipts/{id}`.",
-          "type": "string"
         }
       }
     },
     "QueryHit": {
-      "description": "One ranked hit in a [`QueryResponse`].",
+      "description": "One ranked hit in a [`QueryResponse`].\n\nField shape mirrors `sealstack_engine::api::SearchHit` exactly so the gateway can pass engine hits through without per-field conversion.",
       "type": "object",
       "required": [
+        "excerpt",
         "id",
+        "record",
         "score"
       ],
       "properties": {
         "id": {
-          "description": "Resource identifier.",
+          "description": "Primary key of the matched record.",
           "type": "string"
-        },
-        "title": {
-          "description": "Display title or subject line.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "snippet": {
-          "description": "Snippet to render in UI.",
-          "type": [
-            "string",
-            "null"
-          ]
         },
         "score": {
           "description": "Combined hybrid score.",
           "type": "number",
           "format": "float"
+        },
+        "excerpt": {
+          "description": "Snippet of text likely to have matched.",
+          "type": "string"
+        },
+        "record": {
+          "description": "The full record as a JSON object."
         }
       }
     },

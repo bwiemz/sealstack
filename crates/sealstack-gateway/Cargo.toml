@@ -35,6 +35,7 @@ futures         = "0.3"
 jsonwebtoken    = "9.2"
 reqwest         = { workspace = true }
 # Internal crates
+sealstack-api-types               = { path = "../sealstack-api-types" }
 sealstack-common                  = { path = "../sealstack-common" }
 sealstack-csl                     = { path = "../sealstack-csl" }
 sealstack-engine                  = { path = "../sealstack-engine", features = ["reranker", "wasm-policy"] }

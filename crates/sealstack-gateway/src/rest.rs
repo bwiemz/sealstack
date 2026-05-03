@@ -22,6 +22,15 @@
 //!
 //! All JSON responses follow `{ "data": ..., "error": null }` on success or
 //! `{ "data": null, "error": { "code": ..., "message": ... } }` on failure.
+//!
+//! # Wire types
+//!
+//! Request and success-response shapes come from `sealstack-api-types`. The
+//! engine emits richer internal structs (`SearchResponse`, `SchemaMeta`,
+//! `Receipt`, `ConnectorBindingInfo`, `SyncOutcome`); each is projected to
+//! its wire counterpart by a small helper at the bottom of this file.
+//! Keeping the wire shapes in `sealstack-api-types` is what lets the
+//! TS/Python SDKs and the gateway share one source of truth.
 
 use axum::{
     Json, Router,
@@ -30,12 +39,32 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use sealstack_engine::api::{Caller, EngineError, EngineHandle, SearchRequest};
+use sealstack_api_types::{
+    connectors::{
+        ConnectorBindingWire, ListConnectorsResponse, RegisterConnectorRequest,
+        RegisterConnectorResponse, SyncConnectorResponse,
+    },
+    health::{HealthStatus, HealthStatusKind},
+    query::{QueryHit, QueryRequest, QueryResponse},
+    receipts::{ReceiptSource, ReceiptWire},
+    schemas::{
+        ApplyDdlRequest, ApplyDdlResponse, ListSchemasResponse, RegisterSchemaRequest,
+        RegisterSchemaResponse, SchemaMetaWire,
+    },
+};
+use sealstack_engine::api::{Caller, EngineError, EngineHandle, SearchRequest, SearchResponse};
+use sealstack_engine::receipts::Receipt;
 use sealstack_engine::schema_registry::SchemaMeta;
-use serde::Deserialize;
+use sealstack_ingest::registry::ConnectorBindingInfo;
 use serde_json::{Value, json};
 
 use crate::server::AppState;
+
+/// Default hybrid alpha for schemas whose CSL `context` block omitted it.
+/// Mirrors `sealstack_engine::config::default_hybrid_alpha`; duplicated here
+/// to avoid coupling the wire layer to engine config internals. Bump in
+/// lockstep if the engine default ever changes.
+const DEFAULT_HYBRID_ALPHA: f32 = 0.6;
 
 /// Assemble the REST routes.
 pub fn router() -> Router<AppState> {
@@ -58,33 +87,27 @@ pub fn router() -> Router<AppState> {
 // Liveness / readiness
 // ---------------------------------------------------------------------------
 
-async fn healthz() -> impl IntoResponse {
-    (StatusCode::OK, Json(json!({ "status": "ok" })))
+async fn healthz() -> Response {
+    ok(json!(HealthStatus {
+        status: HealthStatusKind::Ok,
+    }))
 }
 
-async fn readyz(State(_state): State<AppState>) -> impl IntoResponse {
+async fn readyz(State(_state): State<AppState>) -> Response {
     // TODO: DB + vector-store ping. v0.1 reports ready if the process is up.
-    (StatusCode::OK, Json(json!({ "status": "ready" })))
+    ok(json!(HealthStatus {
+        status: HealthStatusKind::Ok,
+    }))
 }
 
 // ---------------------------------------------------------------------------
 // Query
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Deserialize)]
-struct QueryBody {
-    schema: String,
-    query: String,
-    #[serde(default)]
-    top_k: Option<usize>,
-    #[serde(default)]
-    filters: Value,
-}
-
 async fn post_query(
     State(state): State<AppState>,
     caller: CallerExt,
-    Json(body): Json<QueryBody>,
+    Json(body): Json<QueryRequest>,
 ) -> Response {
     let (namespace, schema) = match split_qualified(&body.schema) {
         Ok(x) => x,
@@ -95,12 +118,12 @@ async fn post_query(
         namespace,
         schema,
         query: body.query,
-        top_k: body.top_k.unwrap_or(0),
-        filters: body.filters,
+        top_k: body.top_k.map(|k| k as usize).unwrap_or(0),
+        filters: body.filters.unwrap_or(Value::Null),
     };
 
     match state.engine.search(req).await {
-        Ok(resp) => ok(json!(resp)),
+        Ok(resp) => ok(json!(search_response_to_wire(resp))),
         Err(e) => engine_error_response(e),
     }
 }
@@ -109,16 +132,9 @@ async fn post_query(
 // Schemas
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Deserialize)]
-struct RegisterSchemaBody {
-    /// Schema metadata JSON as emitted by `sealstack_csl::codegen`
-    /// (the contents of `out/schemas/<ns>.<name>.schema.json`).
-    meta: Value,
-}
-
 async fn register_schema(
     State(state): State<AppState>,
-    Json(body): Json<RegisterSchemaBody>,
+    Json(body): Json<RegisterSchemaRequest>,
 ) -> Response {
     let meta: SchemaMeta = match serde_json::from_value(body.meta) {
         Ok(m) => m,
@@ -137,27 +153,18 @@ async fn register_schema(
         state.engine_facade.clone(),
         &meta,
     );
-    ok(json!({ "qualified": qualified, "status": "registered" }))
+    ok(json!(RegisterSchemaResponse { qualified }))
 }
 
 async fn list_schemas(State(state): State<AppState>) -> Response {
-    let items: Vec<Value> = state
+    let schemas: Vec<SchemaMetaWire> = state
         .engine
         .registry()
         .iter()
         .into_iter()
-        .map(|m| {
-            json!({
-                "namespace": m.namespace,
-                "name":      m.name,
-                "version":   m.version,
-                "table":     m.table,
-                "facets":    m.facets,
-                "relations": m.relations.keys().collect::<Vec<_>>(),
-            })
-        })
+        .map(|m| schema_meta_to_wire((*m).clone()))
         .collect();
-    ok(json!({ "schemas": items }))
+    ok(json!(ListSchemasResponse { schemas }))
 }
 
 async fn get_schema(State(state): State<AppState>, Path(qualified): Path<String>) -> Response {
@@ -166,31 +173,31 @@ async fn get_schema(State(state): State<AppState>, Path(qualified): Path<String>
         Err(m) => return bad_request(m),
     };
     match state.engine.registry().get(&ns, &name) {
-        Ok(meta) => ok(json!(*meta)),
+        Ok(meta) => ok(json!(schema_meta_to_wire((*meta).clone()))),
         Err(e) => engine_error_response(e),
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct ApplyDdlBody {
-    ddl: String,
 }
 
 async fn apply_schema_ddl(
     State(state): State<AppState>,
     Path(qualified): Path<String>,
-    Json(body): Json<ApplyDdlBody>,
+    Json(body): Json<ApplyDdlRequest>,
 ) -> Response {
     if let Err(m) = split_qualified(&qualified) {
         return bad_request(m);
     }
+    // `Store::apply_schema_ddl` returns `()` rather than a count. Naively
+    // estimate the number of statements applied by counting top-level `;`
+    // separators in the submitted DDL — close enough for the SDK's
+    // diagnostic-grade `applied` field. Empty bodies report 0.
+    let applied = count_ddl_statements(&body.ddl);
     match state
         .engine
         .store_handle()
         .apply_schema_ddl(&body.ddl)
         .await
     {
-        Ok(()) => ok(json!({ "status": "applied" })),
+        Ok(()) => ok(json!(ApplyDdlResponse { applied })),
         Err(e) => engine_error_response(e),
     }
 }
@@ -200,20 +207,17 @@ async fn apply_schema_ddl(
 // ---------------------------------------------------------------------------
 
 async fn list_connectors(State(state): State<AppState>) -> Response {
-    ok(json!({ "connectors": state.ingest_bindings() }))
-}
-
-#[derive(Debug, Deserialize)]
-struct RegisterConnectorBody {
-    kind: String,
-    schema: String,
-    #[serde(default)]
-    config: Value,
+    let connectors: Vec<ConnectorBindingWire> = state
+        .ingest_bindings()
+        .into_iter()
+        .map(connector_binding_to_wire)
+        .collect();
+    ok(json!(ListConnectorsResponse { connectors }))
 }
 
 async fn register_connector(
     State(state): State<AppState>,
-    Json(body): Json<RegisterConnectorBody>,
+    Json(body): Json<RegisterConnectorRequest>,
 ) -> Response {
     let (namespace, name) = match split_qualified(&body.schema) {
         Ok(x) => x,
@@ -223,14 +227,18 @@ async fn register_connector(
         .register_connector(&body.kind, &namespace, &name, body.config)
         .await
     {
-        Ok(id) => ok(json!({ "id": id, "status": "registered" })),
+        Ok(id) => ok(json!(RegisterConnectorResponse { id })),
         Err(e) => anyhow_error_response(e),
     }
 }
 
 async fn sync_connector(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     match state.sync_connector(&id).await {
-        Some(outcome) => ok(json!(outcome)),
+        Some(outcome) => ok(json!(SyncConnectorResponse {
+            // v0.3 has no separate job table; the binding id uniquely names
+            // the in-flight sync. SDKs treat job_id as opaque.
+            job_id: outcome.binding_id,
+        })),
         None => not_found(format!("connector binding `{id}` not found")),
     }
 }
@@ -241,7 +249,7 @@ async fn sync_connector(State(state): State<AppState>, Path(id): Path<String>) -
 
 async fn get_receipt(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     match state.engine.receipts().fetch(&id).await {
-        Ok(r) => ok(json!(r)),
+        Ok(r) => ok(json!(receipt_to_wire(r))),
         Err(e) => engine_error_response(e),
     }
 }
@@ -367,4 +375,175 @@ fn split_qualified(qualified: &str) -> Result<(String, String), String> {
         ));
     }
     Ok((ns.to_owned(), name.to_owned()))
+}
+
+// ---------------------------------------------------------------------------
+// Wire conversion helpers
+//
+// One helper per engine-internal type. Each is a pure field-mapping; no
+// logic, no fallible paths beyond the field projections themselves.
+// ---------------------------------------------------------------------------
+
+/// Project `sealstack_engine::api::SearchResponse` to its wire shape.
+fn search_response_to_wire(resp: SearchResponse) -> QueryResponse {
+    QueryResponse {
+        receipt_id: resp.receipt_id,
+        results: resp
+            .results
+            .into_iter()
+            .map(|h| QueryHit {
+                id: h.id,
+                score: h.score,
+                excerpt: h.excerpt,
+                record: h.record,
+            })
+            .collect(),
+    }
+}
+
+/// Project `sealstack_engine::SchemaMeta` to its wire shape. Drops `fields`,
+/// `relations`, `chunked_fields`, `facets`, and `context`; flattens
+/// `Option<f32> hybrid_alpha` to `f32` using `DEFAULT_HYBRID_ALPHA` when
+/// the schema declined to override it.
+fn schema_meta_to_wire(meta: SchemaMeta) -> SchemaMetaWire {
+    SchemaMetaWire {
+        namespace: meta.namespace,
+        name: meta.name,
+        version: meta.version,
+        primary_key: meta.primary_key,
+        table: meta.table,
+        collection: meta.collection,
+        hybrid_alpha: meta.hybrid_alpha.unwrap_or(DEFAULT_HYBRID_ALPHA),
+    }
+}
+
+/// Project `sealstack_ingest::ConnectorBindingInfo` to its wire shape.
+///
+/// Renames `connector` → `kind` for SDK ergonomics. v0.3 has no disable
+/// surface, so every registered binding is reported as `enabled: true`;
+/// when the gateway grows a "pause binding" endpoint this will read from
+/// the binding's runtime state instead.
+fn connector_binding_to_wire(info: ConnectorBindingInfo) -> ConnectorBindingWire {
+    ConnectorBindingWire {
+        id: info.id,
+        kind: info.connector,
+        schema: format!("{}.{}", info.namespace, info.schema),
+        enabled: true,
+    }
+}
+
+/// Project `sealstack_engine::receipts::Receipt` to its wire shape. Drops
+/// `qualified_schema`, `tool`, `arguments`, `policies_applied`, and
+/// `timings_ms`; renames `created_at` → `issued_at`; lifts `caller.tenant`
+/// to a top-level `tenant` field; maps each `SourceRef` → `ReceiptSource`.
+fn receipt_to_wire(r: Receipt) -> ReceiptWire {
+    ReceiptWire {
+        id: r.id,
+        caller_id: r.caller.id,
+        tenant: r.caller.tenant,
+        sources: r
+            .sources
+            .into_iter()
+            .map(|s| ReceiptSource {
+                // Engine's `chunk_id` is `Option<String>`; the wire shape
+                // wants a non-optional string. Empty string when missing
+                // is the closest "no chunk" signal we can give the SDK
+                // without adding optionality across the boundary.
+                chunk_id: s.chunk_id.unwrap_or_default(),
+                // Engine's `SourceRef` exposes `{schema, record_id}` but
+                // not a fully-qualified URI. v0.3 stitches them into a
+                // synthetic `<schema>:<record_id>` URI; v0.4 will replace
+                // this with a real URI once connectors record one.
+                source_uri: format!("{}:{}", s.schema, s.record_id),
+                score: s.score,
+            })
+            .collect(),
+        issued_at: r.created_at,
+    }
+}
+
+/// Naive top-level statement counter for the DDL applied to a schema.
+/// Splits on `;` outside of single-quoted and dollar-quoted strings.
+/// Used only for the `applied` field of [`ApplyDdlResponse`]; the engine
+/// itself runs the DDL through a stricter splitter.
+fn count_ddl_statements(ddl: &str) -> u32 {
+    let mut count: u32 = 0;
+    let mut current_has_text = false;
+    let mut in_str = false;
+    let mut dollar_tag: Option<String> = None;
+    let bytes = ddl.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i] as char;
+        if !in_str && dollar_tag.is_none() && c == '-' && bytes.get(i + 1) == Some(&b'-') {
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            continue;
+        }
+        if !in_str && dollar_tag.is_none() && c == '$' {
+            // Try to read a $tag$ marker.
+            let mut j = i + 1;
+            while j < bytes.len() && bytes[j] != b'$' {
+                j += 1;
+            }
+            if j < bytes.len() {
+                let tag = ddl[i..=j].to_owned();
+                dollar_tag = Some(tag);
+                current_has_text = true;
+                i = j + 1;
+                continue;
+            }
+        }
+        if let Some(tag) = &dollar_tag {
+            if ddl[i..].starts_with(tag) {
+                i += tag.len();
+                dollar_tag = None;
+                continue;
+            }
+            i += 1;
+            continue;
+        }
+        if c == '\'' {
+            in_str = !in_str;
+            current_has_text = true;
+            i += 1;
+            continue;
+        }
+        if !in_str && c == ';' {
+            if current_has_text {
+                count += 1;
+            }
+            current_has_text = false;
+            i += 1;
+            continue;
+        }
+        if !c.is_whitespace() {
+            current_has_text = true;
+        }
+        i += 1;
+    }
+    if current_has_text {
+        count += 1;
+    }
+    count
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn count_ddl_statements_handles_typical_bundle() {
+        assert_eq!(count_ddl_statements(""), 0);
+        assert_eq!(count_ddl_statements("CREATE TABLE foo();"), 1);
+        assert_eq!(
+            count_ddl_statements("CREATE TABLE foo(); CREATE INDEX i ON foo(x);"),
+            2
+        );
+        // Trailing statement without `;` still counts.
+        assert_eq!(count_ddl_statements("CREATE TABLE foo()"), 1);
+        // Comments and blank space don't add phantom statements.
+        assert_eq!(count_ddl_statements("-- nothing here\n   \n"), 0);
+    }
 }
