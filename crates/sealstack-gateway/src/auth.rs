@@ -210,10 +210,19 @@ fn extract_and_validate(
 }
 
 fn unauthorized(reason: &str) -> Response {
-    let mut resp = (StatusCode::UNAUTHORIZED, reason.to_owned()).into_response();
-    // Per RFC 6750: advertise how to authenticate. The `resource_metadata`
-    // parameter is an MCP 2025-11 extension that points clients at the
-    // OAuth protected-resource metadata document.
+    use axum::Json;
+    use serde_json::json;
+
+    let body = Json(json!({
+        "data": null,
+        "error": { "code": "unauthorized", "message": reason },
+    }));
+    let mut resp = (StatusCode::UNAUTHORIZED, body).into_response();
+
+    // Per RFC 6750: advertise how to authenticate. Preserved from the
+    // pre-envelope plaintext path. The `resource_metadata` parameter is an
+    // MCP 2025-11 extension that points clients at the OAuth protected-
+    // resource metadata document.
     if let Ok(v) = HeaderValue::from_str(
         "Bearer realm=\"sealstack\", error=\"invalid_token\", \
          resource_metadata=\"/.well-known/oauth-protected-resource\"",
@@ -290,5 +299,27 @@ mod tests {
     fn disabled_mode_reports_not_enforcing() {
         let m = AuthMode::Disabled;
         assert!(!m.enforces());
+    }
+
+    #[tokio::test]
+    async fn unauthorized_response_uses_json_envelope() {
+        use axum::body::to_bytes;
+        let resp = unauthorized("missing Authorization header");
+        let status = resp.status();
+        let bytes = to_bytes(resp.into_body(), 1024).await.unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&bytes)
+            .expect("response body must be valid JSON envelope");
+
+        assert_eq!(status, axum::http::StatusCode::UNAUTHORIZED);
+        assert!(parsed["data"].is_null(), "envelope must have null data: {parsed}");
+        assert_eq!(parsed["error"]["code"], "unauthorized");
+        assert_eq!(parsed["error"]["message"], "missing Authorization header");
+    }
+
+    #[tokio::test]
+    async fn unauthorized_preserves_www_authenticate_header() {
+        let resp = unauthorized("invalid token");
+        let v = resp.headers().get(axum::http::header::WWW_AUTHENTICATE);
+        assert!(v.is_some(), "WWW-Authenticate header must still be present");
     }
 }
