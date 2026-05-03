@@ -4,12 +4,13 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+  # Single npm entry covers the pnpm workspace declared in
+  # pnpm-workspace.yaml (console + sdks/typescript). Dependabot reads the
+  # root pnpm-lock.yaml and proposes bumps for any member package. Don't
+  # add per-member entries here — they create duplicate PRs against the
+  # same lockfile.
   - package-ecosystem: npm
-    directory: "/console"
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: "/sdks/typescript"
+    directory: "/"
     schedule:
       interval: weekly
   - package-ecosystem: github-actions
