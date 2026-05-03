@@ -33,6 +33,19 @@ Capabilities that **work today** (build-green, unit-test-covered):
   receipts, settings. Reads + writes through the gateway's REST surface.
 - **Docs site**: Astro + Starlight with custom industrial-editorial theme,
   deployed to Cloudflare Pages.
+- **TypeScript SDK** (`@sealstack/client`, `sdks/typescript/`) — full
+  client implementation, generated types from the api-types JSON Schemas,
+  msw-mocked unit tests, parametrized fixture corpus tests, and a
+  smoke suite that runs against a live gateway in the integration job.
+- **Python SDK** (`sealstack`, `sdks/python/`) — same surface as the TS
+  SDK plus an async-context-manager protocol, sync facade, parametrized
+  fixture tests via respx, and integration smoke suite. Pydantic v2
+  models are generated from the same JSON Schemas as the TS types.
+- **Wire contracts** (`crates/sealstack-api-types/`, `contracts/`) — single
+  source of truth for the gateway REST surface, JSON Schemas emitted via
+  schemars, fixture corpus consumed by both SDKs, and an `emit-fixtures`
+  validator that round-trips every fixture through the typed Rust
+  `Envelope<T>` so the corpus and the wire types cannot drift silently.
 
 Capabilities that are **present but scoped** — working, but not complete:
 
@@ -52,10 +65,6 @@ Capabilities that are **present but scoped** — working, but not complete:
 What's **deliberately stubbed** — scaffolding only, not functional:
 
 - **Go SDK** (`sdks/go/`) — README only; no Go source.
-- **Python SDK** (`sdks/python/sealstack/`) — package layout + httpx client
-  skeleton; not wired against real endpoints yet.
-- **TypeScript SDK** (`sdks/typescript/`) — build config + export surface;
-  no client implementation.
 - **Helm chart** (`deploy/helm/sealstack/`) — `Chart.yaml` + empty
   `templates/`. Needs resources, probes, ConfigMap for env, and
   secrets handling.
@@ -64,7 +73,10 @@ What's **deliberately stubbed** — scaffolding only, not functional:
 
 ## Known gaps before v0.2
 
-- **Postgres-backed CI integration tests** (lift the `#[ignore]`).
+- **Postgres-backed CI integration tests** (lift the `#[ignore]` on
+  `end_to_end.rs`). The SDK smoke suites already run against a live
+  gateway in CI; this is about giving the gateway's own end-to-end test
+  the same plumbing.
 - **Compiled policy bundles** emitted by `cfg-csl` so users don't hand-write
   WAT against the policy ABI.
 - **Semantic-chunking improvements** — current chunker is a dependency-free
