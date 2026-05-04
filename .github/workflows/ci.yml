@@ -125,7 +125,7 @@ jobs:
         run: pnpm -C sdks/typescript build
       - name: TS SDK smoke
         run: pnpm -C sdks/typescript test:integration
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "3.11" }
       - name: Install Python SDK
         run: pip install -e "sdks/python[dev]"
