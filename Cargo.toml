@@ -89,7 +89,7 @@ qdrant-client = "1.12"
 # returns `ModalResult<O, E>` = `Result<O, ErrMode<E>>`, `LocatingSlice` exposes
 # `Location::location`). Migrating to 1.0 (which flattens `ErrMode` and renames
 # the location accessor) is tracked separately — pin holds the API contract.
-winnow     = "0.6"
+winnow     = "1.0"
 quote      = "1"
 proc-macro2 = "1"
 minijinja  = "2"
