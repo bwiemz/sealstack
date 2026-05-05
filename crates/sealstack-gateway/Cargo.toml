@@ -32,7 +32,7 @@ time            = { workspace = true }
 async-trait     = "0.1"
 dashmap         = "6"
 futures         = "0.3"
-jsonwebtoken    = "9.2"
+jsonwebtoken    = "10.3"
 reqwest         = { workspace = true }
 # Internal crates
 sealstack-api-types               = { path = "../sealstack-api-types" }
