@@ -57,10 +57,15 @@ Capabilities that are **present but scoped** — working, but not complete:
   attachments, DMs/MPIMs (privacy — require opt-in flag).
 - **Integration tests** — [`crates/sealstack-gateway/tests/end_to_end.rs`](./crates/sealstack-gateway/tests/end_to_end.rs)
   exercises the full happy path (register schema → register connector →
-  sync → query), but is `#[ignore]`-gated because it needs a running
-  Postgres. Opt in via `SEALSTACK_DATABASE_URL=... cargo test -- --ignored`.
-- **CI** — `cargo check` + unit tests run on every PR. Integration tests do
-  not run in CI yet (needs containerized Postgres); that wires in v0.2.
+  sync → query). The tests stay `#[ignore]`-gated for `cargo test
+  --workspace` so they don't break local-dev runs without Postgres, but
+  they run unconditionally in the `integration` CI job (which provisions
+  Postgres + Qdrant service containers). Opt in locally via
+  `SEALSTACK_DATABASE_URL=... cargo test -- --ignored`.
+- **CI** — `cargo check` + unit tests run on every PR. The `integration`
+  job provisions Postgres + Qdrant, runs the gateway's `end_to_end.rs`
+  ignored tests in-process, then boots the gateway binary and runs both
+  SDKs' smoke suites against it. No outstanding CI plumbing for v0.2.
 
 What's **deliberately stubbed** — scaffolding only, not functional:
 

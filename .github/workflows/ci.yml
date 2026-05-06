@@ -103,6 +103,14 @@ jobs:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@1.95
       - uses: Swatinem/rust-cache@v2
+      - name: Gateway end-to-end test (in-process, against Postgres)
+        # Closes the v0.2 ROADMAP gap. The tests are `#[ignore]`-gated
+        # because they need SEALSTACK_DATABASE_URL — provided here by the
+        # Postgres service container above. They use `tower::oneshot` to
+        # drive an in-process Router, so they finish before the gateway
+        # binary is built and don't conflict with the long-running gateway
+        # started in the next steps.
+        run: cargo test --test end_to_end -p sealstack-gateway --locked -- --ignored
       - name: Build gateway
         run: cargo build -p sealstack-gateway --bin sealstack-gateway --locked
       - name: Start gateway
