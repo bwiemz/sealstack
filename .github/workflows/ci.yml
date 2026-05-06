@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.95
         with: { components: rustfmt, clippy }
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.95
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   policy-runtime-drift:
@@ -41,12 +41,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.95
       - uses: Swatinem/rust-cache@v2
       - name: Install wasm32 target
         run: rustup target add wasm32-unknown-unknown
       - name: Rebuild policy runtime
         run: ./scripts/rebuild-policy-runtime.sh
+      - name: Upload rebuilt asset (for diagnosing host-dependent byte drift)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: policy_runtime-linux-wasm
+          path: crates/sealstack-csl/assets/policy_runtime.wasm
+          if-no-files-found: error
       - name: Check for drift
         run: |
           if ! git diff --exit-code crates/sealstack-csl/assets/policy_runtime.wasm; then
@@ -59,7 +66,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
-        with: { version: 9 }
       - uses: actions/setup-node@v6
         with:
           node-version: 20
@@ -95,7 +101,7 @@ jobs:
       SEALSTACK_GATEWAY_URL: http://localhost:7070
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.95
       - uses: Swatinem/rust-cache@v2
       - name: Build gateway
         run: cargo build -p sealstack-gateway --bin sealstack-gateway --locked
@@ -115,7 +121,6 @@ jobs:
           cat gateway.log
           exit 1
       - uses: pnpm/action-setup@v6
-        with: { version: 9 }
       - uses: actions/setup-node@v6
         with:
           node-version: 20

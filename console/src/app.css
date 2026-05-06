@@ -16,65 +16,66 @@
  * is a grayscale gradient from near-black to near-white.
  */
 
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* ------------------------------------------------------------------------ */
 /* Fonts                                                                    */
 /* ------------------------------------------------------------------------ */
 
 @font-face {
-  font-family: 'Instrument Serif';
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-  src: url('https://fonts.gstatic.com/s/instrumentserif/v4/jizBRFtNs2ka5fXjeivQ4LroWlx-2zIZj1bIkNoy9w.woff2')
-    format('woff2');
+    font-family: "Instrument Serif";
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+    src: url("https://fonts.gstatic.com/s/instrumentserif/v4/jizBRFtNs2ka5fXjeivQ4LroWlx-2zIZj1bIkNoy9w.woff2")
+        format("woff2");
 }
 
 @font-face {
-  font-family: 'Instrument Serif';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('https://fonts.gstatic.com/s/instrumentserif/v4/jizDRFtNs2ka5fXjeiv-3IpAitEDw6ew.woff2')
-    format('woff2');
+    font-family: "Instrument Serif";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("https://fonts.gstatic.com/s/instrumentserif/v4/jizDRFtNs2ka5fXjeiv-3IpAitEDw6ew.woff2")
+        format("woff2");
 }
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 
 /* ------------------------------------------------------------------------ */
 /* Tokens                                                                   */
 /* ------------------------------------------------------------------------ */
 
 @theme {
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-serif: 'Instrument Serif', Georgia, serif;
+    --font-mono:
+        "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-serif: "Instrument Serif", Georgia, serif;
 
-  /* Grayscale — deliberately narrow range for dense UI. */
-  --color-ink-0: #0a0a0b;   /* canvas */
-  --color-ink-1: #111114;   /* panel  */
-  --color-ink-2: #17171a;   /* raised */
-  --color-ink-3: #1a1a1d;   /* border */
-  --color-ink-4: #2a2a2e;   /* border-strong */
-  --color-ink-5: #3d3d42;
-  --color-ink-6: #5a5a60;
-  --color-ink-7: #7a7a80;   /* muted-fg */
-  --color-ink-8: #9d9da3;   /* secondary-fg */
-  --color-ink-9: #c8c8cc;
-  --color-ink-10: #e8e8e8;  /* primary-fg */
+    /* Grayscale — deliberately narrow range for dense UI. */
+    --color-ink-0: #0a0a0b; /* canvas */
+    --color-ink-1: #111114; /* panel  */
+    --color-ink-2: #17171a; /* raised */
+    --color-ink-3: #1a1a1d; /* border */
+    --color-ink-4: #2a2a2e; /* border-strong */
+    --color-ink-5: #3d3d42;
+    --color-ink-6: #5a5a60;
+    --color-ink-7: #7a7a80; /* muted-fg */
+    --color-ink-8: #9d9da3; /* secondary-fg */
+    --color-ink-9: #c8c8cc;
+    --color-ink-10: #e8e8e8; /* primary-fg */
 
-  /* Accents. */
-  --color-forge: #ff7a1a;    /* live / pending / CTA */
-  --color-forge-dim: #c45d12;
-  --color-forge-bg: #2a1708;
+    /* Accents. */
+    --color-forge: #ff7a1a; /* live / pending / CTA */
+    --color-forge-dim: #c45d12;
+    --color-forge-bg: #2a1708;
 
-  --color-healthy: #22c55e;
-  --color-healthy-dim: #15803d;
-  --color-healthy-bg: #0a1f13;
+    --color-healthy: #22c55e;
+    --color-healthy-dim: #15803d;
+    --color-healthy-bg: #0a1f13;
 
-  --color-denied: #f87171;
-  --color-denied-dim: #b91c1c;
-  --color-denied-bg: #2a0f0f;
+    --color-denied: #f87171;
+    --color-denied-dim: #b91c1c;
+    --color-denied-bg: #2a0f0f;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -82,268 +83,311 @@
 /* ------------------------------------------------------------------------ */
 
 * {
-  -webkit-tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: transparent;
 }
 
 html {
-  color-scheme: dark;
-  background: var(--color-ink-0);
-  font-family: var(--font-mono);
-  font-feature-settings: 'tnum' 1, 'ss01' 1;
-  font-size: 14px;
-  line-height: 1.5;
+    color-scheme: dark;
+    background: var(--color-ink-0);
+    font-family: var(--font-mono);
+    font-feature-settings:
+        "tnum" 1,
+        "ss01" 1;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 body {
-  background: var(--color-ink-0);
-  color: var(--color-ink-10);
-  min-height: 100svh;
+    background: var(--color-ink-0);
+    color: var(--color-ink-10);
+    min-height: 100svh;
 
-  /* Subtle grain texture — the only atmospheric element. Creates depth
+    /* Subtle grain texture — the only atmospheric element. Creates depth
      without drawing attention. Tuned against a dark canvas; pulled from
      two stacked radial gradients at very low opacity. */
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(255, 122, 26, 0.012), transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.008), transparent 50%);
-  background-attachment: fixed;
+    background-image:
+        radial-gradient(
+            circle at 20% 30%,
+            rgba(255, 122, 26, 0.012),
+            transparent 50%
+        ),
+        radial-gradient(
+            circle at 80% 70%,
+            rgba(34, 197, 94, 0.008),
+            transparent 50%
+        );
+    background-attachment: fixed;
 }
 
 /* Editorial serif for page titles and section labels. */
 .serif {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: -0.01em;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.01em;
 }
 
 /* Small-caps italic label — the recurring device that marks section breaks.
    Think Swiss rail timetable or a financial report. */
 .label {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--color-ink-7);
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-ink-7);
 }
 
 /* Horizontal rule the section dividers ride on. */
 .rule {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: var(--color-ink-7);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--color-ink-7);
 }
 .rule::before {
-  content: '';
-  flex: 0 0 auto;
-  width: 1.25rem;
-  height: 1px;
-  background: var(--color-ink-4);
+    content: "";
+    flex: 0 0 auto;
+    width: 1.25rem;
+    height: 1px;
+    background: var(--color-ink-4);
 }
 .rule::after {
-  content: '';
-  flex: 1 1 auto;
-  height: 1px;
-  background: var(--color-ink-3);
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--color-ink-3);
 }
 
 /* Numbers in tabular lining figures, always. */
 .num {
-  font-variant-numeric: tabular-nums lining-nums;
-  font-feature-settings: 'tnum' 1, 'lnum' 1;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings:
+        "tnum" 1,
+        "lnum" 1;
 }
 
 /* Status dot — ● character with a tinted glow. */
 .dot {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 9999px;
-  vertical-align: 1px;
-  margin-right: 0.375rem;
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    vertical-align: 1px;
+    margin-right: 0.375rem;
 }
-.dot-healthy { background: var(--color-healthy); box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
-.dot-pending { background: var(--color-forge); box-shadow: 0 0 6px rgba(255, 122, 26, 0.6); }
-.dot-denied  { background: var(--color-denied);  box-shadow: 0 0 6px rgba(248, 113, 113, 0.5); }
-.dot-muted   { background: var(--color-ink-6); }
+.dot-healthy {
+    background: var(--color-healthy);
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+}
+.dot-pending {
+    background: var(--color-forge);
+    box-shadow: 0 0 6px rgba(255, 122, 26, 0.6);
+}
+.dot-denied {
+    background: var(--color-denied);
+    box-shadow: 0 0 6px rgba(248, 113, 113, 0.5);
+}
+.dot-muted {
+    background: var(--color-ink-6);
+}
 
 /* Panels. Subtle border, never shadow. Shadows imply elevation/3D;
    this UI is flat and precise. */
 .panel {
-  background: var(--color-ink-1);
-  border: 1px solid var(--color-ink-3);
-  border-radius: 2px;
+    background: var(--color-ink-1);
+    border: 1px solid var(--color-ink-3);
+    border-radius: 2px;
 }
 .panel-raised {
-  background: var(--color-ink-2);
-  border: 1px solid var(--color-ink-4);
-  border-radius: 2px;
+    background: var(--color-ink-2);
+    border: 1px solid var(--color-ink-4);
+    border-radius: 2px;
 }
 
 /* Tables — dense rows, no zebra. Subtle column rules. */
 table.data {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
 }
 table.data th {
-  text-align: left;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--color-ink-7);
-  padding: 0.625rem 1rem;
-  border-bottom: 1px solid var(--color-ink-4);
-  background: var(--color-ink-1);
-  position: sticky;
-  top: 0;
+    text-align: left;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-ink-7);
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--color-ink-4);
+    background: var(--color-ink-1);
+    position: sticky;
+    top: 0;
 }
 table.data td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--color-ink-3);
-  color: var(--color-ink-9);
-  vertical-align: top;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-ink-3);
+    color: var(--color-ink-9);
+    vertical-align: top;
 }
 table.data tr:hover td {
-  background: var(--color-ink-2);
+    background: var(--color-ink-2);
 }
 table.data tr:last-child td {
-  border-bottom: none;
+    border-bottom: none;
 }
 
 /* Monospace code block. */
 .code {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  background: var(--color-ink-0);
-  border: 1px solid var(--color-ink-3);
-  border-radius: 2px;
-  padding: 0.75rem 1rem;
-  overflow-x: auto;
-  color: var(--color-ink-9);
-  white-space: pre;
-  line-height: 1.55;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: var(--color-ink-0);
+    border: 1px solid var(--color-ink-3);
+    border-radius: 2px;
+    padding: 0.75rem 1rem;
+    overflow-x: auto;
+    color: var(--color-ink-9);
+    white-space: pre;
+    line-height: 1.55;
 }
 
 /* Inline tag — used for connector kinds, status codes, schema facets. */
 .tag {
-  display: inline-block;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border: 1px solid var(--color-ink-4);
-  border-radius: 2px;
-  color: var(--color-ink-8);
-  background: transparent;
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border: 1px solid var(--color-ink-4);
+    border-radius: 2px;
+    color: var(--color-ink-8);
+    background: transparent;
 }
 .tag-forge {
-  color: var(--color-forge);
-  border-color: var(--color-forge-dim);
-  background: var(--color-forge-bg);
+    color: var(--color-forge);
+    border-color: var(--color-forge-dim);
+    background: var(--color-forge-bg);
 }
 .tag-healthy {
-  color: var(--color-healthy);
-  border-color: var(--color-healthy-dim);
-  background: var(--color-healthy-bg);
+    color: var(--color-healthy);
+    border-color: var(--color-healthy-dim);
+    background: var(--color-healthy-bg);
 }
 .tag-denied {
-  color: var(--color-denied);
-  border-color: var(--color-denied-dim);
-  background: var(--color-denied-bg);
+    color: var(--color-denied);
+    border-color: var(--color-denied-dim);
+    background: var(--color-denied-bg);
 }
 
 /* Buttons. Primary only for the singular action per view. */
 .btn {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  padding: 0.5rem 0.875rem;
-  border: 1px solid var(--color-ink-4);
-  background: var(--color-ink-2);
-  color: var(--color-ink-10);
-  border-radius: 2px;
-  cursor: pointer;
-  transition: background 120ms, border-color 120ms;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--color-ink-4);
+    background: var(--color-ink-2);
+    color: var(--color-ink-10);
+    border-radius: 2px;
+    cursor: pointer;
+    transition:
+        background 120ms,
+        border-color 120ms;
 }
 .btn:hover {
-  background: var(--color-ink-3);
-  border-color: var(--color-ink-5);
+    background: var(--color-ink-3);
+    border-color: var(--color-ink-5);
 }
 .btn:active {
-  background: var(--color-ink-1);
+    background: var(--color-ink-1);
 }
 .btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .btn-forge {
-  color: var(--color-forge);
-  border-color: var(--color-forge-dim);
-  background: var(--color-forge-bg);
+    color: var(--color-forge);
+    border-color: var(--color-forge-dim);
+    background: var(--color-forge-bg);
 }
 .btn-forge:hover {
-  background: color-mix(in oklab, var(--color-forge-bg), var(--color-forge) 18%);
-  border-color: var(--color-forge);
+    background: color-mix(
+        in oklab,
+        var(--color-forge-bg),
+        var(--color-forge) 18%
+    );
+    border-color: var(--color-forge);
 }
 
 /* Inputs. */
 .field {
-  width: 100%;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  padding: 0.625rem 0.875rem;
-  background: var(--color-ink-0);
-  border: 1px solid var(--color-ink-3);
-  color: var(--color-ink-10);
-  border-radius: 2px;
-  outline: none;
-  transition: border-color 120ms;
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 0.625rem 0.875rem;
+    background: var(--color-ink-0);
+    border: 1px solid var(--color-ink-3);
+    color: var(--color-ink-10);
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 120ms;
 }
 .field:focus {
-  border-color: var(--color-ink-6);
+    border-color: var(--color-ink-6);
 }
 .field::placeholder {
-  color: var(--color-ink-6);
+    color: var(--color-ink-6);
 }
 
 /* Links inside body copy. */
 .link {
-  color: var(--color-ink-10);
-  text-decoration: none;
-  border-bottom: 1px solid var(--color-ink-4);
-  transition: border-color 120ms;
+    color: var(--color-ink-10);
+    text-decoration: none;
+    border-bottom: 1px solid var(--color-ink-4);
+    transition: border-color 120ms;
 }
 .link:hover {
-  border-bottom-color: var(--color-forge);
+    border-bottom-color: var(--color-forge);
 }
 
 /* Scrollbar — thin, dark, unobtrusive. */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: var(--color-ink-3);
-  border: 2px solid var(--color-ink-0);
-  border-radius: 6px;
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--color-ink-4); }
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--color-ink-3);
+    border: 2px solid var(--color-ink-0);
+    border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-4);
+}
 
 /* Selection — amber, emphatic. */
 ::selection {
-  background: var(--color-forge);
-  color: var(--color-ink-0);
+    background: var(--color-forge);
+    color: var(--color-ink-0);
 }
 
 /* Loading shimmer for pending states. Very subtle. */
 @keyframes shimmer {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.95; }
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 0.95;
+    }
 }
-.shimmer { animation: shimmer 2s ease-in-out infinite; }
+.shimmer {
+    animation: shimmer 2s ease-in-out infinite;
+}

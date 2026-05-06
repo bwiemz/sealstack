@@ -96,7 +96,10 @@ fn main() -> Result<()> {
     }
 
     if !errors.is_empty() {
-        eprintln!("emit-fixtures: {} fixture(s) failed validation:", errors.len());
+        eprintln!(
+            "emit-fixtures: {} fixture(s) failed validation:",
+            errors.len()
+        );
         for e in &errors {
             eprintln!("  - {e}");
         }
@@ -126,16 +129,16 @@ fn validate_one(dir: &Path, name: &str) -> Result<()> {
         bail!("missing description.md");
     }
 
-    let req: Value = serde_json::from_str(&fs::read_to_string(&req_path)?)
-        .context("parsing request.json")?;
+    let req: Value =
+        serde_json::from_str(&fs::read_to_string(&req_path)?).context("parsing request.json")?;
     for k in ["method", "path", "headers", "body"] {
         if req.get(k).is_none() {
             bail!("request.json missing `{k}`");
         }
     }
 
-    let res: Value = serde_json::from_str(&fs::read_to_string(&res_path)?)
-        .context("parsing response.json")?;
+    let res: Value =
+        serde_json::from_str(&fs::read_to_string(&res_path)?).context("parsing response.json")?;
     for k in ["status", "headers", "body"] {
         if res.get(k).is_none() {
             bail!("response.json missing `{k}`");
