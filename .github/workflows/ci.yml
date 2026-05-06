@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.95
         with: { components: rustfmt, clippy }
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.95
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   policy-runtime-drift:
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.95
       - uses: Swatinem/rust-cache@v2
       - name: Install wasm32 target
         run: rustup target add wasm32-unknown-unknown
@@ -94,7 +94,7 @@ jobs:
       SEALSTACK_GATEWAY_URL: http://localhost:7070
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.95
       - uses: Swatinem/rust-cache@v2
       - name: Build gateway
         run: cargo build -p sealstack-gateway --bin sealstack-gateway --locked

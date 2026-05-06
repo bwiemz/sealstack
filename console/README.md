@@ -38,16 +38,16 @@ works:
 
 ## Routes
 
-| Path | Purpose |
-|------|---------|
-| `/` | Dashboard: gateway health + schema / connector counts + quickstart |
-| `/schemas` | List every registered schema |
-| `/schemas/[qualified]` | Field / relation / context inspection for one schema |
-| `/connectors` | List bindings; add new ones; trigger syncs |
-| `/query` | Query playground with result list + receipt link |
-| `/receipts` | Look up a receipt by id |
-| `/receipts/[id]` | **The receipt viewer** — document-style provenance audit |
-| `/settings` | Gateway URL + caller identity; persisted to localStorage |
+| Path                   | Purpose                                                            |
+| ---------------------- | ------------------------------------------------------------------ |
+| `/`                    | Dashboard: gateway health + schema / connector counts + quickstart |
+| `/schemas`             | List every registered schema                                       |
+| `/schemas/[qualified]` | Field / relation / context inspection for one schema               |
+| `/connectors`          | List bindings; add new ones; trigger syncs                         |
+| `/query`               | Query playground with result list + receipt link                   |
+| `/receipts`            | Look up a receipt by id                                            |
+| `/receipts/[id]`       | **The receipt viewer** — document-style provenance audit           |
+| `/settings`            | Gateway URL + caller identity; persisted to localStorage           |
 
 ## Aesthetic
 

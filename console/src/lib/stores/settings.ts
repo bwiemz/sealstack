@@ -2,9 +2,9 @@
 // localStorage. We avoid the full reactive-store dance for this since Svelte
 // 5 runes handle it fine with a small wrapper.
 
-import { browser } from '$app/environment';
+import { browser } from "$app/environment";
 
-const KEY = 'cfg.console.settings';
+const KEY = "cfg.console.settings";
 
 export interface Settings {
   gatewayUrl: string;
@@ -13,10 +13,10 @@ export interface Settings {
 
 const DEFAULT: Settings = {
   gatewayUrl:
-    (typeof window !== 'undefined' &&
+    (typeof window !== "undefined" &&
       (window as any).__SEALSTACK_GATEWAY_URL__) ??
-    'http://localhost:7070',
-  user: 'console'
+    "http://localhost:7070",
+  user: "console",
 };
 
 function read(): Settings {
@@ -26,8 +26,11 @@ function read(): Settings {
     if (!raw) return DEFAULT;
     const parsed = JSON.parse(raw);
     return {
-      gatewayUrl: typeof parsed.gatewayUrl === 'string' ? parsed.gatewayUrl : DEFAULT.gatewayUrl,
-      user: typeof parsed.user === 'string' ? parsed.user : DEFAULT.user
+      gatewayUrl:
+        typeof parsed.gatewayUrl === "string"
+          ? parsed.gatewayUrl
+          : DEFAULT.gatewayUrl,
+      user: typeof parsed.user === "string" ? parsed.user : DEFAULT.user,
     };
   } catch {
     return DEFAULT;
