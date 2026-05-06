@@ -47,6 +47,13 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - name: Rebuild policy runtime
         run: ./scripts/rebuild-policy-runtime.sh
+      - name: Upload rebuilt asset (for diagnosing host-dependent byte drift)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: policy_runtime-linux-wasm
+          path: crates/sealstack-csl/assets/policy_runtime.wasm
+          if-no-files-found: error
       - name: Check for drift
         run: |
           if ! git diff --exit-code crates/sealstack-csl/assets/policy_runtime.wasm; then
