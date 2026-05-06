@@ -110,7 +110,11 @@ jobs:
         # drive an in-process Router, so they finish before the gateway
         # binary is built and don't conflict with the long-running gateway
         # started in the next steps.
-        run: cargo test --test end_to_end -p sealstack-gateway --locked -- --ignored
+        #
+        # `--test-threads=1` serializes the three tests because they all
+        # register `examples.Doc` / `examples.AdminDoc` schemas in the
+        # shared Postgres and would race otherwise.
+        run: cargo test --test end_to_end -p sealstack-gateway --locked -- --ignored --test-threads=1
       - name: Build gateway
         run: cargo build -p sealstack-gateway --bin sealstack-gateway --locked
       - name: Start gateway
