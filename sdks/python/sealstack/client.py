@@ -7,7 +7,7 @@ import warnings
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from ._http import HttpClient, HttpClientOptions
+from ._http import HeadersSource, HttpClient, HttpClientOptions
 from .namespaces.admin import AdminNamespace
 from .namespaces.connectors import ConnectorsNamespace
 from .namespaces.receipts import ReceiptsNamespace
@@ -47,8 +47,12 @@ class SealStack:
         debug: bool | Callable[[str], None] = False,
     ) -> "SealStack":
         token_fn: Callable[[], str] = token if callable(token) else (lambda: token)
-        headers = {"authorization": f"Bearer {token_fn()}"}
-        return cls(_make_http(url, headers, timeout, retry_attempts,
+        # Pass the factory itself, not its evaluated result — HttpClient
+        # resolves headers per-request so token-rotation closures actually
+        # rotate.
+        def headers_fn() -> dict[str, str]:
+            return {"authorization": f"Bearer {token_fn()}"}
+        return cls(_make_http(url, headers_fn, timeout, retry_attempts,
                               retry_initial_backoff_ms, debug))
 
     @classmethod
@@ -141,7 +145,7 @@ class SyncSealStack:
 
 def _make_http(
     url: str,
-    headers: dict[str, str],
+    headers: HeadersSource,
     timeout: float,
     retry_attempts: int,
     retry_initial_backoff_ms: int,

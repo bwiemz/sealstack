@@ -29,10 +29,17 @@ REDACTED_HEADERS = frozenset({
 })
 
 
+# Per-request headers. Static dict for the common case; a callable
+# returning a dict for token-rotating clients
+# (`SealStack.bearer(token=lambda: fetch_jwt())`), which would otherwise
+# bind to a single token at client construction.
+HeadersSource = dict[str, str] | Callable[[], dict[str, str]]
+
+
 @dataclass
 class HttpClientOptions:
     base_url: str
-    headers: dict[str, str]
+    headers: HeadersSource
     timeout_s: float
     retry_attempts: int
     retry_initial_backoff_ms: int
@@ -42,17 +49,25 @@ class HttpClientOptions:
 class HttpClient:
     def __init__(self, opts: HttpClientOptions) -> None:
         self._opts = opts
+        # Construction-time headers are intentionally absent: httpx merges
+        # client-level headers with per-request headers, so any
+        # constructor-set headers would silently persist alongside the
+        # factory-resolved auth header and partially re-introduce the
+        # stale-token bug. _resolve_headers() must remain the sole source.
         self._client = httpx.AsyncClient(
             base_url=opts.base_url.rstrip("/"),
-            headers=opts.headers,
             timeout=opts.timeout_s,
         )
+
+    def _resolve_headers(self) -> dict[str, str]:
+        h = self._opts.headers
+        return h() if callable(h) else h
 
     async def aclose(self) -> None:
         await self._client.aclose()
 
     def _log_request_for_test(self, method: str, path: str) -> None:
-        self._log_request(method, path)
+        self._log_request(method, path, self._resolve_headers())
 
     async def request(
         self,
@@ -81,10 +96,15 @@ class HttpClient:
     async def _attempt(
         self, method: str, path: str, body: Any, timeout_s: float | None
     ) -> Any:
-        self._log_request(method, path)
+        # Resolve headers exactly once per attempt: a token-rotation factory
+        # backed by a remote JWT fetch must not fire twice (once for the log,
+        # once for the request) and the log must show the same token that
+        # actually went out on the wire.
+        headers = self._resolve_headers()
+        self._log_request(method, path, headers)
         timeout = timeout_s if timeout_s is not None else self._opts.timeout_s
         resp = await self._client.request(
-            method, path, json=body, timeout=timeout
+            method, path, json=body, headers=headers, timeout=timeout
         )
         headers = {k.lower(): v for k, v in resp.headers.items()}
         env = resp.json() if resp.content else {"data": None, "error": None}
@@ -121,11 +141,12 @@ class HttpClient:
         # through the retry loop without explicit handling.
         await asyncio.sleep(seconds)
 
-    def _log_request(self, method: str, path: str) -> None:
+    def _log_request(
+        self, method: str, path: str, headers: dict[str, str]
+    ) -> None:
         if self._opts.debug is None:
             return
-        redacted = self._redact_headers(self._opts.headers)
-        self._opts.debug(f"→ {method} {path} headers={redacted}")
+        self._opts.debug(f"→ {method} {path} headers={self._redact_headers(headers)}")
 
     def _log_error_response(
         self, status: int, headers: dict[str, str], body: str

@@ -1,6 +1,12 @@
-import pytest
 import warnings
+
+import httpx
+import pytest
+import respx
+
 from sealstack import SealStack
+
+HOST = "http://localhost.sealstack.local"
 
 
 def test_bearer_factory_accepts_string_token():
@@ -47,3 +53,28 @@ def test_exposes_namespaces():
     assert c.admin is not None
     assert c.admin.schemas is not None
     assert c.admin.connectors is not None
+
+
+@respx.mock
+async def test_token_factory_re_evaluates_per_request():
+    """A `token=lambda: ...` rotates per-request, not just at construction."""
+    state = {"n": 0}
+
+    def token_fn() -> str:
+        state["n"] += 1
+        return f"t-{state['n']}"
+
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers.get("authorization", ""))
+        return httpx.Response(200, json={"data": {"status": "ok"}, "error": None})
+
+    respx.get(f"{HOST}/healthz").side_effect = handler
+
+    async with SealStack.bearer(url=HOST, token=token_fn) as c:
+        await c.healthz()
+        await c.healthz()
+        await c.healthz()
+
+    assert seen == ["Bearer t-1", "Bearer t-2", "Bearer t-3"]
