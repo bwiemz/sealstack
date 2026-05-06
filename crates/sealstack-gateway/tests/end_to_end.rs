@@ -421,7 +421,12 @@ async fn admin_only_policy_filters_non_admin_results() {
 
     // 7. Run one sync so the vector store + row store have something to
     //    return.
-    let sync_path = format!("/v1/connectors/{binding_id}/sync");
+    //
+    // Binding IDs are shaped `<kind>/<qualified>` (e.g.
+    // `local-files/examples.AdminDoc`). The slash makes axum see a 5-segment
+    // path against a 4-segment route (`/v1/connectors/{id}/sync`); encode it
+    // so the route matches. Mirrors what the SDKs do at their callsites.
+    let sync_path = format!("/v1/connectors/{}/sync", binding_id.replace('/', "%2F"));
     let (status, _) = call(app.clone(), "POST", &sync_path, None).await;
     assert_eq!(status, StatusCode::OK, "sync connector");
 
