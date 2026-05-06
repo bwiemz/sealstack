@@ -13,9 +13,16 @@ export const REDACTED_HEADERS = new Set([
   "x-cfg-roles",
 ]);
 
+/**
+ * Per-request headers. Static dict for the common case; a factory `() => dict`
+ * for token-rotating clients (`SealStack.bearer({ token: () => fetch_jwt() })`),
+ * which would otherwise bind to a single token at client construction.
+ */
+export type HeadersSource = Record<string, string> | (() => Record<string, string>);
+
 export interface HttpClientOptions {
   baseUrl: string;
-  headers: Record<string, string>;
+  headers: HeadersSource;
   timeoutMs: number;
   retryAttempts: number;
   retryInitialBackoffMs: number;
@@ -41,9 +48,13 @@ interface Envelope<T> {
 export class HttpClient {
   constructor(private opts: HttpClientOptions) {}
 
+  private resolveHeaders(): Record<string, string> {
+    return typeof this.opts.headers === "function" ? this.opts.headers() : this.opts.headers;
+  }
+
   /** Public test hook for the redaction logic; not for production callers. */
   logRequestForTest(req: { method: string; path: string }): void {
-    this.logRequest(req);
+    this.logRequest(req, this.resolveHeaders());
   }
 
   async request<T>(req: RequestOptions): Promise<T> {
@@ -65,7 +76,12 @@ export class HttpClient {
   }
 
   private async attempt<T>(req: RequestOptions, timeoutMs: number): Promise<T> {
-    this.logRequest(req);
+    // Resolve headers exactly once per attempt: a token-rotation factory
+    // backed by a remote JWT fetch must not fire twice (once for the log,
+    // once for the request) and the log must show the same token that
+    // actually went out on the wire.
+    const reqHeaders = this.resolveHeaders();
+    this.logRequest(req, reqHeaders);
     const url = `${this.opts.baseUrl}${req.path}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -75,7 +91,7 @@ export class HttpClient {
     try {
       res = await fetch(url, {
         method: req.method,
-        headers: { "content-type": "application/json", ...this.opts.headers },
+        headers: { "content-type": "application/json", ...reqHeaders },
         body: req.body == null ? undefined : JSON.stringify(req.body),
         signal: controller.signal,
       });
@@ -130,10 +146,12 @@ export class HttpClient {
     });
   }
 
-  private logRequest(req: { method: string; path: string }): void {
+  private logRequest(
+    req: { method: string; path: string },
+    headers: Record<string, string>,
+  ): void {
     if (!this.opts.debug) return;
-    const redacted = redactHeaders(this.opts.headers);
-    this.opts.debug(`→ ${req.method} ${req.path} headers=${JSON.stringify(redacted)}`);
+    this.opts.debug(`→ ${req.method} ${req.path} headers=${JSON.stringify(redactHeaders(headers))}`);
   }
 
   private logErrorResponse(status: number, headers: Record<string, string>, body: string): void {

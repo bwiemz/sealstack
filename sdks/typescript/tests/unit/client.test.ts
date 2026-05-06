@@ -1,5 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
+import { setupServer } from "msw/node";
+import { http, HttpResponse } from "msw";
 import { SealStack } from "../../src/index.js";
+
+const HOST = "http://localhost.sealstack.local";
+const server = setupServer();
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
 
 describe("SealStack factories", () => {
   it("bearer factory accepts a string token", () => {
@@ -48,5 +56,22 @@ describe("SealStack factories", () => {
     expect(c.admin).toBeDefined();
     expect(c.admin.schemas).toBeDefined();
     expect(c.admin.connectors).toBeDefined();
+  });
+
+  it("re-evaluates a token factory on every request", async () => {
+    let n = 0;
+    const tokenFn = (): string => `t-${++n}`;
+    const seen: string[] = [];
+    server.use(http.get(`${HOST}/healthz`, ({ request }) => {
+      seen.push(request.headers.get("authorization") ?? "");
+      return HttpResponse.json({ data: { status: "ok" }, error: null });
+    }));
+
+    const c = SealStack.bearer({ url: HOST, token: tokenFn });
+    await c.healthz();
+    await c.healthz();
+    await c.healthz();
+
+    expect(seen).toEqual(["Bearer t-1", "Bearer t-2", "Bearer t-3"]);
   });
 });

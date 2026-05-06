@@ -1,4 +1,4 @@
-import { HttpClient, type HttpClientOptions } from "./http.js";
+import { HttpClient, type HttpClientOptions, type HeadersSource } from "./http.js";
 import { SchemasNamespace } from "./namespaces/schemas.js";
 import { ConnectorsNamespace } from "./namespaces/connectors.js";
 import { ReceiptsNamespace } from "./namespaces/receipts.js";
@@ -56,8 +56,10 @@ export class SealStack {
 
   static bearer(opts: BearerOptions): SealStack {
     const tokenFn = typeof opts.token === "function" ? opts.token : () => opts.token as string;
-    const headers = (): Record<string, string> => ({ authorization: `Bearer ${tokenFn()}` });
-    return new SealStack(makeHttp(opts, headers()));
+    // Pass the factory itself, not its evaluated result — HttpClient resolves
+    // headers per-request so token-rotation closures actually rotate.
+    const headers: HeadersSource = () => ({ authorization: `Bearer ${tokenFn()}` });
+    return new SealStack(makeHttp(opts, headers));
   }
 
   static unauthenticated(opts: UnauthenticatedOptions): SealStack {
@@ -101,7 +103,7 @@ export class SealStack {
 
 function makeHttp(
   opts: BearerOptions | UnauthenticatedOptions,
-  headers: Record<string, string>,
+  headers: HeadersSource,
 ): HttpClient {
   const debug = opts.debug === true
     ? (m: string) => console.debug("[sealstack]", m)
