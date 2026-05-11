@@ -49,7 +49,7 @@ jobs:
         run: ./scripts/rebuild-policy-runtime.sh
       - name: Upload rebuilt asset (for diagnosing host-dependent byte drift)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: policy_runtime-linux-wasm
           path: crates/sealstack-csl/assets/policy_runtime.wasm
