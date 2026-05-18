@@ -3098,7 +3098,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
- "wasmparser 0.247.0",
+ "wasmparser 0.248.0",
  "wasmtime",
  "wat",
  "winnow 0.6.26",
@@ -4568,26 +4568,15 @@ dependencies = [
 
 [[package]]
 name = "wasmparser"
-version = "0.247.0"
+version = "0.248.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e6fb4c2bee46c5ea4d40f8cdb5c131725cd976718ec56f1c8e82fbde5fa2a80"
+checksum = "aa4439c5eee9df71ee0c6efb37f63b1fcb1fec38f85f5142c54e7ed05d33091a"
 dependencies = [
  "bitflags 2.11.1",
  "hashbrown 0.17.0",
  "indexmap 2.14.0",
  "semver",
  "serde",
-]
-
-[[package]]
-name = "wasmparser"
-version = "0.248.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa4439c5eee9df71ee0c6efb37f63b1fcb1fec38f85f5142c54e7ed05d33091a"
-dependencies = [
- "bitflags 2.11.1",
- "indexmap 2.14.0",
- "semver",
 ]
 
 [[package]]
