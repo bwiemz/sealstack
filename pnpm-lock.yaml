@@ -16,10 +16,10 @@ importers:
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^7.0.1
-        version: 7.0.1(@sveltejs/kit@2.58.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))
+        version: 7.0.1(@sveltejs/kit@2.62.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))
       '@sveltejs/kit':
-        specifier: ^2.58.0
-        version: 2.58.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1))
+        specifier: ^2.59.0
+        version: 2.62.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^4.0.0
         version: 4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1))
@@ -39,8 +39,8 @@ importers:
         specifier: ^5.1.0
         version: 5.55.5
       svelte-check:
-        specifier: ^4.0.5
-        version: 4.4.6(picomatch@4.0.4)(svelte@5.55.5)(typescript@6.0.3)
+        specifier: ^4.4.7
+        version: 4.5.0(picomatch@4.0.4)(svelte@5.55.5)(typescript@6.0.3)
       tailwindcss:
         specifier: ^4.0.0
         version: 4.2.4
@@ -66,14 +66,14 @@ importers:
         specifier: ^15.0.0
         version: 15.0.4
       msw:
-        specifier: ^2.6.0
-        version: 2.14.2(@types/node@22.19.17)(typescript@5.9.3)
+        specifier: ^2.14.5
+        version: 2.14.6(@types/node@22.19.17)(typescript@5.9.3)
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
       vitest:
         specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.17)(lightningcss@1.32.0)(msw@2.14.2(@types/node@22.19.17)(typescript@5.9.3))
+        version: 2.1.9(@types/node@22.19.17)(lightningcss@1.32.0)(msw@2.14.6(@types/node@22.19.17)(typescript@5.9.3))
 
 packages:
 
@@ -598,8 +598,8 @@ packages:
     peerDependencies:
       '@sveltejs/kit': ^2.0.0
 
-  '@sveltejs/kit@2.58.0':
-    resolution: {integrity: sha512-kT9GCN8yJTkCK1W+Gi/bvGooWAM7y7WXP+yd+rf6QOIjyoK1ERPrMwSufXJUNu2pMWIqruhFvmz+LbOqsEmKmA==}
+  '@sveltejs/kit@2.62.0':
+    resolution: {integrity: sha512-4JlkXGRJ3kW15dL4LCHV3Mu5aSTTtmH8EBNE4QjJl+KLY77dClgAsZg8aebpwFcDXemNP1z9az8EatD2UNWAcQ==}
     engines: {node: '>=18.13'}
     hasBin: true
     peerDependencies:
@@ -901,6 +901,9 @@ packages:
 
   devalue@5.7.1:
     resolution: {integrity: sha512-MUbZ586EgQqdRnC4yDrlod3BEdyvE4TapGYHMW2CiaW+KkkFmWEFqBUaLltEZCGi0iFXCEjRF0OjF0DV2QHjOA==}
+
+  devalue@5.8.1:
+    resolution: {integrity: sha512-4CXDYRBGqN+57wVJkuXBYmpAVUSg3L6JAQa/DFqm238G73E1wuyc/JhGQJzN7vUf/CMphYau2zXbfWzDR5aTEw==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -1235,8 +1238,8 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  msw@2.14.2:
-    resolution: {integrity: sha512-D2bTe0tpuf9nw4DA39wFaqUD/hRPKj0DKpo2lAqu+A47Ifg4+h0hbfn6QxVOsiUY2uhgEN6TTpGSHDsc+ysYNg==}
+  msw@2.14.6:
+    resolution: {integrity: sha512-ALe+N10S72cyx94cMcy3Zs4HhXCj35sgeAL4c+WTvKi0zWnbd8/h0lcFqv0mb2P+aSgAdD7p9HzvA0DiUPxsyg==}
     engines: {node: '>=18'}
     hasBin: true
     peerDependencies:
@@ -1336,8 +1339,8 @@ packages:
     resolution: {integrity: sha512-pb/MYmXstAkysRFx8piNI1tGFNQIFA3vkE3Gq4EuA1dF6gHp/+vgZqsCGJapvy8N3Q+4o7FwvquPJcnZ7RYy4g==}
     engines: {node: '>=4'}
 
-  rettime@0.11.10:
-    resolution: {integrity: sha512-zzgUfAF20wZtfDs72M15qiX6EutHxgEZ1PAEJUsWQsOi4aOdcK8BJ3/WSDHBhJ7P27fQjd6iOE1+CWIO8t3XOA==}
+  rettime@0.11.11:
+    resolution: {integrity: sha512-ILJRqVWBCTlg9r42fFgwVZx1gnFAcQF8mRoMkbgQfIrjEDf9nbBFDFx00oloOa+Q869FUtaYDXZvEfnecQSCoQ==}
 
   rolldown@1.0.0-rc.17:
     resolution: {integrity: sha512-ZrT53oAKrtA4+YtBWPQbtPOxIbVDbxT0orcYERKd63VJTF13zPcgXTvD4843L8pcsI7M6MErt8QtON6lrB9tyA==}
@@ -1408,8 +1411,8 @@ packages:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
     engines: {node: '>=8'}
 
-  svelte-check@4.4.6:
-    resolution: {integrity: sha512-kP1zG81EWaFe9ZyTv4ZXv44Csi6Pkdpb7S3oj6m+K2ec/IcDg/a8LsFsnVLqm2nxtkSwsd5xPj/qFkTBgXHXjg==}
+  svelte-check@4.5.0:
+    resolution: {integrity: sha512-9lNwPxCLWniFvQIcEv1LFqjIxcFtO3smb5+5BKbRJ3ttL4o2lXCej5rLF4DAnfLPI66oaA81vAxw6ILdIWI7kA==}
     engines: {node: '>= 18.0.0'}
     hasBin: true
     peerDependencies:
@@ -2013,11 +2016,11 @@ snapshots:
     dependencies:
       acorn: 8.16.0
 
-  '@sveltejs/adapter-auto@7.0.1(@sveltejs/kit@2.58.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))':
+  '@sveltejs/adapter-auto@7.0.1(@sveltejs/kit@2.62.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))':
     dependencies:
-      '@sveltejs/kit': 2.58.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1))
+      '@sveltejs/kit': 2.62.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1))
 
-  '@sveltejs/kit@2.58.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1))':
+  '@sveltejs/kit@2.62.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.5)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1))':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@sveltejs/acorn-typescript': 1.0.9(acorn@8.16.0)
@@ -2025,7 +2028,7 @@ snapshots:
       '@types/cookie': 0.6.0
       acorn: 8.16.0
       cookie: 0.6.0
-      devalue: 5.7.1
+      devalue: 5.8.1
       esm-env: 1.2.2
       kleur: 4.1.5
       magic-string: 0.30.21
@@ -2159,13 +2162,13 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 1.2.0
 
-  '@vitest/mocker@2.1.9(msw@2.14.2(@types/node@22.19.17)(typescript@5.9.3))(vite@5.4.21(@types/node@22.19.17)(lightningcss@1.32.0))':
+  '@vitest/mocker@2.1.9(msw@2.14.6(@types/node@22.19.17)(typescript@5.9.3))(vite@5.4.21(@types/node@22.19.17)(lightningcss@1.32.0))':
     dependencies:
       '@vitest/spy': 2.1.9
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      msw: 2.14.2(@types/node@22.19.17)(typescript@5.9.3)
+      msw: 2.14.6(@types/node@22.19.17)(typescript@5.9.3)
       vite: 5.4.21(@types/node@22.19.17)(lightningcss@1.32.0)
 
   '@vitest/pretty-format@2.1.9':
@@ -2291,6 +2294,8 @@ snapshots:
   detect-libc@2.1.2: {}
 
   devalue@5.7.1: {}
+
+  devalue@5.8.1: {}
 
   emoji-regex@8.0.0: {}
 
@@ -2610,7 +2615,7 @@ snapshots:
 
   ms@2.1.3: {}
 
-  msw@2.14.2(@types/node@22.19.17)(typescript@5.9.3):
+  msw@2.14.6(@types/node@22.19.17)(typescript@5.9.3):
     dependencies:
       '@inquirer/confirm': 6.0.12(@types/node@22.19.17)
       '@mswjs/interceptors': 0.41.8
@@ -2623,7 +2628,7 @@ snapshots:
       outvariant: 1.4.3
       path-to-regexp: 6.3.0
       picocolors: 1.1.1
-      rettime: 0.11.10
+      rettime: 0.11.11
       statuses: 2.0.2
       strict-event-emitter: 0.5.1
       tough-cookie: 6.0.1
@@ -2701,7 +2706,7 @@ snapshots:
 
   resolve-from@4.0.0: {}
 
-  rettime@0.11.10: {}
+  rettime@0.11.11: {}
 
   rolldown@1.0.0-rc.17:
     dependencies:
@@ -2803,7 +2808,7 @@ snapshots:
     dependencies:
       has-flag: 4.0.0
 
-  svelte-check@4.4.6(picomatch@4.0.4)(svelte@5.55.5)(typescript@6.0.3):
+  svelte-check@4.5.0(picomatch@4.0.4)(svelte@5.55.5)(typescript@6.0.3):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       chokidar: 4.0.3
@@ -2935,10 +2940,10 @@ snapshots:
     optionalDependencies:
       vite: 8.0.10(@types/node@22.19.17)(jiti@2.6.1)
 
-  vitest@2.1.9(@types/node@22.19.17)(lightningcss@1.32.0)(msw@2.14.2(@types/node@22.19.17)(typescript@5.9.3)):
+  vitest@2.1.9(@types/node@22.19.17)(lightningcss@1.32.0)(msw@2.14.6(@types/node@22.19.17)(typescript@5.9.3)):
     dependencies:
       '@vitest/expect': 2.1.9
-      '@vitest/mocker': 2.1.9(msw@2.14.2(@types/node@22.19.17)(typescript@5.9.3))(vite@5.4.21(@types/node@22.19.17)(lightningcss@1.32.0))
+      '@vitest/mocker': 2.1.9(msw@2.14.6(@types/node@22.19.17)(typescript@5.9.3))(vite@5.4.21(@types/node@22.19.17)(lightningcss@1.32.0))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.9
       '@vitest/snapshot': 2.1.9
