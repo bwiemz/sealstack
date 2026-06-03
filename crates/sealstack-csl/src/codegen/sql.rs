@@ -1,12 +1,16 @@
 //! Postgres-dialect SQL code generation.
 //!
-//! For each schema, we emit a `CREATE TABLE` with columns mapped from CSL primitives,
-//! indexes for `@indexed`/`@unique`/`@searchable` fields, and foreign-key constraints
-//! for `Ref<T>` fields. `@chunked` fields live in a separate `*_chunk` table with a
-//! composite key `(parent_id, chunk_idx)`.
+//! For each schema, we emit a `CREATE TABLE` with columns mapped from CSL
+//! primitives, plus a fixed set of convention columns
+//! (`body`, `created_at`, `tenant`, `metadata`) that the engine's row writer
+//! at `crates/sealstack-engine/src/ingest.rs` references by name. `@chunked`
+//! fields stay on the parent row as plain `text` for BM25; chunk-and-embed
+//! happens at ingest time and writes to the vector store, not to a sidecar
+//! SQL table. Indexes for `@indexed`/`@unique`/`@searchable` fields and
+//! foreign-key constraints for `Ref<T>` fields are emitted too.
 //!
-//! This module emits forward migrations only. Downgrade migrations are produced by
-//! a sibling function that diffs two schema versions — not shown here.
+//! This module emits forward migrations only. Downgrade migrations are produced
+//! by a sibling function that diffs two schema versions — not shown here.
 
 use crate::ast::{FieldDecl, PrimitiveType, SchemaDecl, TypeExpr};
 use crate::error::CslResult;
@@ -38,13 +42,14 @@ fn emit_schema(schema: &SchemaDecl, out: &mut String) -> CslResult<()> {
     let table = table_name(&schema.name);
     out.push_str(&format!("CREATE TABLE IF NOT EXISTS {table} (\n"));
 
-    // Emit columns.
+    // Emit one column per declared field. `@chunked` fields stay on the parent
+    // table as plain `text`; they're separately chunked + embedded into the
+    // vector store at ingest time. The earlier `*_chunk` sidecar table design
+    // wasn't actually written to by the engine (which keeps full body on the
+    // parent row and offloads chunks to the vector store), so omitting it
+    // here closes a schema/codegen drift that breaks every ingest.
     let mut column_lines: Vec<String> = Vec::new();
     for f in &schema.fields {
-        // Skip fields that live in a separate chunk table.
-        if is_chunked(f) {
-            continue;
-        }
         let sql_type = map_type(&f.ty);
         let nullable = if f.ty.is_optional() { "" } else { " NOT NULL" };
         let mut line = format!(
@@ -65,11 +70,29 @@ fn emit_schema(schema: &SchemaDecl, out: &mut String) -> CslResult<()> {
         column_lines.push(line);
     }
 
-    // Convention: every CSL-generated table carries a `tenant` text column for
-    // multi-tenant isolation at retrieval time. Empty string means "default
-    // tenant" (single-tenant deployments).
+    // Convention columns added to every CSL-generated table. They match the
+    // engine's `INSERT INTO ... (id, title, body, created_at, tenant, metadata)`
+    // shape (see `crates/sealstack-engine/src/ingest.rs`):
+    //   - `body`        — concatenated chunked-field text for BM25 search
+    //                     against `to_tsvector('english', body)`
+    //   - `created_at`  — record-level timestamp populated from the connector's
+    //                     `source_updated_at`
+    //   - `tenant`      — multi-tenant isolation key, empty string means
+    //                     "default tenant"
+    //   - `metadata`    — JSONB sidecar carrying connector-specific extras
+    // Each is only emitted when the schema doesn't already declare a field of
+    // the same name, so user schemas keep authority over their own typing.
+    if !schema.fields.iter().any(|f| f.name == "body") && !schema.fields.iter().any(is_chunked) {
+        column_lines.push("  body text NOT NULL DEFAULT ''".to_string());
+    }
+    if !schema.fields.iter().any(|f| f.name == "created_at") {
+        column_lines.push("  created_at timestamptz NOT NULL DEFAULT now()".to_string());
+    }
     if !schema.fields.iter().any(|f| f.name == "tenant") {
         column_lines.push("  tenant text NOT NULL DEFAULT ''".to_string());
+    }
+    if !schema.fields.iter().any(|f| f.name == "metadata") {
+        column_lines.push("  metadata jsonb NOT NULL DEFAULT '{}'::jsonb".to_string());
     }
 
     // Emit foreign keys for Ref<T> fields.
@@ -108,19 +131,14 @@ fn emit_schema(schema: &SchemaDecl, out: &mut String) -> CslResult<()> {
         }
     }
 
-    // Chunk table for any @chunked field.
-    if schema.fields.iter().any(is_chunked) {
-        let chunk_table = format!("{table}_chunk");
-        out.push_str(&format!(
-            "CREATE TABLE IF NOT EXISTS {chunk_table} (\n\
-             \x20\x20parent_id  bytea NOT NULL REFERENCES {table}(id) ON DELETE CASCADE,\n\
-             \x20\x20chunk_idx  integer NOT NULL,\n\
-             \x20\x20content    text NOT NULL,\n\
-             \x20\x20metadata   jsonb NOT NULL DEFAULT '{{}}'::jsonb,\n\
-             \x20\x20PRIMARY KEY (parent_id, chunk_idx)\n\
-             );\n",
-        ));
-    }
+    // BM25 retrieval reads `to_tsvector('english', body)`. Index it so the
+    // search is sub-millisecond instead of a sequential scan on every query.
+    // `CREATE INDEX IF NOT EXISTS` is a no-op if the schema explicitly
+    // declared `body` with `@searchable` (the per-field branch above already
+    // produced the same name `{table}_body_fts_idx`).
+    out.push_str(&format!(
+        "CREATE INDEX IF NOT EXISTS {table}_body_fts_idx ON {table} USING gin (to_tsvector('english', body));\n",
+    ));
 
     Ok(())
 }
@@ -145,7 +163,7 @@ fn map_type(ty: &TypeExpr) -> String {
     match ty {
         TypeExpr::Optional(inner, _) => map_type(inner),
         TypeExpr::Primitive(p, _) => map_primitive(*p).to_owned(),
-        TypeExpr::Ref(_, _) => "bytea".to_owned(), // FK column type mirrors Ulid representation
+        TypeExpr::Ref(_, _) => "text".to_owned(), // FK column type mirrors Ulid representation
         TypeExpr::Vector(_, _) => "bytea".to_owned(), // vectors live in the vector store, placeholder
         TypeExpr::List(_, _) => "jsonb".to_owned(),
         TypeExpr::Map(_, _, _) => "jsonb".to_owned(),
@@ -156,7 +174,13 @@ fn map_type(ty: &TypeExpr) -> String {
 fn map_primitive(p: PrimitiveType) -> &'static str {
     match p {
         PrimitiveType::String | PrimitiveType::Text => "text",
-        PrimitiveType::Ulid => "bytea",
+        // ULIDs are bound as 26-char Crockford-base32 strings by the engine's
+        // ingest layer (`record_id = Ulid::new().to_string()`), so the column
+        // is `text` rather than `bytea`. Switching to `bytea` would require
+        // changing every sqlx bind site; `text` round-trips cleanly through
+        // sqlx, makes ad-hoc psql inspection readable, and preserves lexical
+        // sort order since ULID Crockford-base32 is monotonic over time.
+        PrimitiveType::Ulid => "text",
         PrimitiveType::Uuid => "uuid",
         PrimitiveType::I32 => "integer",
         PrimitiveType::I64 => "bigint",
@@ -166,5 +190,111 @@ fn map_primitive(p: PrimitiveType) -> &'static str {
         PrimitiveType::Instant => "timestamptz",
         PrimitiveType::Duration => "interval",
         PrimitiveType::Json => "jsonb",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::parse_file;
+    use crate::types::check;
+
+    /// Compile a CSL snippet and emit its SQL. Panics on parse / typecheck error
+    /// (tests want a single-line surface; failures here mean the fixture is bad).
+    fn sql_of(src: &str) -> String {
+        let parsed = parse_file(src).expect("parse");
+        let typed = check(&parsed).expect("typecheck");
+        super::emit_sql(&typed).expect("emit_sql")
+    }
+
+    /// Every CSL-generated table MUST carry these columns; the engine's
+    /// `INSERT INTO ... (id, title, body, created_at, tenant, metadata)` bind
+    /// site at `crates/sealstack-engine/src/ingest.rs` references them by name.
+    /// Drift between the SQL emitter and the engine row writer is the entire
+    /// reason `admin_only_policy_filters_non_admin_results` was broken.
+    #[test]
+    fn parent_table_carries_engine_convention_columns() {
+        let sql = sql_of(
+            r#"namespace examples
+schema Doc {
+    id:    Ulid   @primary
+    title: String @searchable
+    body:  Text   @chunked
+}
+"#,
+        );
+
+        for col in [
+            "id text",    // ULID is bound as a string, not bytea
+            "title text", // declared schema field
+            "body text",  // @chunked field stays on parent for BM25 + INSERT
+            "created_at timestamptz",
+            "tenant text",
+            "metadata jsonb",
+        ] {
+            assert!(
+                sql.contains(col),
+                "expected `{col}` in generated DDL but it was missing:\n{sql}",
+            );
+        }
+        // The body FTS index has to exist for BM25 search to be sub-millisecond.
+        assert!(
+            sql.contains("USING gin (to_tsvector('english', body))"),
+            "expected GIN FTS index on body column:\n{sql}",
+        );
+    }
+
+    /// If the user declares their own `body` field, the emitter must not
+    /// duplicate it as a convention column.
+    #[test]
+    fn convention_columns_yield_to_user_declared_fields() {
+        let sql = sql_of(
+            r#"namespace examples
+schema Doc {
+    id:       Ulid   @primary
+    body:     Text   @chunked
+    tenant:   String
+    metadata: Json
+}
+"#,
+        );
+        // Each name should appear in exactly one column-line context — the user's.
+        let count = |needle: &str| sql.matches(needle).count();
+        assert_eq!(count("tenant text"), 1, "tenant duplicated:\n{sql}");
+        assert!(
+            !sql.contains("tenant text NOT NULL DEFAULT ''"),
+            "user-declared tenant must not get the convention default:\n{sql}",
+        );
+        assert!(
+            !sql.contains("metadata jsonb NOT NULL DEFAULT '{}'::jsonb"),
+            "user-declared metadata must not get the convention default:\n{sql}",
+        );
+    }
+
+    /// Ref<T> foreign keys must point at a `text` `id` column (matching the
+    /// ULID-as-text convention).
+    #[test]
+    fn ref_columns_match_id_column_type() {
+        let sql = sql_of(
+            r#"namespace examples
+schema Doc {
+    id:    Ulid   @primary
+    title: String
+}
+
+schema Comment {
+    id:   Ulid     @primary
+    doc:  Ref<Doc>
+    body: Text     @chunked
+}
+"#,
+        );
+        assert!(
+            sql.contains("doc text"),
+            "Ref column should be text, not bytea:\n{sql}",
+        );
+        assert!(
+            sql.contains("FOREIGN KEY (doc) REFERENCES doc (id)"),
+            "FK clause should still be emitted:\n{sql}",
+        );
     }
 }
