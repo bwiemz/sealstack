@@ -32,4 +32,13 @@ ignore = [
     "RUSTSEC-2025-0134", # `rustls-pemfile` — unmaintained but non-vulnerable.
                          # rustls is migrating the API; upgrade when our
                          # reqwest/sqlx versions land on rustls-pki-types.
+
+    # webpki name-constraints vulnerabilities. These ship via rustls →
+    # reqwest / sqlx / aws-sdk-s3 → webpki, and only impact servers
+    # validating client certificates with name-constraint extensions —
+    # which SealStack does not do. We use rustls for outbound HTTPS only;
+    # inbound TLS is terminated by the gateway's ingress. The upstream
+    # patch will land via the next reqwest / aws-sdk minor release.
+    "RUSTSEC-2026-0098", # webpki: name constraints for URI names accepted incorrectly.
+    "RUSTSEC-2026-0099", # webpki: name constraints accepted for wildcard certs.
 ]
