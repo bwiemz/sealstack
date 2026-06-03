@@ -112,14 +112,27 @@ impl VectorStore for InMemoryStore {
             )));
         }
 
-        let filter_obj = filter.as_ref().and_then(Value::as_object);
+        let filter_typed = match filter.as_ref() {
+            None => None,
+            Some(v) => match crate::filter::Filter::from_json(v) {
+                Ok(crate::filter::Filter::All) => None,
+                Ok(f) => Some(f),
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        "search filter rejected by DSL parser; falling back to no filter",
+                    );
+                    None
+                }
+            },
+        };
 
         let mut scored: Vec<(f32, &Chunk)> = entry
             .chunks
             .iter()
-            .filter(|c| match filter_obj {
+            .filter(|c| match &filter_typed {
                 None => true,
-                Some(obj) => matches_filter(&c.metadata, obj),
+                Some(f) => f.matches(&c.metadata),
             })
             .map(|c| {
                 let s = match entry.distance {
@@ -199,35 +212,7 @@ fn euclidean(a: &[f32], b: &[f32]) -> f32 {
         .sqrt()
 }
 
-// ---------------------------------------------------------------------------
-// Filter matching
-// ---------------------------------------------------------------------------
-
-/// Shallow metadata equality matcher.
-///
-/// Supports: `{ "key": "value" }` → `metadata.key == "value"`, `{ "key": 42 }`,
-/// `{ "key": true }`. For each filter entry, the chunk metadata must contain
-/// the same value at the same key. Arrays and nested objects are rejected.
-fn matches_filter(
-    metadata: &serde_json::Map<String, Value>,
-    filter: &serde_json::Map<String, Value>,
-) -> bool {
-    for (k, v) in filter {
-        let Some(actual) = metadata.get(k) else {
-            return false;
-        };
-        match v {
-            Value::String(_) | Value::Number(_) | Value::Bool(_) | Value::Null => {
-                if actual != v {
-                    return false;
-                }
-            }
-            // Unsupported: arrays, objects. Treat as no-match to be safe.
-            _ => return false,
-        }
-    }
-    true
-}
+// Filter matching is now centralized in `crate::filter::Filter::matches`.
 
 #[cfg(test)]
 mod tests {

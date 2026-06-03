@@ -338,42 +338,138 @@ fn qvalue_to_serde_json(v: QValue) -> Value {
 // JSON filter → qdrant Filter
 // ---------------------------------------------------------------------------
 
-/// Translate the narrow JSON filter DSL into a Qdrant `Filter`.
+/// Translate a wire-format filter to a Qdrant native `Filter`.
 ///
-/// Returns `None` if the filter is empty or unsupported, in which case the
-/// caller passes no filter and may post-filter as a fallback.
+/// Returns `None` if the filter is empty / unsupported by Qdrant's native
+/// expression language — in that case the caller post-filters in memory.
+/// `$or` and `$not` always trigger the post-filter path (logged at warn
+/// level so deployments see the cost in their logs).
 fn value_to_filter(v: Value) -> Option<Filter> {
-    let obj = v.as_object()?.clone();
-    if obj.is_empty() {
+    let parsed = match crate::filter::Filter::from_json(&v) {
+        Ok(f) => f,
+        Err(e) => {
+            tracing::warn!(error = %e, "qdrant filter parse failed; falling back to no filter");
+            return None;
+        }
+    };
+    if matches!(parsed, crate::filter::Filter::All) {
         return None;
     }
-    let mut must: Vec<Condition> = Vec::new();
-    for (field, val) in obj {
-        match val {
-            Value::String(s) => must.push(Condition::matches(field, s)),
-            Value::Bool(b) => must.push(Condition::matches(field, b)),
-            Value::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    must.push(Condition::matches(field, i));
-                }
-            }
-            Value::Array(items) => {
-                // "any of" — collect strings; ignore mixed-type arrays in v0.1.
-                let strings: Vec<String> = items
-                    .into_iter()
-                    .filter_map(|x| x.as_str().map(str::to_owned))
-                    .collect();
-                if !strings.is_empty() {
-                    must.push(Condition::matches(field, strings));
-                }
-            }
-            _ => { /* skip objects/null for v0.1 */ }
-        }
+    if !parsed.is_qdrant_native() {
+        tracing::warn!(
+            "qdrant filter uses $or / $not; falling back to in-memory post-filter \
+             (slower than native filters at large collection sizes)",
+        );
+        return None;
     }
+    let must = filter_to_conditions(&parsed)?;
     if must.is_empty() {
         None
     } else {
         Some(Filter::must(must))
+    }
+}
+
+/// Flatten our typed [`crate::filter::Filter`] into Qdrant `must` conditions.
+/// Returns `None` for unsupported shapes (which the caller treats as
+/// "no native filter, post-filter instead").
+fn filter_to_conditions(filter: &crate::filter::Filter) -> Option<Vec<Condition>> {
+    let mut out: Vec<Condition> = Vec::new();
+    push_conditions(filter, &mut out)?;
+    Some(out)
+}
+
+fn push_conditions(filter: &crate::filter::Filter, out: &mut Vec<Condition>) -> Option<()> {
+    use crate::filter::Filter as F;
+    match filter {
+        F::All => Some(()),
+        F::Eq { field, value } => {
+            push_match_condition(field, value, out)?;
+            Some(())
+        }
+        F::Ne { field, value } => {
+            // Qdrant exposes `must_not` at the Filter level. We're emitting
+            // flat `must` conditions, so wrap ne as a sub-filter must_not.
+            let inner = match_condition(field, value)?;
+            out.push(Condition::from(qdrant_client::qdrant::Filter::must_not(
+                vec![inner],
+            )));
+            Some(())
+        }
+        F::In { field, values } => {
+            // Try a single matches-any condition first (Qdrant's "any-of").
+            let strings: Vec<String> = values
+                .iter()
+                .filter_map(|x| x.as_str().map(str::to_owned))
+                .collect();
+            if strings.len() == values.len() && !strings.is_empty() {
+                out.push(Condition::matches(field, strings));
+                return Some(());
+            }
+            // Fallback: numeric IDs.
+            let ints: Vec<i64> = values.iter().filter_map(Value::as_i64).collect();
+            if ints.len() == values.len() && !ints.is_empty() {
+                // Qdrant doesn't have matches-any-int directly; emit as `should`
+                // (logical OR) sub-filter.
+                let conds: Vec<Condition> = ints
+                    .into_iter()
+                    .map(|i| Condition::matches(field, i))
+                    .collect();
+                out.push(Condition::from(qdrant_client::qdrant::Filter::should(
+                    conds,
+                )));
+                return Some(());
+            }
+            None
+        }
+        F::NotIn { field, values } => {
+            // Wrap each forbidden value as `must_not` collectively.
+            let mut conds: Vec<Condition> = Vec::new();
+            for v in values {
+                conds.push(match_condition(field, v)?);
+            }
+            out.push(Condition::from(qdrant_client::qdrant::Filter::must_not(
+                conds,
+            )));
+            Some(())
+        }
+        F::Range {
+            field,
+            gte,
+            gt,
+            lte,
+            lt,
+        } => {
+            let range = qdrant_client::qdrant::Range {
+                gte: *gte,
+                gt: *gt,
+                lte: *lte,
+                lt: *lt,
+            };
+            out.push(Condition::range(field, range));
+            Some(())
+        }
+        F::And(parts) => {
+            for p in parts {
+                push_conditions(p, out)?;
+            }
+            Some(())
+        }
+        F::Or(_) | F::Not(_) => None,
+    }
+}
+
+fn push_match_condition(field: &str, value: &Value, out: &mut Vec<Condition>) -> Option<()> {
+    out.push(match_condition(field, value)?);
+    Some(())
+}
+
+fn match_condition(field: &str, value: &Value) -> Option<Condition> {
+    match value {
+        Value::String(s) => Some(Condition::matches(field, s.clone())),
+        Value::Bool(b) => Some(Condition::matches(field, *b)),
+        Value::Number(n) => n.as_i64().map(|i| Condition::matches(field, i)),
+        _ => None,
     }
 }
 
