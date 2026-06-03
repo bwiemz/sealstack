@@ -1,16 +1,196 @@
+# SealStack Helm chart default values.
+#
+# See README.md and templates/ for full schema. Most installs only override
+# image.tag, ingress.hosts[0].host, and the externalDatabase / externalQdrant
+# URLs (or set their `enabled: true` flag to deploy them in-cluster as
+# sub-charts in a future release).
+
+# --- Image ------------------------------------------------------------------
+
 image:
-  repository: ghcr.io/sealstack/sealstack-gateway
-  tag: "0.1.0"
+  repository: ghcr.io/bwiemz/sealstack/gateway
+  tag: "0.4.0"
   pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# --- Workload ---------------------------------------------------------------
+
+replicaCount: 1
+
+# Pod-level scheduling tweaks. The chart ships sane defaults — fill these
+# in for a real production install.
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
+
+# Pod / container-level security contexts. Defaults run as a non-root
+# uid (10001 matches the distroless/cc-debian12 nobody) and drop all
+# capabilities. Adjust if your cluster's PSA policies demand otherwise.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  capabilities:
+    drop:
+      - ALL
+
+# Standard requests/limits. Floors picked to give headroom for the
+# embedder + vector store; bump for production.
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+# Probes hit the gateway's /readyz and /livez endpoints, which return
+# 200 once the engine has hydrated all registered schemas from
+# Postgres. Initial delay is generous because cold-start on a large
+# schema set can take 10s+.
+livenessProbe:
+  httpGet:
+    path: /livez
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+startupProbe:
+  httpGet:
+    path: /livez
+    port: http
+  periodSeconds: 5
+  failureThreshold: 36 # 36 * 5s = 3 minutes max startup
+
+# --- Service & Ingress ------------------------------------------------------
 
 service:
   type: ClusterIP
   port: 7070
+  annotations: {}
 
-postgres:
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: sealstack.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# --- Autoscaling ------------------------------------------------------------
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# --- Service account --------------------------------------------------------
+
+serviceAccount:
+  create: true
+  annotations: {}
+  # Leave empty to derive from the release name; set to override.
+  name: ""
+
+# --- Configuration ----------------------------------------------------------
+
+# Gateway runtime settings. Read from a ConfigMap that's mounted as env.
+# Add free-form keys here — they're projected straight into env vars.
+config:
+  # Address the gateway binds to. The container exposes 7070; leaving
+  # 0.0.0.0 is correct for in-cluster.
+  bind: "0.0.0.0:7070"
+  logFilter: "info,sealstack=debug"
+  # `wasm` or `cedar`. Set the matching policy bundle dir below.
+  policyBackend: "wasm"
+  # In-cluster path mounted from a separate ConfigMap; empty = allow-all.
+  policyDir: ""
+  policyDefault: "allow"
+  # Embedder / reranker selection. See server.rs for the env-var contract.
+  embedder: "stub"
+  embedderModel: ""
+  reranker: "identity"
+  rerankerUrl: ""
+  rerankerModel: ""
+
+# Sensitive credentials. By default the chart references an externally-
+# managed Secret named `<release>-credentials` with these keys; set
+# secret.create=true to have Helm manage it (NOT recommended for prod).
+secret:
+  create: false
+  name: ""
+  # Used only when create=true.
+  values:
+    OPENAI_API_KEY: ""
+    VOYAGE_API_KEY: ""
+    QDRANT_API_KEY: ""
+    SEALSTACK_RERANKER_API_KEY: ""
+
+# --- External services ------------------------------------------------------
+
+# Postgres connection. Provide a fully-qualified DSN via either:
+#   externalDatabase.urlSecretRef: { name, key } — preferred
+#   externalDatabase.url           — inline (dev only)
+externalDatabase:
   url: ""
+  urlSecretRef:
+    name: ""
+    key: ""
 
-qdrant:
+externalQdrant:
   url: ""
+  urlSecretRef:
+    name: ""
+    key: ""
 
-resources: {}
+# --- Observability ----------------------------------------------------------
+
+# ServiceMonitor is rendered when the kube-prometheus stack is installed.
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+# --- Network policy ---------------------------------------------------------
+
+networkPolicy:
+  enabled: false
+  # Allow ingress from these namespaces (matched by label).
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: sealstack-clients

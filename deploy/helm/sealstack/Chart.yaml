@@ -2,5 +2,19 @@ apiVersion: v2
 name: sealstack
 description: SealStack — the open context OS for AI-native companies.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.4.0
+appVersion: "0.4.0"
+home: https://github.com/bwiemz/sealstack
+sources:
+  - https://github.com/bwiemz/sealstack
+maintainers:
+  - name: SealStack Contributors
+    url: https://github.com/bwiemz/sealstack
+keywords:
+  - sealstack
+  - rag
+  - retrieval
+  - mcp
+  - model-context-protocol
+  - embeddings
+  - vector-search

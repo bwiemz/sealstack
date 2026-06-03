@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sealstack.fullname" . }}
+  labels: {{- include "sealstack.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels: {{- include "sealstack.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "sealstack.selectorLabels" . | nindent 8 }}
+      annotations:
+        # ConfigMap/secret rotation triggers a rolling restart via checksum
+        # annotations. Helm renders the rendered content into the sum so any
+        # values change refreshes the pods.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.secret.create }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "sealstack.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 7070
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "sealstack.fullname" . }}-config
+            - secretRef:
+                name: {{ include "sealstack.secretName" . }}
+                optional: {{ not .Values.secret.create }}
+          env:
+            {{- if .Values.externalDatabase.urlSecretRef.name }}
+            - name: SEALSTACK_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalDatabase.urlSecretRef.name | quote }}
+                  key:  {{ .Values.externalDatabase.urlSecretRef.key  | quote }}
+            {{- else if .Values.externalDatabase.url }}
+            - name: SEALSTACK_DATABASE_URL
+              value: {{ .Values.externalDatabase.url | quote }}
+            {{- end }}
+            {{- if .Values.externalQdrant.urlSecretRef.name }}
+            - name: SEALSTACK_QDRANT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalQdrant.urlSecretRef.name | quote }}
+                  key:  {{ .Values.externalQdrant.urlSecretRef.key  | quote }}
+            {{- else if .Values.externalQdrant.url }}
+            - name: SEALSTACK_QDRANT_URL
+              value: {{ .Values.externalQdrant.url | quote }}
+            {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            # Read-only root FS requires /tmp to be a volume.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
