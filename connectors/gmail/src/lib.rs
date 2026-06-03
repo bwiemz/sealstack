@@ -334,34 +334,34 @@ fn extract_text_body(payload: &Option<MessagePart>) -> String {
 fn walk_parts(part: &MessagePart, out: &mut String) {
     let mime = part.mime_type.as_deref().unwrap_or("");
     if mime.starts_with("text/plain") {
-        if let Some(d) = part.body.as_ref().and_then(|b| b.data.as_deref()) {
-            if let Some(decoded) = decode_b64url(d) {
-                out.push_str(&decoded);
-                out.push('\n');
-            }
+        if let Some(d) = part.body.as_ref().and_then(|b| b.data.as_deref())
+            && let Some(decoded) = decode_b64url(d)
+        {
+            out.push_str(&decoded);
+            out.push('\n');
         }
     } else if mime.starts_with("text/html") && out.is_empty() {
         // Only fall back to HTML if no plain has been found yet.
-        if let Some(d) = part.body.as_ref().and_then(|b| b.data.as_deref()) {
-            if let Some(decoded) = decode_b64url(d) {
-                // Strip the very thin set of HTML tags we can without a parser.
-                let stripped: String = decoded
-                    .replace("<br>", "\n")
-                    .replace("<br/>", "\n")
-                    .replace("<br />", "\n")
-                    .replace("</p>", "\n");
-                // Drop residual tags.
-                let mut in_tag = false;
-                for c in stripped.chars() {
-                    match (in_tag, c) {
-                        (false, '<') => in_tag = true,
-                        (true, '>') => in_tag = false,
-                        (false, _) => out.push(c),
-                        (true, _) => {}
-                    }
+        if let Some(d) = part.body.as_ref().and_then(|b| b.data.as_deref())
+            && let Some(decoded) = decode_b64url(d)
+        {
+            // Strip the very thin set of HTML tags we can without a parser.
+            let stripped: String = decoded
+                .replace("<br>", "\n")
+                .replace("<br/>", "\n")
+                .replace("<br />", "\n")
+                .replace("</p>", "\n");
+            // Drop residual tags.
+            let mut in_tag = false;
+            for c in stripped.chars() {
+                match (in_tag, c) {
+                    (false, '<') => in_tag = true,
+                    (true, '>') => in_tag = false,
+                    (false, _) => out.push(c),
+                    (true, _) => {}
                 }
-                out.push('\n');
             }
+            out.push('\n');
         }
     }
     for child in &part.parts {
@@ -383,10 +383,10 @@ fn decode_b64url(s: &str) -> Option<String> {
 /// is `Display Name <email@host>`, but real-world senders also drop the
 /// angle brackets. We take whatever looks like an address.
 fn extract_email(value: &str) -> Option<String> {
-    if let (Some(lt), Some(gt)) = (value.find('<'), value.rfind('>')) {
-        if lt < gt {
-            return Some(value[lt + 1..gt].to_string());
-        }
+    if let (Some(lt), Some(gt)) = (value.find('<'), value.rfind('>'))
+        && lt < gt
+    {
+        return Some(value[lt + 1..gt].to_string());
     }
     if value.contains('@') {
         return Some(value.trim().to_string());
