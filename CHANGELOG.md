@@ -8,6 +8,78 @@ Maintained automatically by `release-please`.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-03
+
+### Added
+
+- **Cedar ABAC policy adapter** (`crates/sealstack-policy-cedar`) — new
+  `PolicyEngine` impl backed by [Cedar](https://www.cedarpolicy.com/) 4.x.
+  Selected via `SEALSTACK_POLICY_BACKEND=cedar` (default `wasm`). Bundle
+  filename convention is `<namespace>.<schema>.cedar`. The entity model
+  is `Sealstack::User::"<caller.id>"` parented to one
+  `Sealstack::Group::"<g>"` per group + one `Sealstack::Role::"<r>"`
+  per role; resources are `Sealstack::Resource::"<record.id>"` with
+  every record field surfaced as a Cedar attribute. Missing-bundle
+  behavior matches WASM (default Allow, flip to Deny via
+  `SEALSTACK_POLICY_DEFAULT=deny`).
+- **Five new connectors** bringing the total to 12 (was 7 in v0.3):
+  - **linear**: GraphQL `issues` connection with Relay cursor pagination,
+    `linear:team:<key>` predicate.
+  - **jira**: Jira Cloud REST `/rest/api/3/search` with JQL filter, ADF
+    body flattening, `jira:project:<key>` predicate.
+  - **confluence**: Confluence Cloud `/wiki/rest/api/content?type=page`
+    with storage-format HTML → text via html2text,
+    `confluence:space:<key>` predicate.
+  - **s3**: AWS SDK `ListObjectsV2` + `GetObject`, endpoint-URL override
+    for S3-compatible stores (MinIO / R2 / Ceph), glob include filter,
+    `s3:bucket:<bucket>` predicate.
+  - **gmail**: REST `/gmail/v1/users/me/messages` with Gmail-query
+    filter, MIME-tree text/plain extraction (HTML fallback),
+    `gmail:user:<email>` predicate from `From:` header.
+- **Chat-style console route** (`/chat`) — alternative to the playground
+  with composer at the bottom, transcript in the middle, and a clickable
+  receipt link on every assistant turn. Retrieval-only (no LLM in the
+  loop); each turn fires one `/v1/query` against the selected schema.
+- **Vector-store filter DSL** (`crates/sealstack-vectorstore/src/filter.rs`)
+  — MongoDB-style operator vocabulary: `$eq` (or bare scalar), `$ne`,
+  `$in`, `$nin`, `$gt`, `$gte`, `$lt`, `$lte`, `$and`, `$or`, `$not`.
+  Flat-equals shape stays backwards-compatible. In-memory + Qdrant
+  backends both consume the typed `Filter` enum. `$or` / `$not`
+  compositions fall back to in-memory post-filter on Qdrant (logged at
+  warn so deployments see the cost).
+- **Tiktoken-rs token counting** for the chunker (feature
+  `tiktoken-chunker`, opt-in; gateway opts in). Real cl100k_base BPE
+  counts replace the 4-chars-per-token heuristic for `Semantic` and
+  `Recursive` chunking strategies. Char-approx counter still ships as
+  the dependency-free fallback.
+- **Production-ready Helm chart** — Deployment with full probes
+  (`/livez`, `/readyz`, startup probe), non-root security context,
+  read-only rootfs, resource floors, ConfigMap-driven env, externalized
+  Secret pattern, optional HPA / PDB / ServiceMonitor / NetworkPolicy /
+  Ingress.
+
+### Changed
+
+- Release pipeline cleanups (from the v0.3 post-mortem):
+  - `cli-binaries` matrix no longer races on tag creation — release is
+    pre-created in a `create-release` job, the matrix uploads only.
+  - `release-attestations`: dropped the obsolete `--output-pattern`
+    flag; per-crate bom.json files collected into `artifacts/`.
+  - `publish-ts-sdk`: dropped `--no-git-checks` from the dry-run
+    (pnpm-only flag, rejected by `npm publish`).
+  - `gateway-image`: Dockerfile scopes the bin build to
+    `-p sealstack-gateway` since workspace `default-members` points at
+    the CLI crate. Base image bumped 1.85 → 1.88.
+- `Range`/`Filter` conversions in the Qdrant backend route through the
+  new typed `crate::filter::Filter` rather than ad-hoc JSON walks.
+
+### Fixed
+
+- `webpki` RUSTSEC-2026-0098 / RUSTSEC-2026-0099 (name-constraint
+  advisories) added to `deny.toml` ignore list. Both impact only servers
+  validating client certificates with name-constraint extensions;
+  SealStack uses rustls for outbound HTTPS only.
+
 ## [0.3.0] - 2026-06-03
 
 ### Added
