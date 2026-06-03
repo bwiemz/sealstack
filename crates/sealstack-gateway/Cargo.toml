@@ -48,6 +48,7 @@ sealstack-connector-github        = { path = "../../connectors/github" }
 sealstack-connector-slack         = { path = "../../connectors/slack" }
 sealstack-connector-postgres      = { path = "../../connectors/postgres" }
 sealstack-connector-web           = { path = "../../connectors/web" }
+sealstack-connector-notion        = { path = "../../connectors/notion" }
 
 [dev-dependencies]
 tokio           = { workspace = true, features = ["macros", "rt-multi-thread"] }
