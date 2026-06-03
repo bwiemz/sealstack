@@ -59,6 +59,16 @@ pub struct SyncOutcome {
     /// Last fatal error, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// First per-resource ingestion failure encountered during this sync.
+    ///
+    /// Per-resource errors are still aggregated into [`Self::resources_failed`],
+    /// but the first message is hoisted here so callers can see *why* a sync
+    /// reports `kind = Completed` with `resources_failed > 0` instead of just
+    /// guessing. Without this, an entire schema can silently fail to ingest
+    /// (e.g. a DDL/INSERT column mismatch) while `/sync` returns 200 OK —
+    /// exactly the failure mode the admin-only e2e test was hiding for weeks.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_resource_error: Option<String>,
 }
 
 /// High-level result of a sync attempt.
@@ -125,6 +135,7 @@ impl IngestRuntime {
             finished_at: started_at,
             elapsed_ms: 0,
             error: None,
+            first_resource_error: None,
         };
 
         let Some(binding) = self.registry.get(binding_id) else {
@@ -192,9 +203,13 @@ impl IngestRuntime {
                 }
                 Err(e) => {
                     outcome.resources_failed += 1;
+                    let msg = e.to_string();
+                    if outcome.first_resource_error.is_none() {
+                        outcome.first_resource_error = Some(msg.clone());
+                    }
                     tracing::warn!(
                         binding = %binding.id(),
-                        error = %e,
+                        error = %msg,
                         "failed to ingest resource; continuing",
                     );
                 }
