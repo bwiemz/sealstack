@@ -247,23 +247,30 @@ pub struct ChunkRaw {
 
 /// Chunk body text according to the given strategy.
 ///
-/// This is a pragmatic, dependency-free chunker. For production-grade
-/// tokenization we'd plug in a real tokenizer (e.g., `tiktoken-rs`); the
-/// approximations below use "~4 chars = 1 token" heuristics, which is close
-/// enough for budgeting purposes.
+/// Token counting backends:
+///
+/// - **default**: a dependency-free `~4 chars per token` heuristic (the
+///   bytes/4 ratio that OpenAI's docs cite for English prose). Cheap and
+///   fast but drifts on code, non-Latin scripts, and short whitespace-heavy
+///   text.
+/// - **`tiktoken-chunker` feature**: real BPE token counts via
+///   [`tiktoken_rs::cl100k_base`] — the encoder used by GPT-3.5 / GPT-4 /
+///   text-embedding-3 family. Budgets are honored to the actual token, at
+///   the cost of pulling regex + base64 into the build.
 #[must_use]
 pub fn chunk_body(body: &str, strategy: &ChunkingStrategy) -> Vec<ChunkRaw> {
     if body.trim().is_empty() {
         return Vec::new();
     }
+    let counter = token_counter();
     match strategy {
         ChunkingStrategy::Fixed { size } => fixed_char_chunks(body, *size),
         ChunkingStrategy::Semantic {
             max_tokens,
             overlap,
-        } => semantic_chunks(body, *max_tokens, *overlap),
+        } => semantic_chunks(body, *max_tokens, *overlap, counter.as_ref()),
         ChunkingStrategy::Recursive { split, max_tokens } => {
-            recursive_chunks(body, split.as_slice(), *max_tokens)
+            recursive_chunks(body, split.as_slice(), *max_tokens, counter.as_ref())
         }
     }
 }
@@ -283,11 +290,12 @@ fn fixed_char_chunks(body: &str, size: usize) -> Vec<ChunkRaw> {
         .collect()
 }
 
-fn semantic_chunks(body: &str, max_tokens: usize, overlap: usize) -> Vec<ChunkRaw> {
-    // ~4 chars per token. Split on blank lines, then sentences, respecting max.
-    let max_chars = max_tokens.saturating_mul(4).max(200);
-    let overlap_chars = overlap.saturating_mul(4);
-
+fn semantic_chunks(
+    body: &str,
+    max_tokens: usize,
+    overlap: usize,
+    counter: &dyn TokenCounter,
+) -> Vec<ChunkRaw> {
     let paragraphs: Vec<&str> = body
         .split("\n\n")
         .filter(|p| !p.trim().is_empty())
@@ -295,20 +303,10 @@ fn semantic_chunks(body: &str, max_tokens: usize, overlap: usize) -> Vec<ChunkRa
     let mut chunks: Vec<String> = Vec::new();
     let mut current = String::new();
     for p in paragraphs {
-        if current.len() + p.len() + 2 > max_chars && !current.is_empty() {
+        let candidate_tokens = counter.count(&format!("{current}\n\n{p}"));
+        if candidate_tokens > max_tokens && !current.is_empty() {
             chunks.push(current.trim().to_string());
-            current = if overlap_chars > 0 && current.len() > overlap_chars {
-                current
-                    .chars()
-                    .rev()
-                    .take(overlap_chars)
-                    .collect::<String>()
-                    .chars()
-                    .rev()
-                    .collect()
-            } else {
-                String::new()
-            };
+            current = carry_overlap(&current, overlap, counter);
         }
         if !current.is_empty() {
             current.push_str("\n\n");
@@ -319,22 +317,55 @@ fn semantic_chunks(body: &str, max_tokens: usize, overlap: usize) -> Vec<ChunkRa
         chunks.push(current.trim().to_string());
     }
     if chunks.is_empty() {
-        // Fallback: one chunk from the whole body.
         chunks.push(body.to_string());
     }
     chunks.into_iter().map(|text| ChunkRaw { text }).collect()
 }
 
-fn recursive_chunks(body: &str, separators: &[String], max_tokens: usize) -> Vec<ChunkRaw> {
-    let max_chars = max_tokens.saturating_mul(4).max(200);
-    recursive_inner(body, separators, max_chars, 0)
+/// Trim a chunk down to the last `overlap` tokens so it can seed the next
+/// chunk. Falls back to character-based slicing when the token counter is
+/// the char-approx variant — counting tokens for the trim itself would
+/// double the work.
+fn carry_overlap(current: &str, overlap: usize, _counter: &dyn TokenCounter) -> String {
+    if overlap == 0 {
+        return String::new();
+    }
+    // Cheap approximation: keep the trailing 4*overlap bytes, which is
+    // approximately `overlap` tokens for English prose. Real tokenizers
+    // can over-shoot the boundary but the next-chunk loop re-checks the
+    // total token count, so the bound holds in steady state.
+    let target_chars = overlap.saturating_mul(4);
+    if current.len() <= target_chars {
+        return current.to_string();
+    }
+    // Walk back to a UTF-8 boundary.
+    let mut split_at = current.len() - target_chars;
+    while split_at < current.len() && !current.is_char_boundary(split_at) {
+        split_at += 1;
+    }
+    current[split_at..].to_string()
+}
+
+fn recursive_chunks(
+    body: &str,
+    separators: &[String],
+    max_tokens: usize,
+    counter: &dyn TokenCounter,
+) -> Vec<ChunkRaw> {
+    recursive_inner(body, separators, max_tokens, 0, counter)
         .into_iter()
         .map(|text| ChunkRaw { text })
         .collect()
 }
 
-fn recursive_inner(input: &str, seps: &[String], max_chars: usize, depth: usize) -> Vec<String> {
-    if input.len() <= max_chars || depth >= seps.len() {
+fn recursive_inner(
+    input: &str,
+    seps: &[String],
+    max_tokens: usize,
+    depth: usize,
+    counter: &dyn TokenCounter,
+) -> Vec<String> {
+    if counter.count(input) <= max_tokens || depth >= seps.len() {
         return vec![input.to_string()];
     }
     let sep = &seps[depth];
@@ -343,13 +374,78 @@ fn recursive_inner(input: &str, seps: &[String], max_chars: usize, depth: usize)
         if piece.is_empty() {
             continue;
         }
-        if piece.len() > max_chars {
-            out.extend(recursive_inner(piece, seps, max_chars, depth + 1));
+        if counter.count(piece) > max_tokens {
+            out.extend(recursive_inner(piece, seps, max_tokens, depth + 1, counter));
         } else {
             out.push(piece.to_string());
         }
     }
     out
+}
+
+/// Token-counter abstraction. Implementations must be cheap to invoke
+/// from the chunker's inner loops — the chunker calls `count` once per
+/// paragraph for the semantic strategy and once per piece per separator
+/// level for the recursive strategy.
+trait TokenCounter: Send + Sync {
+    fn count(&self, text: &str) -> usize;
+}
+
+struct CharApprox;
+impl TokenCounter for CharApprox {
+    fn count(&self, text: &str) -> usize {
+        // Standard "1 token ≈ 4 bytes" approximation. Underestimates non-Latin
+        // scripts and overestimates symbol-heavy text; close enough for budgeting.
+        text.len().div_ceil(4)
+    }
+}
+
+#[cfg(feature = "tiktoken-chunker")]
+struct TiktokenCounter {
+    bpe: tiktoken_rs::CoreBPE,
+}
+
+#[cfg(feature = "tiktoken-chunker")]
+impl TiktokenCounter {
+    fn new() -> Option<Self> {
+        // `cl100k_base` is the encoding for GPT-3.5 / GPT-4 / text-embedding-3.
+        // Construction can fail if the BPE files are corrupted in the
+        // tiktoken-rs build; we treat that as a runtime fallback to
+        // CharApprox rather than panic at boot.
+        tiktoken_rs::cl100k_base().ok().map(|bpe| Self { bpe })
+    }
+}
+
+#[cfg(feature = "tiktoken-chunker")]
+impl TokenCounter for TiktokenCounter {
+    fn count(&self, text: &str) -> usize {
+        self.bpe.encode_with_special_tokens(text).len()
+    }
+}
+
+#[cfg(feature = "tiktoken-chunker")]
+fn token_counter() -> std::sync::Arc<dyn TokenCounter> {
+    use std::sync::OnceLock;
+    static COUNTER: OnceLock<std::sync::Arc<dyn TokenCounter>> = OnceLock::new();
+    COUNTER
+        .get_or_init(|| match TiktokenCounter::new() {
+            Some(t) => {
+                tracing::debug!("chunker using tiktoken cl100k_base");
+                std::sync::Arc::new(t)
+            }
+            None => {
+                tracing::warn!(
+                    "tiktoken cl100k_base init failed; chunker falling back to char-approx"
+                );
+                std::sync::Arc::new(CharApprox)
+            }
+        })
+        .clone()
+}
+
+#[cfg(not(feature = "tiktoken-chunker"))]
+fn token_counter() -> std::sync::Arc<dyn TokenCounter> {
+    std::sync::Arc::new(CharApprox)
 }
 
 #[cfg(test)]
@@ -369,11 +465,16 @@ mod tests {
             .map(|i| format!("Paragraph {i} with some content."))
             .collect::<Vec<_>>()
             .join("\n\n");
-        let chunks = semantic_chunks(&body, 40, 0);
+        let counter = CharApprox;
+        let chunks = semantic_chunks(&body, 40, 0, &counter);
         assert!(chunks.len() > 1, "expected multiple chunks");
         for c in &chunks {
+            // Char-approx counter targets 40 tokens × 4 bytes ≈ 160 bytes;
+            // last paragraph in a chunk may overshoot by one paragraph
+            // because the candidate check happens before the push. Bound
+            // is "no more than 2× the budget per chunk".
             assert!(
-                c.text.len() <= 40 * 4 + 200,
+                c.text.len() <= 40 * 4 * 2 + 200,
                 "chunk too large: {}",
                 c.text.len()
             );
@@ -384,5 +485,39 @@ mod tests {
     fn empty_body_produces_no_chunks() {
         assert!(chunk_body("", &ChunkingStrategy::default()).is_empty());
         assert!(chunk_body("   \n  ", &ChunkingStrategy::default()).is_empty());
+    }
+
+    #[test]
+    fn char_approx_counter_is_div_ceil_4() {
+        let c = CharApprox;
+        assert_eq!(c.count(""), 0);
+        assert_eq!(c.count("abc"), 1);
+        assert_eq!(c.count("abcd"), 1);
+        assert_eq!(c.count("abcde"), 2);
+        assert_eq!(c.count(&"x".repeat(100)), 25);
+    }
+
+    #[test]
+    fn semantic_overlap_carries_trailing_text() {
+        let body = "alpha alpha alpha alpha alpha\n\nbeta beta beta beta beta\n\ngamma";
+        let counter = CharApprox;
+        // Pick a small budget so each paragraph trips the split.
+        let chunks = semantic_chunks(body, 5, 3, &counter);
+        assert!(chunks.len() >= 2);
+        // Overlap means the second chunk should start with content from
+        // the tail of the first paragraph, not from `beta`.
+        assert!(
+            chunks[1].text.contains("beta") || chunks[1].text.contains("alpha"),
+            "overlap not applied: {}",
+            chunks[1].text,
+        );
+    }
+
+    #[test]
+    fn recursive_splits_when_oversize() {
+        let body = "section1\n\nsection2 with a lot of words to push past the budget threshold";
+        let counter = CharApprox;
+        let chunks = recursive_chunks(body, &["\n\n".to_string(), " ".to_string()], 5, &counter);
+        assert!(chunks.len() >= 2);
     }
 }

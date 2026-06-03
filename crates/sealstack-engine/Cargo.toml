@@ -46,6 +46,12 @@ reqwest     = { workspace = true, optional = true }
 # Policy VM
 wasmtime    = { workspace = true, optional = true }
 
+# Real tokenization for the chunker. Off by default — the heuristic
+# 4-chars-per-token chunker is dependency-free; tiktoken-rs pulls in
+# regex + base64 + bstr. Gateway opts in via the `tiktoken-chunker`
+# feature.
+tiktoken-rs = { version = "0.7", optional = true }
+
 # Concurrent data structures
 dashmap     = "6.1"
 
@@ -63,3 +69,4 @@ wat          = "1"
 default  = []
 reranker = ["dep:reqwest"]
 wasm-policy = ["dep:wasmtime"]
+tiktoken-chunker = ["dep:tiktoken-rs"]

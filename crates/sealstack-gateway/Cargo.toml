@@ -38,7 +38,7 @@ reqwest         = { workspace = true }
 sealstack-api-types               = { path = "../sealstack-api-types" }
 sealstack-common                  = { path = "../sealstack-common" }
 sealstack-csl                     = { path = "../sealstack-csl" }
-sealstack-engine                  = { path = "../sealstack-engine", features = ["reranker", "wasm-policy"] }
+sealstack-engine                  = { path = "../sealstack-engine", features = ["reranker", "wasm-policy", "tiktoken-chunker"] }
 sealstack-vectorstore             = { path = "../sealstack-vectorstore", features = ["qdrant"] }
 sealstack-embedders               = { path = "../sealstack-embedders", features = ["stub", "openai", "voyage"] }
 sealstack-connector-sdk           = { path = "../sealstack-connector-sdk" }
