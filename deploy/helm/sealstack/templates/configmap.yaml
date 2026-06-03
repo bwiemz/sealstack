@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sealstack.fullname" . }}-config
+  labels: {{- include "sealstack.labels" . | nindent 4 }}
+data:
+  SEALSTACK_BIND:             {{ .Values.config.bind | quote }}
+  SEALSTACK_LOG_FILTER:       {{ .Values.config.logFilter | quote }}
+  SEALSTACK_POLICY_BACKEND:   {{ .Values.config.policyBackend | quote }}
+  SEALSTACK_POLICY_DIR:       {{ .Values.config.policyDir | quote }}
+  SEALSTACK_POLICY_DEFAULT:   {{ .Values.config.policyDefault | quote }}
+  SEALSTACK_EMBEDDER:         {{ .Values.config.embedder | quote }}
+  {{- with .Values.config.embedderModel }}
+  SEALSTACK_EMBEDDER_MODEL:   {{ . | quote }}
+  {{- end }}
+  SEALSTACK_RERANKER:         {{ .Values.config.reranker | quote }}
+  {{- with .Values.config.rerankerUrl }}
+  SEALSTACK_RERANKER_URL:     {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.rerankerModel }}
+  SEALSTACK_RERANKER_MODEL:   {{ . | quote }}
+  {{- end }}

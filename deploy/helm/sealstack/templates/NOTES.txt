@@ -1,0 +1,45 @@
+{{- /*
+  Post-install notes printed after `helm install`.
+*/ -}}
+SealStack gateway {{ .Chart.AppVersion }} installed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+1. Service:
+   {{- if eq .Values.service.type "ClusterIP" }}
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "sealstack.fullname" . }} 7070:{{ .Values.service.port }}
+   then open http://localhost:7070/v1/schemas
+   {{- else if eq .Values.service.type "LoadBalancer" }}
+   kubectl get svc {{ include "sealstack.fullname" . }} -n {{ .Release.Namespace }}
+   then GET <external-ip>:{{ .Values.service.port }}/v1/schemas
+   {{- end }}
+   {{- if .Values.ingress.enabled }}
+   Ingress hosts:
+   {{- range .Values.ingress.hosts }}
+   - https://{{ .host }}
+   {{- end }}
+   {{- end }}
+
+2. Required externalized secrets (set via secret.create=true OR provision out of band):
+   {{- if not .Values.secret.create }}
+   The chart references an existing Secret named "{{ include "sealstack.secretName" . }}".
+   It must contain at minimum the credentials your embedder/reranker needs (OPENAI_API_KEY,
+   VOYAGE_API_KEY, etc.). Empty Secret is OK if you're running the stub embedder.
+   {{- end }}
+
+3. External Postgres / Qdrant:
+   {{- if not (or .Values.externalDatabase.url .Values.externalDatabase.urlSecretRef.name) }}
+   ⚠ No SEALSTACK_DATABASE_URL configured. Set externalDatabase.url OR
+   externalDatabase.urlSecretRef before the gateway can register schemas.
+   {{- end }}
+   {{- if not (or .Values.externalQdrant.url .Values.externalQdrant.urlSecretRef.name) }}
+   ℹ No SEALSTACK_QDRANT_URL configured. The gateway will fall back to the
+   in-memory vector store — fine for evaluation, not for prod (data is lost on
+   pod restart).
+   {{- end }}
+
+4. Liveness / readiness:
+   - Liveness probe: GET /livez (failure after 3 × 30s)
+   - Readiness probe: GET /readyz (failure after 2 × 10s)
+   - Startup probe: GET /livez (up to 3 minutes for cold-start)
+
+Watch logs:
+   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "sealstack.name" . }} -f
