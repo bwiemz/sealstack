@@ -3129,7 +3129,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-notion"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3203,7 +3203,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-web"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
