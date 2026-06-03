@@ -46,6 +46,7 @@ sealstack-ingest                  = { path = "../sealstack-ingest" }
 sealstack-connector-local-files   = { path = "../../connectors/local-files" }
 sealstack-connector-github        = { path = "../../connectors/github" }
 sealstack-connector-slack         = { path = "../../connectors/slack" }
+sealstack-connector-postgres      = { path = "../../connectors/postgres" }
 
 [dev-dependencies]
 tokio           = { workspace = true, features = ["macros", "rt-multi-thread"] }
