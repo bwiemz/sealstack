@@ -1,0 +1,30 @@
+[package]
+name         = "sealstack-connector-web"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "HTTP fetcher connector for SealStack. Reads from a fixed list of URLs (no crawling) with SSRF defense."
+
+[lints]
+workspace = true
+
+[dependencies]
+sealstack-common        = { path = "../../crates/sealstack-common" }
+sealstack-connector-sdk = { path = "../../crates/sealstack-connector-sdk" }
+async-trait       = { workspace = true }
+futures           = "0.3"
+html2text         = "0.16"
+reqwest           = { workspace = true }
+serde             = { workspace = true }
+serde_json        = { workspace = true }
+thiserror         = { workspace = true }
+time              = { workspace = true }
+tokio             = { workspace = true, features = ["full", "net"] }
+tracing           = { workspace = true }
+url               = "2.5"
+
+[dev-dependencies]
+wiremock          = "0.6"
+tokio             = { workspace = true, features = ["full", "test-util"] }
