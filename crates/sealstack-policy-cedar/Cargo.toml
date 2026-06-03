@@ -1,0 +1,25 @@
+[package]
+name         = "sealstack-policy-cedar"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "Cedar ABAC policy engine adapter for SealStack."
+
+[lints]
+workspace = true
+
+[dependencies]
+sealstack-engine = { path = "../sealstack-engine" }
+cedar-policy     = "4.5"
+async-trait      = { workspace = true }
+dashmap          = { workspace = true }
+serde            = { workspace = true }
+serde_json       = { workspace = true }
+thiserror        = { workspace = true }
+tokio            = { workspace = true }
+tracing          = { workspace = true }
+
+[dev-dependencies]
+tempfile         = { workspace = true }

@@ -12,6 +12,7 @@ members = [
     "crates/sealstack-vectorstore",
     "crates/sealstack-receipts",
     "crates/sealstack-policy-ir",
+    "crates/sealstack-policy-cedar",
     "crates/sealstack-cli",
     "connectors/google-drive",
     "connectors/local-files",

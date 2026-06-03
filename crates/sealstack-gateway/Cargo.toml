@@ -43,6 +43,7 @@ sealstack-vectorstore             = { path = "../sealstack-vectorstore", feature
 sealstack-embedders               = { path = "../sealstack-embedders", features = ["stub", "openai", "voyage"] }
 sealstack-connector-sdk           = { path = "../sealstack-connector-sdk" }
 sealstack-ingest                  = { path = "../sealstack-ingest" }
+sealstack-policy-cedar            = { path = "../sealstack-policy-cedar" }
 sealstack-connector-local-files   = { path = "../../connectors/local-files" }
 sealstack-connector-github        = { path = "../../connectors/github" }
 sealstack-connector-slack         = { path = "../../connectors/slack" }
