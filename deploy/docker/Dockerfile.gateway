@@ -1,8 +1,11 @@
-FROM rust:1.85-slim AS builder
+FROM rust:1.88-slim AS builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 COPY . .
-RUN cargo build --release --bin sealstack-gateway
+# `default-members = ["crates/sealstack-cli"]` means a bare `--bin sealstack-gateway`
+# is resolved against the CLI crate (which has no such bin) and fails. Scope
+# explicitly to the gateway crate.
+RUN cargo build --release -p sealstack-gateway --bin sealstack-gateway
 
 FROM gcr.io/distroless/cc-debian12
 COPY --from=builder /build/target/release/sealstack-gateway /usr/local/bin/sealstack-gateway
