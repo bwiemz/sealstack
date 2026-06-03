@@ -24,6 +24,9 @@ pub mod memory;
 #[cfg(feature = "qdrant")]
 pub mod qdrant;
 
+pub mod filter;
+pub use filter::{Filter, FilterParseError};
+
 // ---------------------------------------------------------------------------
 // Data types
 // ---------------------------------------------------------------------------
