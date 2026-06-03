@@ -17,5 +17,5 @@ pub mod policy;
 pub mod rest;
 pub mod server;
 
-pub use policy::policy_from_dir;
+pub use policy::{PolicyBackend, policy_from_dir, policy_from_dir_with_backend};
 pub use server::{AppState, build_app};
