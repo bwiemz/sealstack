@@ -76,6 +76,11 @@ async fn main() -> anyhow::Result<()> {
                         .map_err(|e| anyhow::anyhow!(e))?;
                     Ok(Arc::new(c))
                 }
+                "notion" => {
+                    let c = sealstack_connector_notion::NotionConnector::from_json(config)
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                    Ok(Arc::new(c))
+                }
                 other => Err(anyhow::anyhow!("unknown connector kind `{other}`")),
             }
         },
