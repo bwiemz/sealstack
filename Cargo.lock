@@ -3523,7 +3523,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "sealstack-api-types"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "schemars 0.8.22",
@@ -3535,7 +3535,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3554,7 +3554,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-common"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3565,7 +3565,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-confluence"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -3585,7 +3585,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-github"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3603,7 +3603,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-google-drive"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3622,7 +3622,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-jira"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -3641,7 +3641,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-linear"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3659,7 +3659,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-local-files"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3678,7 +3678,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-notion"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3696,7 +3696,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-postgres"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3713,7 +3713,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-sdk"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3734,7 +3734,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-slack"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3752,7 +3752,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-connector-web"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3772,7 +3772,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-csl"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "bitflags 2.11.1",
@@ -3794,7 +3794,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-embedders"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -3809,7 +3809,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-engine"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3839,7 +3839,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-gateway"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3884,7 +3884,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-ingest"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "dashmap",
@@ -3902,7 +3902,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-policy-cedar"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "cedar-policy",
@@ -3918,7 +3918,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-policy-ir"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde_json",
  "thiserror 2.0.18",
@@ -3926,7 +3926,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-receipts"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "sealstack-common",
  "serde",
@@ -3937,7 +3937,7 @@ dependencies = [
 
 [[package]]
 name = "sealstack-vectorstore"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "dashmap",
