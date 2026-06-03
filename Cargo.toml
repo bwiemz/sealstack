@@ -20,6 +20,9 @@ members = [
     "connectors/postgres",
     "connectors/web",
     "connectors/notion",
+    "connectors/linear",
+    "connectors/jira",
+    "connectors/confluence",
 ]
 # sealstack-policy-runtime is `#![no_std]` `#![no_main]` and only compiles for
 # wasm32-unknown-unknown. Including it in `members` makes `cargo check
