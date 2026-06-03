@@ -1,7 +1,7 @@
 {
   "name": "@sealstack/client",
   "version": "0.3.0",
-  "description": "SealStack TypeScript SDK",
+  "description": "SealStack TypeScript SDK — typed REST/MCP client for the SealStack gateway.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,6 +10,26 @@
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
   },
   "files": ["dist", "README.md", "LICENSE"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bwiemz/sealstack.git",
+    "directory": "sdks/typescript"
+  },
+  "homepage": "https://github.com/bwiemz/sealstack/tree/main/sdks/typescript#readme",
+  "bugs": { "url": "https://github.com/bwiemz/sealstack/issues" },
+  "keywords": [
+    "sealstack",
+    "rag",
+    "retrieval",
+    "mcp",
+    "model-context-protocol",
+    "embeddings",
+    "vector-search"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
