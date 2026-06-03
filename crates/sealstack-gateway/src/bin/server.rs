@@ -66,6 +66,11 @@ async fn main() -> anyhow::Result<()> {
                         .map_err(|e| anyhow::anyhow!(e))?;
                     Ok(Arc::new(c))
                 }
+                "postgres" => {
+                    let c = sealstack_connector_postgres::PostgresConnector::from_json(config)
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                    Ok(Arc::new(c))
+                }
                 other => Err(anyhow::anyhow!("unknown connector kind `{other}`")),
             }
         },

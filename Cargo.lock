@@ -3044,6 +3044,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "sealstack-connector-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "sealstack-common",
+ "sealstack-connector-sdk",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "sealstack-connector-sdk"
 version = "0.1.0"
 dependencies = [
@@ -3165,6 +3182,7 @@ dependencies = [
  "sealstack-common",
  "sealstack-connector-github",
  "sealstack-connector-local-files",
+ "sealstack-connector-postgres",
  "sealstack-connector-sdk",
  "sealstack-connector-slack",
  "sealstack-csl",
