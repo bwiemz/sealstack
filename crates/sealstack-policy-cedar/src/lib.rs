@@ -214,17 +214,17 @@ impl PolicyEngine for CedarPolicy {
         // Sealstack::Group::"x"` is checkable. Cedar requires the parent
         // entities to exist in the store even if they have no attrs.
         for g in &input.caller.groups {
-            if let Ok(uid) = make_uid(GROUP_TYPE, g) {
-                if let Ok(entity) = Entity::new(uid, HashMap::new(), HashSet::new()) {
-                    all.push(entity);
-                }
+            if let Ok(uid) = make_uid(GROUP_TYPE, g)
+                && let Ok(entity) = Entity::new(uid, HashMap::new(), HashSet::new())
+            {
+                all.push(entity);
             }
         }
         for r in &input.caller.roles {
-            if let Ok(uid) = make_uid(ROLE_TYPE, r) {
-                if let Ok(entity) = Entity::new(uid, HashMap::new(), HashSet::new()) {
-                    all.push(entity);
-                }
+            if let Ok(uid) = make_uid(ROLE_TYPE, r)
+                && let Ok(entity) = Entity::new(uid, HashMap::new(), HashSet::new())
+            {
+                all.push(entity);
             }
         }
 
