@@ -104,12 +104,12 @@ impl ConfluenceConnector {
                 "confluence `site_url` must start with http:// or https://".into(),
             ));
         }
-        if let Some(k) = &config.space_key {
-            if !valid_space_key(k) {
-                return Err(SealStackError::Config(format!(
-                    "confluence `space_key` must be alphanumeric; got `{k}`"
-                )));
-            }
+        if let Some(k) = &config.space_key
+            && !valid_space_key(k)
+        {
+            return Err(SealStackError::Config(format!(
+                "confluence `space_key` must be alphanumeric; got `{k}`"
+            )));
         }
 
         let site_url = config.site_url.trim_end_matches('/').to_string();
@@ -309,10 +309,10 @@ fn page_to_resource(site_url: &str, page: &ConfluencePage) -> Resource {
     let mut metadata = serde_json::Map::new();
     metadata.insert("confluence_id".into(), Value::String(page.id.clone()));
     metadata.insert("space".into(), Value::String(space_key.clone()));
-    if let Some(v) = &page.version {
-        if let Some(n) = v.number {
-            metadata.insert("version".into(), Value::from(n));
-        }
+    if let Some(v) = &page.version
+        && let Some(n) = v.number
+    {
+        metadata.insert("version".into(), Value::from(n));
     }
     let url = format!("{site_url}/wiki/spaces/{space_key}/pages/{}", page.id);
     metadata.insert("url".into(), Value::String(url));

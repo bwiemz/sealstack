@@ -189,14 +189,14 @@ impl LinearConnector {
                 .json()
                 .await
                 .map_err(|e| SealStackError::Backend(format!("linear graphql body: {e}")))?;
-            if let Some(errs) = envelope.errors {
-                if !errs.is_empty() {
-                    let first = errs
-                        .first()
-                        .and_then(|e| e.get("message").and_then(Value::as_str))
-                        .unwrap_or("unknown linear graphql error");
-                    return Err(SealStackError::Backend(format!("linear graphql: {first}",)));
-                }
+            if let Some(errs) = envelope.errors
+                && !errs.is_empty()
+            {
+                let first = errs
+                    .first()
+                    .and_then(|e| e.get("message").and_then(Value::as_str))
+                    .unwrap_or("unknown linear graphql error");
+                return Err(SealStackError::Backend(format!("linear graphql: {first}",)));
             }
             let Some(data) = envelope.data else {
                 return Err(SealStackError::Backend("linear graphql: empty data".into()));
