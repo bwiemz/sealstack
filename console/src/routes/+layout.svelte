@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/stores';
-  import { Database, Plug, Search, ScrollText, Settings, Activity } from 'lucide-svelte';
+  import { Database, Plug, Search, ScrollText, Settings, Activity, MessageSquare } from 'lucide-svelte';
 
   interface Props {
     children: import('svelte').Snippet;
@@ -13,8 +13,9 @@
     { href: '/',           label: 'overview',    icon: Activity,   match: (p: string) => p === '/' },
     { href: '/schemas',    label: 'schemas',     icon: Database,   match: (p: string) => p.startsWith('/schemas') },
     { href: '/connectors', label: 'connectors',  icon: Plug,       match: (p: string) => p.startsWith('/connectors') },
-    { href: '/query',      label: 'query',       icon: Search,     match: (p: string) => p.startsWith('/query') },
-    { href: '/receipts',   label: 'receipts',    icon: ScrollText, match: (p: string) => p.startsWith('/receipts') },
+    { href: '/query',      label: 'query',       icon: Search,         match: (p: string) => p.startsWith('/query') },
+    { href: '/chat',       label: 'chat',        icon: MessageSquare,  match: (p: string) => p.startsWith('/chat') },
+    { href: '/receipts',   label: 'receipts',    icon: ScrollText,     match: (p: string) => p.startsWith('/receipts') },
     { href: '/settings',   label: 'settings',    icon: Settings,   match: (p: string) => p.startsWith('/settings') }
   ];
 </script>
