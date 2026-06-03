@@ -81,6 +81,21 @@ async fn main() -> anyhow::Result<()> {
                         .map_err(|e| anyhow::anyhow!(e))?;
                     Ok(Arc::new(c))
                 }
+                "linear" => {
+                    let c = sealstack_connector_linear::LinearConnector::from_json(config)
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                    Ok(Arc::new(c))
+                }
+                "jira" => {
+                    let c = sealstack_connector_jira::JiraConnector::from_json(config)
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                    Ok(Arc::new(c))
+                }
+                "confluence" => {
+                    let c = sealstack_connector_confluence::ConfluenceConnector::from_json(config)
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                    Ok(Arc::new(c))
+                }
                 other => Err(anyhow::anyhow!("unknown connector kind `{other}`")),
             }
         },

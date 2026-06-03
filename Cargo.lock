@@ -3072,6 +3072,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "sealstack-connector-confluence"
+version = "0.3.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "futures",
+ "html2text",
+ "reqwest",
+ "sealstack-common",
+ "sealstack-connector-sdk",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tracing",
+ "wiremock",
+]
+
+[[package]]
 name = "sealstack-connector-github"
 version = "0.3.0"
 dependencies = [
@@ -3099,6 +3119,43 @@ dependencies = [
  "sealstack-common",
  "sealstack-connector-sdk",
  "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tracing",
+ "wiremock",
+]
+
+[[package]]
+name = "sealstack-connector-jira"
+version = "0.3.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "futures",
+ "reqwest",
+ "sealstack-common",
+ "sealstack-connector-sdk",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tracing",
+ "wiremock",
+]
+
+[[package]]
+name = "sealstack-connector-linear"
+version = "0.3.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "reqwest",
+ "sealstack-common",
+ "sealstack-connector-sdk",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -3302,7 +3359,10 @@ dependencies = [
  "reqwest",
  "sealstack-api-types",
  "sealstack-common",
+ "sealstack-connector-confluence",
  "sealstack-connector-github",
+ "sealstack-connector-jira",
+ "sealstack-connector-linear",
  "sealstack-connector-local-files",
  "sealstack-connector-notion",
  "sealstack-connector-postgres",
