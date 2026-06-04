@@ -41,4 +41,7 @@ ignore = [
     # patch will land via the next reqwest / aws-sdk minor release.
     "RUSTSEC-2026-0098", # webpki: name constraints for URI names accepted incorrectly.
     "RUSTSEC-2026-0099", # webpki: name constraints accepted for wildcard certs.
+    "RUSTSEC-2026-0104", # webpki: reachable panic in CRL parsing
+                         # (BorrowedCertRevocationList::from_der). SealStack
+                         # does not use CRLs.
 ]

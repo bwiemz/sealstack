@@ -53,6 +53,8 @@ sealstack-connector-notion        = { path = "../../connectors/notion" }
 sealstack-connector-linear        = { path = "../../connectors/linear" }
 sealstack-connector-jira          = { path = "../../connectors/jira" }
 sealstack-connector-confluence    = { path = "../../connectors/confluence" }
+sealstack-connector-s3            = { path = "../../connectors/s3" }
+sealstack-connector-gmail         = { path = "../../connectors/gmail" }
 
 [dev-dependencies]
 tokio           = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -96,6 +96,20 @@ async fn main() -> anyhow::Result<()> {
                         .map_err(|e| anyhow::anyhow!(e))?;
                     Ok(Arc::new(c))
                 }
+                "s3" => {
+                    let cfg = config.clone();
+                    let c = tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current()
+                            .block_on(sealstack_connector_s3::S3Connector::from_json(&cfg))
+                    })
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                    Ok(Arc::new(c))
+                }
+                "gmail" => {
+                    let c = sealstack_connector_gmail::GmailConnector::from_json(config)
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                    Ok(Arc::new(c))
+                }
                 other => Err(anyhow::anyhow!("unknown connector kind `{other}`")),
             }
         },

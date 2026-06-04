@@ -1,0 +1,28 @@
+[package]
+name         = "sealstack-connector-gmail"
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+repository   = { workspace = true }
+description  = "Gmail API connector for SealStack. Pulls user messages via /users/me/messages."
+
+[lints]
+workspace = true
+
+[dependencies]
+sealstack-common        = { path = "../../crates/sealstack-common" }
+sealstack-connector-sdk = { path = "../../crates/sealstack-connector-sdk" }
+async-trait       = { workspace = true }
+base64            = "0.22"
+futures           = "0.3"
+reqwest           = { workspace = true }
+serde             = { workspace = true }
+serde_json        = { workspace = true }
+thiserror         = { workspace = true }
+time              = { workspace = true }
+tokio             = { workspace = true, features = ["full"] }
+tracing           = { workspace = true }
+
+[dev-dependencies]
+tokio             = { workspace = true, features = ["full", "test-util"] }
