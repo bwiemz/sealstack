@@ -14,7 +14,7 @@ workspace = true
 anyhow     = { workspace = true }
 serde      = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-schemars   = { version = "0.8", features = ["preserve_order"] }
+schemars   = { version = "1.2", features = ["preserve_order"] }
 time       = { workspace = true, features = ["serde"] }
 ulid       = { workspace = true, features = ["serde"] }
 
